@@ -88,48 +88,26 @@
             <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Worker Salary Breakdown</h3>
 
             <div class="overflow-x-auto">
-                @php
-                    // Get previous month's submission to show previous OT being paid this month
-                    $previousMonth = $invoice->month - 1;
-                    $previousYear = $invoice->year;
-                    if ($previousMonth < 1) {
-                        $previousMonth = 12;
-                        $previousYear--;
-                    }
-                    $previousSubmission = App\Models\PayrollSubmission::where('contractor_clab_no', $invoice->contractor_clab_no)
-                        ->where('month', $previousMonth)
-                        ->where('year', $previousYear)
-                        ->with('workers')
-                        ->first();
-
-                    // Create map of worker_id => previous OT
-                    $previousOtMap = [];
-                    if ($previousSubmission) {
-                        foreach ($previousSubmission->workers as $prevWorker) {
-                            $previousOtMap[$prevWorker->worker_id] = $prevWorker->total_ot_pay;
-                        }
-                    }
-                @endphp
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-zinc-200 dark:border-zinc-700">
                             <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Prev Month OT</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Normal</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Rest</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Public</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Overtime (OT)</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Gross Salary</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker EPF</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker SOCSO</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Net Salary</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Employer EPF</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Employer SOCSO</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Total Payment</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                         @foreach($invoice->workers as $worker)
                         @php
-                            $previousOt = $previousOtMap[$worker->worker_id] ?? 0;
+                            $totalOtHours = $worker->ot_normal_hours + $worker->ot_rest_hours + $worker->ot_public_hours;
                         @endphp
                         <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                             <td class="py-3">
@@ -144,25 +122,21 @@
                             <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                 RM {{ number_format($worker->basic_salary, 2) }}
                             </td>
-                            <td class="py-3 text-right">
-                                @if($previousOt > 0)
-                                    <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($previousOt, 2) }}</div>
-                                    <div class="text-xs text-zinc-600 dark:text-zinc-400">Paid now</div>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                @if($worker->total_ot_pay > 0)
+                                    RM {{ number_format($worker->total_ot_pay, 2) }}
                                 @else
-                                    <div class="text-sm text-zinc-400 dark:text-zinc-500">-</div>
+                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                 @endif
                             </td>
-                            <td class="py-3 text-right">
-                                <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->ot_normal_hours }}h</div>
-                                <div class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($worker->ot_normal_pay, 2) }}</div>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->gross_salary, 2) }}
                             </td>
-                            <td class="py-3 text-right">
-                                <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->ot_rest_hours }}h</div>
-                                <div class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($worker->ot_rest_pay, 2) }}</div>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->epf_employee, 2) }}
                             </td>
-                            <td class="py-3 text-right">
-                                <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->ot_public_hours }}h</div>
-                                <div class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($worker->ot_public_pay, 2) }}</div>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->socso_employee, 2) }}
                             </td>
                             <td class="py-3">
                                 @php
@@ -176,7 +150,7 @@
                                             <div class="text-sm font-medium text-orange-600 dark:text-orange-400">Advance:</div>
                                             @foreach($advancePayments as $transaction)
                                                 <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                    -RM {{ number_format($transaction->amount, 2) }}
+                                                    RM {{ number_format($transaction->amount, 2) }}
                                                     <div class="italic">({{ $transaction->remarks }})</div>
                                                 </div>
                                             @endforeach
@@ -185,7 +159,7 @@
                                             <div class="text-sm font-medium text-red-600 dark:text-red-400">Deduction:</div>
                                             @foreach($deductions as $transaction)
                                                 <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                    -RM {{ number_format($transaction->amount, 2) }}
+                                                    RM {{ number_format($transaction->amount, 2) }}
                                                     <div class="italic">({{ $transaction->remarks }})</div>
                                                 </div>
                                             @endforeach
@@ -195,19 +169,17 @@
                                     <div class="text-sm text-center text-zinc-400 dark:text-zinc-500">-</div>
                                 @endif
                             </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->gross_salary, 2) }}
-                            </td>
-                            <td class="py-3 text-right">
-                                <div class="text-sm font-medium text-red-600 dark:text-red-400">-RM {{ number_format($worker->total_deductions, 2) }}</div>
-                                <div class="text-xs text-zinc-600 dark:text-zinc-400">(EPF+SOCSO)</div>
-                            </td>
-                            <td class="py-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">
+                            <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                 RM {{ number_format($worker->net_salary, 2) }}
                             </td>
-                            <td class="py-3 text-right">
-                                <div class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($worker->total_payment, 2) }}</div>
-                                <div class="text-xs text-zinc-600 dark:text-zinc-400">(+RM {{ number_format($worker->total_employer_contribution, 2) }} contrib.)</div>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->epf_employer, 2) }}
+                            </td>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->socso_employer, 2) }}
+                            </td>
+                            <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->total_payment, 2) }}
                             </td>
                         </tr>
                         @endforeach
@@ -247,13 +219,14 @@
                         </tr>
                         @if($invoice->has_penalty)
                         <tr>
-                            <td colspan="10" class="py-2 text-right text-sm font-semibold text-red-600 dark:text-red-400">
+                            <td colspan="10" class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
                                 Late Payment Penalty (8%):
                             </td>
-                            <td class="py-2 text-right text-sm font-semibold text-red-600 dark:text-red-400">
+                            <td class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
                                 RM {{ number_format($invoice->penalty_amount, 2) }}
                             </td>
                         </tr>
+                        @endif
                         <tr class="border-t border-zinc-300 dark:border-zinc-600">
                             <td colspan="10" class="py-3 text-right text-base font-bold text-zinc-900 dark:text-zinc-100">
                                 Total Amount Due:
@@ -262,16 +235,6 @@
                                 RM {{ number_format($invoice->total_with_penalty, 2) }}
                             </td>
                         </tr>
-                        @else
-                        <tr class="border-t border-zinc-300 dark:border-zinc-600">
-                            <td colspan="10" class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                Total Amount Due:
-                            </td>
-                            <td class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->grand_total, 2) }}
-                            </td>
-                        </tr>
-                        @endif
                     </tfoot>
                 </table>
             </div>
@@ -350,24 +313,22 @@
         @endif
 
         <!-- OT Information Notice -->
-        {{-- <flux:card class="p-4 dark:bg-zinc-900 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-            <div class="flex gap-3">
-                <flux:icon.information-circle class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-                <div class="text-sm text-blue-900 dark:text-blue-100">
-                    <p class="font-medium">Important: Deferred OT Payment</p>
-                    <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                        The overtime hours shown above are recorded for {{ $invoice->month_year }}, but they will be paid in the following month's payroll.
-                        This month's payment includes basic salary plus previous month's overtime.
-                    </p>
-                </div>
-            </div>
-        </flux:card> --}}
-        <flux:callout icon="information-circle" color="sky">
-            <flux:callout.heading>Important: Deferred OT Payment</flux:callout.heading>
+        @php
+            // Calculate previous month name
+            $previousMonth = $invoice->month - 1;
+            $previousYear = $invoice->year;
+            if ($previousMonth < 1) {
+                $previousMonth = 12;
+                $previousYear--;
+            }
+            $previousMonthName = \Carbon\Carbon::create($previousYear, $previousMonth, 1)->format('F Y');
+        @endphp
+        <flux:callout icon="information-circle" color="blue">
+            <flux:callout.heading>Previous Month OT Payment</flux:callout.heading>
             <flux:callout.text>
                 <p>
-                    The overtime hours shown above are recorded for {{ $invoice->month_year }}, but they will be paid in the following month's payroll.
-                    This month's payment includes basic salary plus previous month's overtime.
+                    The overtime amount shown above are for <strong>{{ $previousMonthName }}</strong> and are being paid in this <strong>{{ $invoice->month_year }}</strong> payroll.
+                    This payment includes basic salary plus {{ $previousMonthName }}'s overtime.
                 </p>
             </flux:callout.text>
         </flux:callout>         

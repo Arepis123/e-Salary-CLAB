@@ -46,11 +46,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         };
     })->name('workers.show');
 
-    // Invoices - Unified route
-    Route::get('invoices', function (Illuminate\Http\Request $request) {
+    // Invoices - Unified route redirects to role-specific Livewire pages (real-time search & filtering)
+    Route::get('invoices', function () {
         return match(auth()->user()->role) {
-            'admin', 'super_admin' => app(\App\Http\Controllers\Admin\InvoiceController::class)->index($request),
-            'client' => app(\App\Http\Controllers\Client\InvoiceController::class)->index($request),
+            'admin', 'super_admin' => redirect()->route('invoices.admin'),
+            'client' => redirect()->route('invoices.client'),
             default => abort(403)
         };
     })->name('invoices');
@@ -86,6 +86,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('contractors/{clabNo}', \App\Livewire\Admin\ContractorDetail::class)->name('contractors.detail');
         Route::get('notifications', \App\Livewire\Admin\Notifications::class)->name('notifications');
         Route::get('news', \App\Livewire\Admin\NewsManagement::class)->name('news');
+        Route::get('invoices-admin', \App\Livewire\Admin\Invoices::class)->name('invoices.admin');
     });
 
     // ========================================================================
@@ -108,6 +109,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('timesheet/{id}/edit', \App\Livewire\Client\TimesheetEdit::class)->name('timesheet.edit');
         Route::get('payments', \App\Livewire\Client\Payments::class)->name('payments');
         Route::post('payment/{submission}', [\App\Http\Controllers\Client\PaymentController::class, 'createPayment'])->name('payment.create');
+        Route::get('invoices-client', \App\Livewire\Client\Invoices::class)->name('invoices.client');
     });
 });
 

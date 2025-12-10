@@ -349,10 +349,10 @@
                         </tr>
                         @if($submission->has_penalty)
                         <tr>
-                            <td colspan="9" class="py-2 text-right text-sm font-semibold text-red-600 dark:text-red-400">
+                            <td colspan="9" class="py-2 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-300">
                                 Late Payment Penalty (8%):
                             </td>
-                            <td class="py-2 text-right text-sm font-semibold text-red-600 dark:text-red-400">
+                            <td class="py-2 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-300">
                                 +RM {{ number_format($submission->penalty_amount, 2) }}
                             </td>
                         </tr>
@@ -376,24 +376,6 @@
                         @endif
                     </tfoot>
                 </table>
-            </div>
-        </flux:card>
-
-        <!-- Payment Summary Notice -->
-        <flux:card class="p-4 dark:bg-zinc-900 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-            <div class="flex gap-3">
-                <flux:icon.information-circle class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-                <div class="text-sm text-blue-900 dark:text-blue-100">
-                    <p class="font-medium">Payment Summary for {{ $submission->month_year }}</p>
-                    <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                        @if($previousSubmission && $previousOtStats['total_ot_hours'] > 0)
-                            This month's total includes: <strong>Basic salary (RM {{ number_format($submission->workers->sum('basic_salary'), 2) }})</strong> + <strong>Previous month's OT (RM {{ number_format($previousOtStats['total_ot_pay'], 2) }})</strong> + Service charge + SST.
-                        @else
-                            This month's total includes: <strong>Basic salary (RM {{ number_format($submission->workers->sum('basic_salary'), 2) }})</strong> + Service charge + SST. (No previous month OT)
-                        @endif
-                        Current month's OT (RM {{ number_format($currentOtPay ?? 0, 2) }}) will be charged next month.
-                    </p>
-                </div>
             </div>
         </flux:card>
     </div>

@@ -25,7 +25,7 @@
                 </ul>
             </div>
 
-            <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <!-- <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p class="text-sm text-blue-900 dark:text-blue-100">
                     <strong>Period:</strong> {{ $submission->month_year }}<br>
                     <strong>Grand Total:</strong> RM {{ number_format($submission->grand_total, 2) }}<br>
@@ -36,7 +36,7 @@
                         <strong class="text-lg">Total Due:</strong> RM {{ number_format($submission->grand_total, 2) }}
                     @endif
                 </p>
-            </div>
+            </div> -->
 
             <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <p class="text-xs text-yellow-900 dark:text-yellow-100">

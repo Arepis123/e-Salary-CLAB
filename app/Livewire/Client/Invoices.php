@@ -26,10 +26,17 @@ class Invoices extends Component
     #[Url]
     public $sortDirection = 'desc';
 
-    public function mount()
+    public $highlightId = null;
+
+    public function mount($highlight = null)
     {
         if (!$this->year) {
             $this->year = now()->year;
+        }
+
+        // Store the highlight ID if provided
+        if ($highlight) {
+            $this->highlightId = $highlight;
         }
     }
 

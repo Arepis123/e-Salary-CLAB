@@ -116,30 +116,35 @@ class PayrollWorker extends Model
     /**
      * Calculate all salary components using PaymentCalculatorService
      *
-     * IMPORTANT: OT Payment Deferral
-     * - Current month OT is CALCULATED and STORED but NOT PAID this month
-     * - Previous month OT is INCLUDED in this month's payment
+     * NEW SYSTEM: Contractor enters PREVIOUS month's OT hours in current month's payroll
+     * - Example: In November payroll, contractor enters October's OT hours
+     * - The OT is calculated and paid in the same month (November)
      *
-     * This system collects: Basic Salary + Employer Contributions (EPF + SOCSO) + Previous Month OT
-     * Worker receives: Basic Salary - Worker Deductions (EPF + SOCSO) + Previous Month OT
+     * This system collects: Basic Salary + Employer Contributions (EPF + SOCSO) + OT
+     * Worker receives: Basic Salary - Worker Deductions (EPF + SOCSO) + OT
      *
      * Formula (from FORMULA PENGIRAAN GAJI DAN OVERTIME.csv):
      * - Basic Salary: RM 1,700 minimum
-     * - EPF Worker: 2% | EPF Employer: 2%
-     * - SOCSO Worker: (Follow table provided) | SOCSO Employer: (Follow table provided)
+     * - EPF Worker: 2% of BASIC SALARY (OT NOT included) | EPF Employer: 2% of BASIC SALARY
+     * - SOCSO Worker: (Follow table, based on Gross Salary) | SOCSO Employer: (Follow table, based on Gross Salary)
      * - Daily Rate: Basic / 26 days
      * - Hourly Rate: Daily / 8 hours
      * - Weekday OT: Hourly × 1.5
      * - Rest Day OT: Hourly × 2.0
      * - Public Holiday OT: Hourly × 3.0
      *
-     * @param float $previousMonthOtPay Previous month's OT amount to be paid this month
+     * IMPORTANT: EPF vs SOCSO Calculation Base
+     * - EPF (both worker & employer): Calculated on BASIC SALARY only
+     * - SOCSO (both worker & employer): Calculated on GROSS SALARY (Basic + OT - Advance - Deduction)
+     *
+     * @param float $additionalOtPay Additional OT amount (legacy parameter, kept for compatibility)
      */
-    public function calculateSalary(float $previousMonthOtPay = 0): void
+    public function calculateSalary(float $additionalOtPay = 0): void
     {
         $calculator = app(PaymentCalculatorService::class);
 
-        // Calculate CURRENT month overtime (to be paid NEXT month)
+        // Calculate OT for PREVIOUS month (entered this month, paid this month)
+        // Example: In November payroll, these hours are October's OT
         $this->ot_normal_pay = round($calculator->calculateWeekdayOTRate($this->basic_salary) * $this->ot_normal_hours, 2);
         $this->ot_rest_pay = round($calculator->calculateRestDayOTRate($this->basic_salary) * $this->ot_rest_hours, 2);
         $this->ot_public_pay = round($calculator->calculatePublicHolidayOTRate($this->basic_salary) * $this->ot_public_hours, 2);
@@ -148,30 +153,38 @@ class PayrollWorker extends Model
         // Regular pay is the basic salary
         $this->regular_pay = $this->basic_salary;
 
-        // Gross salary = Basic + PREVIOUS month's OT - Advance Payment - Deduction
-        // Formula from CSV: Jumlah Gaji = Basic - Advance Payment - Deduction
-        // Use transaction totals if available, otherwise use direct fields
+        // Get transaction totals (advances and deductions)
         $totalAdvancePayment = $this->exists ? $this->total_advance_payment : ($this->advance_payment ?? 0);
         $totalDeduction = $this->exists ? $this->total_deduction : ($this->deduction ?? 0);
+        $totalTransactionDeductions = $totalAdvancePayment + $totalDeduction;
 
-        $this->gross_salary = $this->basic_salary + $previousMonthOtPay - $totalAdvancePayment - $totalDeduction;
+        // Gross salary = Basic + OT (before any deductions)
+        // This is the total earnings before statutory and transaction deductions
+        $this->gross_salary = $this->basic_salary + $this->total_ot_pay + $additionalOtPay;
 
-        // Employee deductions (calculated on gross salary including previous month OT)
-        $this->epf_employee = $calculator->calculateWorkerEPF($this->gross_salary);
+        // Employee statutory deductions
+        // EPF: Calculated on BASIC SALARY only (OT NOT included)
+        // SOCSO: Calculated on GROSS SALARY (Basic + OT, before deductions)
+        $this->epf_employee = $calculator->calculateWorkerEPF($this->basic_salary);
         $this->socso_employee = $calculator->calculateWorkerSOCSO($this->gross_salary);
         $this->total_deductions = $this->epf_employee + $this->socso_employee;
 
-        // Employer contributions (calculated on gross salary including previous month OT)
-        $this->epf_employer = $calculator->calculateEmployerEPF($this->gross_salary);
+        // Employer contributions
+        // EPF: Calculated on BASIC SALARY only (OT NOT included)
+        // SOCSO: Calculated on GROSS SALARY (Basic + OT, before deductions)
+        $this->epf_employer = $calculator->calculateEmployerEPF($this->basic_salary);
         $this->socso_employer = $calculator->calculateEmployerSOCSO($this->gross_salary);
         $this->total_employer_contribution = $this->epf_employer + $this->socso_employer;
 
         // Final amounts
-        // Net salary = What worker receives (Gross - Worker deductions)
-        $this->net_salary = $this->gross_salary - $this->total_deductions;
+        // Net salary = Gross - Statutory Deductions - Transaction Deductions (Advances/Deductions)
+        // Calculation flow: Gross -> minus Statutory -> minus Advances/Deductions = Net
+        $this->net_salary = $this->gross_salary - $this->total_deductions - $totalTransactionDeductions;
 
-        // Total payment = What system collects from contractor (Gross + Employer contributions)
-        $this->total_payment = $this->gross_salary + $this->total_employer_contribution;
+        // Total payment = What system collects from contractor
+        // Formula: Gross + Employer Contributions - Transaction Deductions
+        // Transaction deductions are subtracted because contractor already paid these amounts
+        $this->total_payment = $this->gross_salary + $this->total_employer_contribution - $totalTransactionDeductions;
     }
 
     /**

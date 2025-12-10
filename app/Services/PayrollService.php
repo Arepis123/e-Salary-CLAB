@@ -42,6 +42,10 @@ class PayrollService
     /**
      * Save payroll as DRAFT (not submitted for payment yet)
      * Draft submissions can be edited later before final submission
+     *
+     * NEW SYSTEM: Contractor enters PREVIOUS month's OT hours in current month's payroll
+     * Example: In November payroll, contractor enters October's OT hours
+     * The OT is calculated and paid in the same month (November)
      */
     public function savePayrollDraft(string $clabNo, array $workersData, ?int $month = null, ?int $year = null): PayrollSubmission
     {
@@ -61,35 +65,12 @@ class PayrollService
             'submitted_at' => null,  // Not submitted yet
         ]);
 
-        // Get previous month's submission to retrieve OT amounts
-        $previousMonth = $month - 1;
-        $previousYear = $year;
-
-        // Handle year rollover (January gets December from previous year)
-        if ($previousMonth < 1) {
-            $previousMonth = 12;
-            $previousYear--;
-        }
-
-        $previousSubmission = $this->getSubmissionForMonth($clabNo, $previousMonth, $previousYear);
-
-        // Create a map of worker_id => previous month OT amount
-        $previousMonthOtMap = [];
-        if ($previousSubmission) {
-            foreach ($previousSubmission->workers as $prevWorker) {
-                $previousMonthOtMap[$prevWorker->worker_id] = $prevWorker->total_ot_pay;
-            }
-        }
-
         $totalAmount = 0;
 
         // Create payroll workers and calculate totals
         foreach ($workersData as $workerData) {
             $payrollWorker = new PayrollWorker($workerData);
             $payrollWorker->payroll_submission_id = $submission->id;
-
-            // Get previous month's OT for this worker (default to 0)
-            $previousMonthOt = $previousMonthOtMap[$workerData['worker_id']] ?? 0;
 
             // Save worker first (without final calculations)
             $payrollWorker->save();
@@ -105,8 +86,9 @@ class PayrollService
                 }
             }
 
-            // NOW calculate salary with transactions in database
-            $payrollWorker->calculateSalary($previousMonthOt);
+            // Calculate salary with OT included THIS MONTH (no deferral)
+            // The OT hours entered are for PREVIOUS month and paid THIS month
+            $payrollWorker->calculateSalary(0); // No previous month OT to add, it's already in the hours
             $payrollWorker->save();
 
             // Total amount is what the system collects (Gross + Employer contributions)
@@ -135,13 +117,12 @@ class PayrollService
      * Create or update payroll submission with workers data
      *
      * Payment Calculation (based on FORMULA PENGIRAAN GAJI DAN OVERTIME.csv):
-     * - System collects: Basic Salary + Employer Contributions (EPF + SOCSO) + PREVIOUS Month OT
-     * - Worker receives: Basic Salary - Worker Deductions (EPF + SOCSO) + PREVIOUS Month OT
+     * - System collects: Basic Salary + Employer Contributions (EPF + SOCSO) + OT
+     * - Worker receives: Basic Salary - Worker Deductions (EPF + SOCSO) + OT
      *
-     * IMPORTANT: OT Payment Deferral
-     * - Current month OT is CALCULATED and STORED but NOT PAID this month
-     * - Previous month OT is INCLUDED in this month's payment
-     * - This ensures OT is verified before payment
+     * NEW SYSTEM: Contractor enters PREVIOUS month's OT hours in current month's payroll
+     * Example: In November payroll, contractor enters October's OT hours
+     * The OT is calculated and paid in the same month (November)
      */
     public function savePayrollSubmission(string $clabNo, array $workersData, ?int $month = null, ?int $year = null): PayrollSubmission
     {
@@ -161,35 +142,12 @@ class PayrollService
             'submitted_at' => now(),
         ]);
 
-        // Get previous month's submission to retrieve OT amounts
-        $previousMonth = $month - 1;
-        $previousYear = $year;
-
-        // Handle year rollover (January gets December from previous year)
-        if ($previousMonth < 1) {
-            $previousMonth = 12;
-            $previousYear--;
-        }
-
-        $previousSubmission = $this->getSubmissionForMonth($clabNo, $previousMonth, $previousYear);
-
-        // Create a map of worker_id => previous month OT amount
-        $previousMonthOtMap = [];
-        if ($previousSubmission) {
-            foreach ($previousSubmission->workers as $prevWorker) {
-                $previousMonthOtMap[$prevWorker->worker_id] = $prevWorker->total_ot_pay;
-            }
-        }
-
         $totalAmount = 0;
 
         // Create payroll workers and calculate totals
         foreach ($workersData as $workerData) {
             $payrollWorker = new PayrollWorker($workerData);
             $payrollWorker->payroll_submission_id = $submission->id;
-
-            // Get previous month's OT for this worker (default to 0)
-            $previousMonthOt = $previousMonthOtMap[$workerData['worker_id']] ?? 0;
 
             // Save worker first (without final calculations)
             $payrollWorker->save();
@@ -205,8 +163,9 @@ class PayrollService
                 }
             }
 
-            // NOW calculate salary with transactions in database
-            $payrollWorker->calculateSalary($previousMonthOt);
+            // Calculate salary with OT included THIS MONTH (no deferral)
+            // The OT hours entered are for PREVIOUS month and paid THIS month
+            $payrollWorker->calculateSalary(0); // No previous month OT to add, it's already in the hours
             $payrollWorker->save();
 
             // Total amount is what the system collects (Gross + Employer contributions)

@@ -17,7 +17,6 @@ class TimesheetEdit extends Component
     public $selectedWorkers = [];
     public $period;
     public $currentSubmission;
-    public $successMessage = '';
     public $errorMessage = '';
 
     // Transaction management
@@ -27,6 +26,15 @@ class TimesheetEdit extends Component
     public $newTransactionType = 'advance_payment';
     public $newTransactionAmount = '';
     public $newTransactionRemarks = '';
+
+    // OT management
+    public $showOTModal = false;
+    public $otNormalHours = 0;
+    public $otRestHours = 0;
+    public $otPublicHours = 0;
+
+    // Calculation info modal
+    public $showCalculationModal = false;
 
     public function boot(PayrollService $payrollService, ContractWorkerService $contractWorkerService)
     {
@@ -58,8 +66,15 @@ class TimesheetEdit extends Component
 
         $this->currentSubmission = $submission;
 
-        // Get current payroll period info
-        $this->period = $this->payrollService->getCurrentPayrollPeriod();
+        // Get period info from the draft submission (not current month)
+        $targetDate = \Carbon\Carbon::create($submission->year, $submission->month, 1);
+        $this->period = [
+            'month' => $submission->month,
+            'year' => $submission->year,
+            'month_name' => $targetDate->format('F'),
+            'deadline' => $targetDate->copy()->endOfMonth(),
+            'days_until_deadline' => now()->diffInDays($targetDate->copy()->endOfMonth(), false),
+        ];
 
         // Get CLAB number for contract checks
         $clabNo = auth()->user()->contractor_clab_no;
@@ -73,7 +88,11 @@ class TimesheetEdit extends Component
                 ->orderBy('con_end', 'desc')
                 ->first();
 
-            $hasActiveContract = $contract && $contract->isActive();
+            // Check if contract was active during the DRAFT SUBMISSION'S period (not today)
+            $payrollPeriodDate = \Carbon\Carbon::create($submission->year, $submission->month, 1);
+            $hasActiveContract = $contract &&
+                                 $contract->con_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
+                                 $contract->con_start <= $payrollPeriodDate->endOfMonth()->toDateString();
 
             // Get previous month's OT
             $previousMonth = $submission->month - 1;
@@ -245,7 +264,76 @@ class TimesheetEdit extends Component
 
         // Close modal
         $this->closeTransactionModal();
-        $this->successMessage = "Transactions saved successfully for {$workerName}. Total: Advance RM " . number_format($totalAdvancePayment, 2) . ", Deduction RM " . number_format($totalDeduction, 2);
+        \Flux::toast(
+            variant: 'success',
+            heading: 'Transactions Saved',
+            text: "Successfully saved transactions for {$workerName}. Total: Advance RM " . number_format($totalAdvancePayment, 2) . ", Deduction RM " . number_format($totalDeduction, 2)
+        );
+    }
+
+    public function openOTModal($workerIndex)
+    {
+        $this->currentWorkerIndex = $workerIndex;
+        $this->showOTModal = true;
+
+        // Load existing OT hours
+        $this->otNormalHours = $this->workers[$workerIndex]['ot_normal_hours'] ?? 0;
+        $this->otRestHours = $this->workers[$workerIndex]['ot_rest_hours'] ?? 0;
+        $this->otPublicHours = $this->workers[$workerIndex]['ot_public_hours'] ?? 0;
+    }
+
+    public function closeOTModal()
+    {
+        $this->showOTModal = false;
+        $this->currentWorkerIndex = null;
+        $this->otNormalHours = 0;
+        $this->otRestHours = 0;
+        $this->otPublicHours = 0;
+    }
+
+    public function openCalculationModal()
+    {
+        $this->showCalculationModal = true;
+    }
+
+    public function closeCalculationModal()
+    {
+        $this->showCalculationModal = false;
+    }
+
+    public function saveOT()
+    {
+        if ($this->currentWorkerIndex === null) {
+            return;
+        }
+
+        // Get worker name before closing
+        $workerName = $this->workers[$this->currentWorkerIndex]['worker_name'];
+
+        // Save OT hours to the worker
+        $this->workers[$this->currentWorkerIndex]['ot_normal_hours'] = $this->otNormalHours ?? 0;
+        $this->workers[$this->currentWorkerIndex]['ot_rest_hours'] = $this->otRestHours ?? 0;
+        $this->workers[$this->currentWorkerIndex]['ot_public_hours'] = $this->otPublicHours ?? 0;
+
+        // Calculate total OT pay
+        $totalOTPay = ($this->otNormalHours * 12.26) + ($this->otRestHours * 16.34) + ($this->otPublicHours * 24.51);
+
+        // Close modal
+        $this->closeOTModal();
+        \Flux::toast(
+            variant: 'success',
+            heading: 'OT Hours Saved',
+            text: "Successfully saved OT hours for {$workerName}. Total OT Pay: RM " . number_format($totalOTPay, 2)
+        );
+    }
+
+    public function toggleAllWorkers()
+    {
+        if (count($this->selectedWorkers) === count($this->workers)) {
+            $this->selectedWorkers = [];
+        } else {
+            $this->selectedWorkers = collect($this->workers)->pluck('worker_id')->toArray();
+        }
     }
 
     public function updateDraft()
@@ -317,7 +405,8 @@ class TimesheetEdit extends Component
             }
             $submission->workers()->delete();
 
-            // Recalculate with new worker data
+            // Save ALL workers (not just selected ones) to preserve them in the draft
+            // But only calculate totals for selected workers
             $totalAmount = 0;
             $previousMonth = now()->month - 1;
             $previousYear = now()->year;
@@ -333,7 +422,8 @@ class TimesheetEdit extends Component
                 }
             }
 
-            foreach ($selectedWorkersData as $workerData) {
+            // Save ALL workers to preserve them in the draft, but only count selected ones in total
+            foreach ($this->workers as $workerData) {
                 $payrollWorker = new \App\Models\PayrollWorker($workerData);
                 $payrollWorker->payroll_submission_id = $submission->id;
                 $previousMonthOt = $previousMonthOtMap[$workerData['worker_id']] ?? 0;
@@ -356,16 +446,20 @@ class TimesheetEdit extends Component
                 $payrollWorker->calculateSalary($previousMonthOt);
                 $payrollWorker->save();
 
-                $totalAmount += $payrollWorker->total_payment;
+                // Only add to total if worker is selected
+                if (in_array($workerData['worker_id'], $this->selectedWorkers)) {
+                    $totalAmount += $payrollWorker->total_payment;
+                }
             }
 
-            // Calculate service charge, SST, and grand total
-            $serviceCharge = count($selectedWorkersData) * 200; // RM200 per worker
+            // Calculate service charge, SST, and grand total (only for selected workers)
+            $selectedWorkerCount = count($this->selectedWorkers);
+            $serviceCharge = $selectedWorkerCount * 200; // RM200 per worker
             $sst = $serviceCharge * 0.08; // 8% SST on service charge
             $grandTotal = $totalAmount + $serviceCharge + $sst;
 
             $submission->update([
-                'total_workers' => count($selectedWorkersData),
+                'total_workers' => $selectedWorkerCount,
                 'total_amount' => $totalAmount,
                 'service_charge' => $serviceCharge,
                 'sst' => $sst,
@@ -379,17 +473,23 @@ class TimesheetEdit extends Component
                     'status' => 'pending_payment',
                     'submitted_at' => now(),
                 ]);
-                $workerCount = count($selectedWorkersData);
                 return redirect()->route('timesheet')
-                    ->with('success', "Draft submitted successfully for {$submission->month_year}. {$workerCount} worker(s) included. Total amount: RM " . number_format($submission->grand_total, 2));
+                    ->with('success', "Draft submitted successfully for {$submission->month_year}. {$selectedWorkerCount} worker(s) included. Total amount: RM " . number_format($submission->grand_total, 2));
             } else {
                 // Keep as draft
-                $workerCount = count($selectedWorkersData);
-                $this->successMessage = "Draft updated successfully. {$workerCount} worker(s) included.";
+                \Flux::toast(
+                    variant: 'success',
+                    heading: 'Draft Updated',
+                    text: "Successfully updated draft with {$selectedWorkerCount} worker(s) included."
+                );
                 $this->loadData(); // Reload data
             }
         } catch (\Exception $e) {
-            $this->errorMessage = 'Failed to save timesheet: ' . $e->getMessage();
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save timesheet: ' . $e->getMessage()
+            );
         }
     }
 

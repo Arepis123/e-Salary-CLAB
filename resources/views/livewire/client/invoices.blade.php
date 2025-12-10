@@ -177,7 +177,11 @@
 
             <flux:table.rows>
                 @forelse($invoices as $invoice)
-                    <flux:table.rows :key="$invoice->id">
+                    <flux:table.rows
+                        :key="$invoice->id"
+                        id="invoice-{{ $invoice->id }}"
+                        class="{{ $highlightId == $invoice->id ? 'animate-pulse bg-green-100 dark:bg-green-900/30' : '' }}"
+                    >
                         <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -190,13 +194,8 @@
 
                         <flux:table.cell variant="strong">
                             <div class="font-semibold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_with_penalty, 2) }}
+                                RM {{ number_format($invoice->total_due, 2) }}
                             </div>
-                            @if($invoice->has_penalty)
-                                <span class="text-xs text-red-600 dark:text-red-400">
-                                    (includes RM {{ number_format($invoice->penalty_amount, 2) }} penalty)
-                                </span>
-                            @endif
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -282,5 +281,23 @@
             </div>
         @endif
     </flux:card>
+    @endif
+
+    @if($highlightId)
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() {
+                    const highlightedRow = document.getElementById('invoice-{{ $highlightId }}');
+                    if (highlightedRow) {
+                        highlightedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        // Remove highlight after 3 seconds
+                        setTimeout(function() {
+                            highlightedRow.classList.remove('animate-pulse', 'bg-green-100', 'dark:bg-green-900/30');
+                        }, 3000);
+                    }
+                }, 100);
+            });
+        </script>
     @endif
 </div>

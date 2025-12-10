@@ -7,119 +7,31 @@
         </div>
     </div>
 
-    <!-- Past Month Indicator -->
-    @if($targetMonth && $targetYear)
-        <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <flux:icon.information-circle class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                    <div>
-                        <p class="text-sm font-medium text-blue-900 dark:text-blue-100">
-                            Viewing Past Month: {{ $period['month_name'] }} {{ $period['year'] }}
-                        </p>
-                        <p class="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-                            You are submitting payroll for a previous period. Workers shown below were active during this month.
-                        </p>
-                    </div>
-                </div>
-                <flux:button variant="filled" size="sm" href="{{ route('timesheet') }}" wire:navigate>
-                    Return to Current Month
-                </flux:button>
-            </div>
-        </div>
-    @endif
 
-    @if($successMessage)
-        <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800">
-            <p class="text-sm text-green-800 dark:text-green-200">{{ $successMessage }}</p>
-        </div>
-    @endif
-
-    @if($errorMessage)
-        <div class="rounded-lg bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
-            <p class="text-sm text-red-800 dark:text-red-200">{{ $errorMessage }}</p>
-        </div>
-    @endif
-
-    <!-- Blocking Alert for Outstanding Issues -->
-    @if($isBlocked)
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+    <!-- Sequential Payroll Queue Notice -->
+    @if($isBlocked && count($blockReasons) > 0)
+        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-2 border-orange-200 dark:border-orange-800">
             <div class="flex items-start gap-3">
-                <flux:icon.lock-closed class="size-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <flux:icon.queue-list class="size-6 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                 <div class="flex-1">
-                    <h3 class="text-base font-semibold text-red-900 dark:text-red-100">Payroll Submission Blocked</h3>
-                    <p class="text-sm text-red-700 dark:text-red-300 mt-1">
-                        You cannot submit new payroll until the following issues are resolved:
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Complete Payroll in Order</h3>
+                        <flux:badge color="zinc" size="sm">{{ $totalOutstandingCount }} {{ \Str::plural('month', $totalOutstandingCount) }} remaining</flux:badge>
+                    </div>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        {{ $blockReasons[0]['message'] }}
                     </p>
-                    <div class="mt-3 space-y-3">
-                        @foreach($blockReasons as $reason)
-                            <div class="rounded-lg bg-white dark:bg-zinc-800 p-3 border border-red-200 dark:border-red-800">
-                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $reason['message'] }}</p>
-                            </div>
-                        @endforeach
 
-                        <!-- Outstanding Drafts List -->
-                        @if($outstandingDrafts->count() > 0)
-                            <div class="bg-white dark:bg-zinc-800 rounded-lg p-3">
-                                <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Outstanding Drafts:</p>
-                                <div class="space-y-1.5">
-                                    @foreach($outstandingDrafts as $draft)
-                                        <div class="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-900 rounded text-sm">
-                                            <div>
-                                                <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $draft->month_year }}</span>
-                                                <span class="text-xs text-zinc-600 dark:text-zinc-400 ml-2">{{ $draft->total_workers }} workers</span>
-                                            </div>
-                                            <flux:badge color="yellow" size="xs">Draft</flux:badge>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        <!-- Overdue Payments List -->
-                        @if($overduePayments->count() > 0)
-                            <div class="bg-white dark:bg-zinc-800 rounded-lg p-3">
-                                <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Overdue Payments:</p>
-                                <div class="space-y-1.5">
-                                    @foreach($overduePayments as $overdue)
-                                        <div class="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-900 rounded text-sm">
-                                            <div>
-                                                <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $overdue->month_year }}</span>
-                                                <span class="text-xs text-red-600 dark:text-red-400 ml-2">
-                                                    Overdue since {{ $overdue->payment_deadline->format('M d, Y') }}
-                                                </span>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="font-bold text-red-600 dark:text-red-400">RM {{ number_format($overdue->total_with_penalty, 2) }}</span>
-                                                <flux:button variant="primary" size="xs" href="{{ route('invoices') }}" wire:navigate>
-                                                    Pay Now
-                                                </flux:button>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        <!-- Missing Submissions List -->
-                        @if(count($missingSubmissions) > 0)
-                            <div class="bg-white dark:bg-zinc-800 rounded-lg p-3">
-                                <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Missing Submissions:</p>
-                                <div class="space-y-1.5">
-                                    @foreach($missingSubmissions as $missing)
-                                        <div class="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-900 rounded text-sm">
-                                            <div>
-                                                <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $missing->month_year }}</span>
-                                                <span class="text-xs text-zinc-600 dark:text-zinc-400 ml-2">
-                                                    {{ $missing->total_workers }} {{ \Str::plural('worker', $missing->total_workers) }} not submitted
-                                                </span>
-                                            </div>
-                                            <flux:badge color="red" size="xs">No Submission</flux:badge>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
+                    <div class="mt-4">
+                        <flux:button
+                            variant="primary"
+                            size="sm"
+                            href="{{ $blockReasons[0]['redirect_url'] }}"
+                            wire:navigate
+                            class="w-full sm:w-auto"
+                        >
+                            {{ $blockReasons[0]['action_text'] }}
+                        </flux:button>
                     </div>
                 </div>
             </div>
@@ -199,59 +111,61 @@
     <!-- Payroll Entry Form -->
     @if(!$errorMessage && !$isBlocked)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-        <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime</h2>
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime</h2>
+            <flux:button wire:click="openCalculationModal" variant="outline" size="sm">
+                <flux:icon.calculator class="size-4" />
+                View Calculation Formula
+            </flux:button>
+        </div>
 
-        <!-- Calculation Information -->
-        <div class="mb-4 grid gap-3 lg:grid-cols-2">
-            <!-- Salary Breakdown Info -->
-            {{-- <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800">
-                <div class="flex gap-3">
-                    <flux:icon.currency-dollar class="size-5 flex-shrink-0 text-green-600 dark:text-green-400" />
-                    <div class="text-sm text-green-900 dark:text-green-100">
-                        <p class="font-medium">Salary Calculation (Based on RM 1,700 minimum):</p>
-                        <div class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-green-700 dark:text-green-300">
-                            <div><strong>Worker Receives:</strong></div>
-                            <div>RM 1,657.50 (RM 1,700 - EPF RM 34 - SOCSO RM 8.50)</div>
-                            <div><strong>System Collects:</strong></div>
-                            <div>RM 1,763.75 (RM 1,700 + Employer EPF RM 34 + Employer SOCSO RM 29.75 + Prev. Month's OT)</div>
-                        </div>
-                        <div class="mt-3 pt-3 border-t border-green-300 dark:border-green-700 text-xs text-green-700 dark:text-green-300">
-                            <p><strong>Important:</strong> Previous month's OT is added to Basic Salary before EPF/SOCSO calculation. System collects total amount including previous month's OT.</p>
-                        </div>
-                    </div>
+        <!-- Calculation Information Modal -->
+        <flux:modal name="calculation-info" wire:model="showCalculationModal">
+            <div class="space-y-4">
+                <div>
+                    <flux:heading size="lg">Salary Calculation Formula</flux:heading>
+                    <flux:subheading>Understanding how worker salaries and payments are calculated</flux:subheading>
                 </div>
-            </div> --}}        
-            <flux:callout icon="currency-dollar" color="emerald">
-                <flux:callout.heading>Salary Calculation (Based on RM 1,700 minimum):</flux:callout.heading>
+
+                <div class="grid gap-3 lg:grid-cols-2">
+                    <flux:callout icon="currency-dollar" color="green">
+                <flux:callout.heading>Salary Calculation Formula:</flux:callout.heading>
                 <flux:callout.text>
-                    <div class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                        <div><strong>Worker Receives:</strong></div>
-                        <div>RM 1,657.50 (RM 1,700 - EPF RM 34 - SOCSO RM 8.50)</div>
-                        <div><strong>System Collects:</strong></div>
-                        <div>RM 1,763.75 (RM 1,700 + Employer EPF RM 34 + Employer SOCSO RM 29.75 + Prev. Month's OT)</div>
+                    <div class="mt-2 space-y-2 text-xs">
+                        <div class="font-semibold text-green-800 dark:text-green-200">Calculation Steps:</div>
+                        <div class="pl-3 space-y-1">
+                            <div><strong>1. Gross Salary</strong> = Basic + OT</div>
+                            <div><strong>2. Worker EPF</strong> = 2% of Basic (RM 1,700 × 2% = RM 34.00)</div>
+                            <div><strong>3. Worker SOCSO</strong> = Based on Gross from official table (e.g., RM 1,700 = RM 8.25)</div>
+                            <div><strong>4. Statutory Deductions</strong> = Worker EPF + Worker SOCSO</div>
+                            <div><strong>5. Net Salary</strong> = Gross - Statutory - Advances/Deductions</div>
+                        </div>
+                        <div class="pt-2 border-t border-green-300 dark:border-green-700">
+                            <div class="font-semibold text-green-800 dark:text-green-200">Example 1 (Basic RM 1,700, no OT, no deductions):</div>
+                            <div class="pl-3 mt-1 space-y-1">
+                                <div>• Gross: RM 1,700 | EPF: RM 34 | SOCSO: RM 8.25</div>
+                                <div><strong>Worker Receives (Net):</strong> RM 1,657.75</div>
+                                <div><strong>System Collects:</strong> RM 1,762.85</div>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-green-300 dark:border-green-700">
+                            <div class="font-semibold text-green-800 dark:text-green-200">Example 2 (Basic RM 1,700 + OT RM 118.47 + Advance RM 100):</div>
+                            <div class="pl-3 mt-1 space-y-1">
+                                <div>• Gross: RM 1,818.47 | EPF: RM 34 (on basic) | SOCSO: RM 8.75 (on gross)</div>
+                                <div>• Statutory: RM 42.75 | Advance: RM 100</div>
+                                <div><strong>Worker Receives (Net):</strong> RM 1,675.72 (RM 1,818.47 - RM 42.75 - RM 100)</div>
+                                <div><strong>System Collects:</strong> RM 1,783.12 (RM 1,818.47 + Employer RM 64.65 - RM 100)</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-green-300 dark:border-green-700 text-xs">
-                        <p><strong>Important:</strong> Previous month's OT is added to Basic Salary before EPF/SOCSO calculation. System collects total amount including previous month's OT.</p>
-                    </div>                       
+                        <p><strong>Important:</strong> EPF is calculated on <strong>Basic Salary only</strong>. SOCSO is calculated on <strong>Gross Salary (Basic + OT)</strong> using official contribution table.</p>
+                    </div>
                 </flux:callout.text>
-            </flux:callout>                    
+            </flux:callout>
 
             <!-- Overtime Rates Info -->
-            {{-- <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
-                <div class="flex gap-3">
-                    <flux:icon.clock class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-                    <div class="text-sm text-blue-900 dark:text-blue-100">
-                        <p class="font-medium">Overtime Rates (Hourly Rate: RM 8.17):</p>
-                        <div class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-blue-700 dark:text-blue-300">
-                            <div><strong>Normal Day:</strong> RM 12.26/hr (1.5x)</div>
-                            <div><strong>Rest Day:</strong> RM 16.34/hr (2.0x)</div>
-                            <div><strong>Public Holiday:</strong> RM 24.51/hr (3.0x)</div>
-                        </div>
-                        <p class="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">Note: This month's OT is calculated now but paid NEXT month. EPF/SOCSO applies to total (Basic + Previous Month OT)</p>
-                    </div>
-                </div>
-            </div> --}}
-            <flux:callout icon="currency-dollar" color="sky">
+            <flux:callout icon="currency-dollar" color="blue">
                 <flux:callout.heading>Overtime Rates (Hourly Rate: RM 8.17):</flux:callout.heading>
                 <flux:callout.text>
                     <div class="text-sm">
@@ -260,11 +174,19 @@
                             <div><strong>Rest Day:</strong> RM 16.34/hr (2.0x)</div>
                             <div><strong>Public Holiday:</strong> RM 24.51/hr (3.0x)</div>
                         </div>
-                        <p class="mt-2 text-xs italic">Note: This month's OT is calculated now but paid NEXT month. EPF/SOCSO applies to total (Basic + Previous Month OT)</p>
-                    </div>                       
+                        <p class="mt-2 text-xs italic">Note: Enter PREVIOUS month's OT hours. Example: In November payroll, enter October's OT hours. EPF applies to Basic Salary only, SOCSO applies to Gross (Basic + OT).</p>
+                    </div>
                 </flux:callout.text>
-            </flux:callout>             
-        </div>
+            </flux:callout>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:button wire:click="closeCalculationModal" variant="primary">
+                        Got it!
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
 
         @if(count($workers) > 0)
             <!-- Selection Controls -->
@@ -280,133 +202,140 @@
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-12">Select</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Employee ID</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Previous Month OT</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Normal (hrs)</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Rest Day (hrs)</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Public (hrs)</th>
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</th>
+                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-10">
+                                <input
+                                    type="checkbox"
+                                    wire:click="toggleAllWorkers"
+                                    @if(count($selectedWorkers) === count($workers) && count($workers) > 0) checked @endif
+                                    class="size-4 rounded border-zinc-300 dark:border-zinc-700"
+                                />
+                            </th>
+                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[20%]">Worker</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Basic Salary">Basic Salary</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Previous Month OT Normal Amount">OT Normal</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Previous Month OT Rest Day Amount">OT Rest Day</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Previous Month OT Public Holiday Amount">OT Public Holiday</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Gross Salary (Basic + All OT)">Gross Salary</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Statutory Deductions (EPF + SOCSO)">Statutory</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Total Deductions (Advances + Deductions)">Deductions</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Net Salary (Gross - Statutory - Deductions)">Net Salary</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[120px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                         @foreach($workers as $index => $worker)
-                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                        <tr wire:key="worker-{{ $worker['worker_id'] }}" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 {{ !in_array($worker['worker_id'], $selectedWorkers) ? 'opacity-50' : '' }}">
                             <td class="py-3">
                                 <input
                                     type="checkbox"
-                                    wire:click="toggleWorker('{{ $worker['worker_id'] }}')"
-                                    @if(in_array($worker['worker_id'], $selectedWorkers)) checked @endif
-                                    @if($isBlocked) disabled @endif
+                                    value="{{ $worker['worker_id'] }}"
+                                    wire:model.live="selectedWorkers"
+                                    {{ $isBlocked ? 'disabled' : '' }}
                                     class="size-4 rounded border-zinc-300 dark:border-zinc-700"
                                 />
                             </td>
-                            <td class="py-3">
-                                <div class="flex items-center gap-3">
+                            <td class="py-3 pr-4">
+                                <div class="flex items-center gap-2">
                                     <flux:avatar size="sm" name="{{ $worker['worker_name'] }}" />
-                                    <div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-sm text-zinc-900 dark:text-zinc-100">{{ $worker['worker_name'] }}</span>
-                                        </div>
-                                        <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $worker['worker_passport'] }}</div>
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{{ $worker['worker_name'] }}</div>
+                                        <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $worker['worker_id'] }} · {{ $worker['worker_passport'] }}</div>
                                         @if($worker['contract_ended'] ?? false)
-                                            <div class="text-xs text-orange-600 dark:text-orange-400 mt-0.5">Contract Ended - Final OT Payment</div>
+                                            <div class="text-xs text-orange-600 dark:text-orange-400">Contract Ended</div>
                                         @endif
                                     </div>
                                 </div>
                             </td>
-                            <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker['worker_id'] }}</td>
-                            <td class="py-3 px-2">
-                                <flux:input
-                                    type="number"
-                                    wire:model="workers.{{ $index }}.basic_salary"
-                                    class="w-32"
-                                    min="1700"
-                                    step="0.01"
-                                    readonly
-                                />
+                            <td class="py-3 text-center">
+                                <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($worker['basic_salary'], 2) }}</span>
                             </td>
-                            <td class="py-3 px-2">
-                                <flux:input
-                                    type="text"
-                                    value="{{ number_format($worker['previous_month_ot'] ?? 0, 2) }}"
-                                    class="w-32 {{ ($worker['previous_month_ot'] ?? 0) > 0 ? 'font-semibold text-green-600 dark:text-green-400' : '' }}"
-                                    readonly
-                                />
+                            <td class="py-3 text-center">
+                                @php
+                                    $otNormalAmount = ($worker['ot_normal_hours'] ?? 0) * 12.26;
+                                @endphp
+                                <span class="text-sm {{ $otNormalAmount > 0 ? 'text-zinc-900 dark:text-zinc-100 font-sm' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ $otNormalAmount > 0 ? 'RM ' . number_format($otNormalAmount, 2) : '-' }}
+                                </span>
                             </td>
-                            <td class="py-3 px-2">
-                                <flux:input
-                                    type="number"
-                                    wire:model="workers.{{ $index }}.ot_normal_hours"
-                                    class="w-24"
-                                    min="0"
-                                    step="0.5"
-                                    :disabled="$isBlocked"
-                                />
+                            <td class="py-3 text-center">
+                                @php
+                                    $otRestAmount = ($worker['ot_rest_hours'] ?? 0) * 16.34;
+                                @endphp
+                                <span class="text-sm {{ $otRestAmount > 0 ? 'text-zinc-900 dark:text-zinc-100 font-sm' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ $otRestAmount > 0 ? 'RM ' . number_format($otRestAmount, 2) : '-' }}
+                                </span>
                             </td>
-                            <td class="py-3 px-2">
-                                <flux:input
-                                    type="number"
-                                    wire:model="workers.{{ $index }}.ot_rest_hours"
-                                    class="w-24"
-                                    min="0"
-                                    step="0.5"
-                                    :disabled="$isBlocked"
-                                />
+                            <td class="py-3 text-center">
+                                @php
+                                    $otPublicAmount = ($worker['ot_public_hours'] ?? 0) * 24.51;
+                                @endphp
+                                <span class="text-sm {{ $otPublicAmount > 0 ? 'text-zinc-900 dark:text-zinc-100 font-sm' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ $otPublicAmount > 0 ? 'RM ' . number_format($otPublicAmount, 2) : '-' }}
+                                </span>
                             </td>
-                            <td class="py-3 px-2">
-                                <flux:input
-                                    type="number"
-                                    wire:model="workers.{{ $index }}.ot_public_hours"
-                                    class="w-24"
-                                    min="0"
-                                    step="0.5"
-                                    :disabled="$isBlocked"
-                                />
+                            <td class="py-3 text-center">
+                                @php
+                                    $grossSalary = $worker['basic_salary'] + $otNormalAmount + $otRestAmount + $otPublicAmount;
+                                @endphp
+                                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($grossSalary, 2) }}
+                                </span>
                             </td>
-                            <td class="py-3 px-2">
-                                <div class="flex flex-col gap-2">
-                                    @if($isBlocked || ($worker['contract_ended'] ?? false))
-                                        <flux:button
-                                            wire:click="openTransactionModal({{ $index }})"
-                                            variant="filled"
-                                            disabled
-                                        >
-                                            Manage Transactions
-                                        </flux:button>
+                            <td class="py-3 text-center">
+                                @php
+                                    // EPF: 2% of basic salary only (not including OT)
+                                    $epfWorker = $worker['basic_salary'] * 0.02;
+
+                                    // SOCSO: Based on gross salary (basic + OT) using official contribution table
+                                    $calculator = new \App\Services\PaymentCalculatorService();
+                                    $socsoWorker = $calculator->calculateWorkerSOCSO($grossSalary);
+
+                                    $totalStatutory = $epfWorker + $socsoWorker;
+                                @endphp
+                                <span class="text-sm text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($totalStatutory, 2) }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-center">
+                                @php
+                                    $transactions = $worker['transactions'] ?? [];
+                                    $totalTransactions = collect($transactions)->sum('amount');
+                                @endphp
+                                <div class="flex items-center justify-center gap-1">
+                                    @if($totalTransactions > 0)
+                                        <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($totalTransactions, 2) }}</span>
                                     @else
-                                        <flux:button
-                                            wire:click="openTransactionModal({{ $index }})"
-                                            variant="filled"
-                                        >
-                                            Manage Transactions
-                                        </flux:button>
+                                        <span class="text-sm text-zinc-400 dark:text-zinc-600">-</span>
                                     @endif
-                                    @php
-                                        $transactions = $worker['transactions'] ?? [];
-                                        $advanceCount = collect($transactions)->where('type', 'advance_payment')->count();
-                                        $deductionCount = collect($transactions)->where('type', 'deduction')->count();
-                                        $totalAdvance = collect($transactions)->where('type', 'advance_payment')->sum('amount');
-                                        $totalDeduction = collect($transactions)->where('type', 'deduction')->sum('amount');
-                                    @endphp
-                                    @if($advanceCount > 0 || $deductionCount > 0)
-                                        <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                            @if($advanceCount > 0)
-                                                <div class="flex items-center gap-1">
-                                                    <flux:icon.arrow-down class="size-3 text-orange-600" />
-                                                    <span>{{ $advanceCount }} Advance (-RM {{ number_format($totalAdvance, 2) }})</span>
-                                                </div>
-                                            @endif
-                                            @if($deductionCount > 0)
-                                                <div class="flex items-center gap-1">
-                                                    <flux:icon.arrow-down class="size-3 text-red-600" />
-                                                    <span>{{ $deductionCount }} Deduction (-RM {{ number_format($totalDeduction, 2) }})</span>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endif
+                                </div>
+                            </td>
+                            <td class="py-3 text-center">
+                                @php
+                                    // Net Salary = Gross Salary - Statutory Deductions - Transaction Deductions
+                                    $netSalary = $grossSalary - $totalStatutory - $totalTransactions;
+                                @endphp
+                                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($netSalary, 2) }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-2">
+                                <div class="flex items-center justify-center gap-2">
+                                    <flux:button
+                                        wire:click="openOTModal({{ $index }})"
+                                        variant="filled"
+                                        size="sm"
+                                        :disabled="$isBlocked || ($worker['contract_ended'] ?? false)"
+                                    >
+                                        Overtime
+                                    </flux:button>
+                                    <flux:button
+                                        wire:click="openTransactionModal({{ $index }})"
+                                        variant="filled"
+                                        size="sm"
+                                        :disabled="$isBlocked || ($worker['contract_ended'] ?? false)"
+                                    >
+                                        Manage
+                                    </flux:button>
                                 </div>
                             </td>
                         </tr>
@@ -648,6 +577,109 @@
                 <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
                     <flux:button wire:click="closeTransactionModal" variant="ghost">Cancel</flux:button>
                     <flux:button wire:click="saveTransactions" variant="primary">Save Transactions</flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
+
+    <!-- OT Management Modal -->
+    @if($showOTModal && $currentWorkerIndex !== null)
+        <flux:modal wire:model="showOTModal" class="min-w-[600px]">
+            <div class="space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                        Manage Overtime Hours
+                    </h2>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        Worker: {{ $workers[$currentWorkerIndex]['worker_name'] ?? 'Unknown' }}
+                    </p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-0">
+                        Passport: {{ $workers[$currentWorkerIndex]['worker_passport'] ?? 'Unknown' }}
+                    </p>
+                </div>
+
+                <!-- OT Input Form -->
+                <flux:card class="p-4 bg-zinc-50 dark:bg-zinc-800">
+                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Enter Overtime Hours</h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <flux:input
+                                wire:model.live="otNormalHours"
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                label="Normal Day OT (hours)"
+                                placeholder="0.0"
+                            />
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Rate: RM 12.26/hr (1.5x)</p>
+                        </div>
+
+                        <div>
+                            <flux:input
+                                wire:model.live="otRestHours"
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                label="Rest Day OT (hours)"
+                                placeholder="0.0"
+                            />
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Rate: RM 16.34/hr (2.0x)</p>
+                        </div>
+
+                        <div>
+                            <flux:input
+                                wire:model.live="otPublicHours"
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                label="Public Holiday OT (hours)"
+                                placeholder="0.0"
+                            />
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Rate: RM 24.51/hr (3.0x)</p>
+                        </div>
+                    </div>
+                </flux:card>
+
+                <!-- OT Summary -->
+                <div class="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">OT Calculation Summary</h4>
+                    <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <p class="text-zinc-600 dark:text-zinc-400">Normal Day OT:</p>
+                            <p class="text-lg font-bold text-green-600 dark:text-green-400">
+                                RM {{ number_format(($otNormalHours ?? 0) * 12.26, 2) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-zinc-600 dark:text-zinc-400">Rest Day OT:</p>
+                            <p class="text-lg font-bold text-green-600 dark:text-green-400">
+                                RM {{ number_format(($otRestHours ?? 0) * 16.34, 2) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-zinc-600 dark:text-zinc-400">Public Holiday OT:</p>
+                            <p class="text-lg font-bold text-green-600 dark:text-green-400">
+                                RM {{ number_format(($otPublicHours ?? 0) * 24.51, 2) }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-green-200 dark:border-green-700">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Total OT Pay:</p>
+                            <p class="text-2xl font-bold text-green-600 dark:text-green-400">
+                                RM {{ number_format((($otNormalHours ?? 0) * 12.26) + (($otRestHours ?? 0) * 16.34) + (($otPublicHours ?? 0) * 24.51), 2) }}
+                            </p>
+                        </div>
+                        <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2">
+                            <strong>Note:</strong> This OT amount will be added to the worker's salary for this period.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:button wire:click="closeOTModal" variant="ghost">Cancel</flux:button>
+                    <flux:button wire:click="saveOT" variant="primary">Save</flux:button>
                 </div>
             </div>
         </flux:modal>

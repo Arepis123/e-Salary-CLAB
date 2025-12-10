@@ -105,6 +105,18 @@ class PayrollSubmission extends Model
     }
 
     /**
+     * Get the total amount including penalty (dynamic calculation)
+     */
+    public function getTotalDueAttribute(): float
+    {
+        if ($this->isOverdue() && $this->status !== 'paid') {
+            $penalty = $this->calculatePenalty();
+            return $this->grand_total + $penalty;
+        }
+        return $this->grand_total;
+    }
+
+    /**
      * Get days until deadline
      */
     public function daysUntilDeadline(): int

@@ -22,7 +22,6 @@ class Timesheet extends Component
     public $currentSubmission;
     public $stats;
     public $recentSubmissions;
-    public $successMessage = '';
     public $errorMessage = '';
 
     // Allow viewing specific month/year from query parameters
@@ -35,6 +34,7 @@ class Timesheet extends Component
     public $outstandingDrafts = [];
     public $overduePayments = [];
     public $missingSubmissions = [];
+    public $totalOutstandingCount = 0;
 
     // Transaction management
     public $showTransactionModal = false;
@@ -43,6 +43,15 @@ class Timesheet extends Component
     public $newTransactionType = 'advance_payment';
     public $newTransactionAmount = '';
     public $newTransactionRemarks = '';
+
+    // OT management
+    public $showOTModal = false;
+    public $otNormalHours = 0;
+    public $otRestHours = 0;
+    public $otPublicHours = 0;
+
+    // Calculation info modal
+    public $showCalculationModal = false;
 
     public function boot(PayrollService $payrollService, ContractWorkerService $contractWorkerService)
     {
@@ -65,7 +74,33 @@ class Timesheet extends Component
 
         if (!$clabNo) {
             $this->errorMessage = 'No contractor CLAB number assigned to your account. Please contact administrator.';
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Configuration Error',
+                text: 'No contractor CLAB number assigned to your account. Please contact administrator.'
+            );
             return;
+        }
+
+        // SECURITY: Validate access to requested month/year
+        if ($this->targetMonth && $this->targetYear) {
+            $allowedPeriod = $this->validatePeriodAccess($clabNo, $this->targetMonth, $this->targetYear);
+            if (!$allowedPeriod) {
+                // Redirect to the oldest outstanding period or current month
+                $this->checkOutstandingIssues($clabNo);
+                if ($this->isBlocked && count($this->blockReasons) > 0) {
+                    // Redirect to oldest period
+                    $this->redirect(route('timesheet', [
+                        'month' => $this->blockReasons[0]['redirect_month'],
+                        'year' => $this->blockReasons[0]['redirect_year']
+                    ]));
+                    return;
+                } else {
+                    // No outstanding issues, redirect to current month
+                    $this->redirect(route('timesheet'));
+                    return;
+                }
+            }
         }
 
         // Check for outstanding drafts and unpaid invoices (only block for current month)
@@ -87,8 +122,8 @@ class Timesheet extends Component
                 'month' => $currentMonth,
                 'year' => $currentYear,
                 'month_name' => $targetDate->format('F'),
-                'deadline' => $targetDate->copy()->day(15)->addMonth(),
-                'days_until_deadline' => now()->diffInDays($targetDate->copy()->day(15)->addMonth(), false),
+                'deadline' => $targetDate->copy()->endOfMonth(),
+                'days_until_deadline' => now()->diffInDays($targetDate->copy()->endOfMonth(), false),
             ];
         } else {
             // Get current payroll period info
@@ -179,29 +214,15 @@ class Timesheet extends Component
 
         // Prepare workers data
         $this->workers = $remainingWorkers->map(function($worker, $index) use ($currentMonth, $currentYear) {
-            // Check if worker has an active contract
-            $hasActiveContract = $worker->contract_info && $worker->contract_info->isActive();
+            // Check if worker had an active contract during the payroll period
+            // Use the payroll period date, not today's date
+            $payrollPeriodDate = \Carbon\Carbon::create($currentYear, $currentMonth, 1);
+            $hasActiveContract = $worker->contract_info &&
+                                 $worker->contract_info->con_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
+                                 $worker->contract_info->con_start <= $payrollPeriodDate->endOfMonth()->toDateString();
 
-            // If no active contract, set basic salary to 0 (OT payment only)
+            // If no active contract during the payroll period, set basic salary to 0 (OT payment only)
             $basicSalary = $hasActiveContract ? ($worker->basic_salary ?? 1700) : 0;
-
-            // Get previous month's OT (to be paid this month)
-            $previousMonth = $currentMonth - 1;
-            $previousYear = $currentYear;
-            if ($previousMonth < 1) {
-                $previousMonth = 12;
-                $previousYear--;
-            }
-
-            $previousMonthPayroll = PayrollWorker::where('worker_id', $worker->wkr_id)
-                ->whereHas('payrollSubmission', function($q) use ($previousMonth, $previousYear) {
-                    $q->where('month', $previousMonth)
-                      ->where('year', $previousYear)
-                      ->where('status', '!=', 'draft');
-                })
-                ->first();
-
-            $previousMonthOT = $previousMonthPayroll ? $previousMonthPayroll->total_ot_pay : 0;
 
             return [
                 'index' => $index,
@@ -209,7 +230,6 @@ class Timesheet extends Component
                 'worker_name' => $worker->name,
                 'worker_passport' => $worker->ic_number,
                 'basic_salary' => $basicSalary,
-                'previous_month_ot' => $previousMonthOT,
                 'ot_normal_hours' => 0,
                 'ot_rest_hours' => 0,
                 'ot_public_hours' => 0,
@@ -255,6 +275,20 @@ class Timesheet extends Component
         } else {
             $this->selectedWorkers[] = $workerId;
         }
+    }
+
+    public function toggleAllWorkers()
+    {
+        if (count($this->selectedWorkers) === count($this->workers)) {
+            // Unselect all
+            $this->selectedWorkers = [];
+        } else {
+            // Select all
+            $this->selectedWorkers = collect($this->workers)->pluck('worker_id')->toArray();
+        }
+
+        // Force Livewire to re-render by resetting the array
+        $this->selectedWorkers = array_values($this->selectedWorkers);
     }
 
     public function openTransactionModal($workerIndex)
@@ -372,7 +406,67 @@ class Timesheet extends Component
 
         // Close modal
         $this->closeTransactionModal();
-        $this->successMessage = "Transactions saved successfully for {$workerName}. Total: Advance RM " . number_format($totalAdvancePayment, 2) . ", Deduction RM " . number_format($totalDeduction, 2);
+        \Flux::toast(
+            variant: 'success',
+            heading: 'Transactions Saved',
+            text: "Successfully saved transactions for {$workerName}. Total: Advance RM " . number_format($totalAdvancePayment, 2) . ", Deduction RM " . number_format($totalDeduction, 2)
+        );
+    }
+
+    public function openOTModal($workerIndex)
+    {
+        $this->currentWorkerIndex = $workerIndex;
+        $this->showOTModal = true;
+
+        // Load existing OT hours
+        $this->otNormalHours = $this->workers[$workerIndex]['ot_normal_hours'] ?? 0;
+        $this->otRestHours = $this->workers[$workerIndex]['ot_rest_hours'] ?? 0;
+        $this->otPublicHours = $this->workers[$workerIndex]['ot_public_hours'] ?? 0;
+    }
+
+    public function closeOTModal()
+    {
+        $this->showOTModal = false;
+        $this->currentWorkerIndex = null;
+        $this->otNormalHours = 0;
+        $this->otRestHours = 0;
+        $this->otPublicHours = 0;
+    }
+
+    public function openCalculationModal()
+    {
+        $this->showCalculationModal = true;
+    }
+
+    public function closeCalculationModal()
+    {
+        $this->showCalculationModal = false;
+    }
+
+    public function saveOT()
+    {
+        if ($this->currentWorkerIndex === null) {
+            return;
+        }
+
+        // Get worker name before closing
+        $workerName = $this->workers[$this->currentWorkerIndex]['worker_name'];
+
+        // Save OT hours to the worker
+        $this->workers[$this->currentWorkerIndex]['ot_normal_hours'] = $this->otNormalHours ?? 0;
+        $this->workers[$this->currentWorkerIndex]['ot_rest_hours'] = $this->otRestHours ?? 0;
+        $this->workers[$this->currentWorkerIndex]['ot_public_hours'] = $this->otPublicHours ?? 0;
+
+        // Calculate total OT pay
+        $totalOTPay = ($this->otNormalHours * 12.26) + ($this->otRestHours * 16.34) + ($this->otPublicHours * 24.51);
+
+        // Close modal
+        $this->closeOTModal();
+        \Flux::toast(
+            variant: 'success',
+            heading: 'OT Hours Saved',
+            text: "Successfully saved OT hours for {$workerName}. Total OT Pay: RM " . number_format($totalOTPay, 2)
+        );
     }
 
     public function saveDraft()
@@ -412,7 +506,11 @@ class Timesheet extends Component
                 'submitted_at' => now(),
             ]);
 
-            $this->successMessage = "Draft submitted successfully for {$submission->month_year}. Total amount: RM " . number_format($submission->total_amount, 2);
+            \Flux::toast(
+                variant: 'success',
+                heading: 'Draft Submitted',
+                text: "Draft submitted successfully for {$submission->month_year}. Total amount: RM " . number_format($submission->total_amount, 2)
+            );
 
             // Log activity
             $this->logTimesheetActivity(
@@ -430,7 +528,11 @@ class Timesheet extends Component
             // Reload data
             $this->loadData();
         } catch (\Exception $e) {
-            $this->errorMessage = 'Failed to submit draft: ' . $e->getMessage();
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to submit draft: ' . $e->getMessage()
+            );
         }
     }
 
@@ -441,7 +543,11 @@ class Timesheet extends Component
         $clabNo = auth()->user()->contractor_clab_no;
 
         if (!$clabNo) {
-            $this->errorMessage = 'No contractor CLAB number assigned.';
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'No contractor CLAB number assigned.'
+            );
             \Log::error('No CLAB number');
             return;
         }
@@ -470,7 +576,11 @@ class Timesheet extends Component
             }
         } catch (\Exception $e) {
             \Log::error('Validation failed', ['error' => $e->getMessage()]);
-            $this->errorMessage = 'Validation failed: ' . $e->getMessage();
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Validation Error',
+                text: $e->getMessage()
+            );
             return;
         }
 
@@ -482,7 +592,11 @@ class Timesheet extends Component
         \Log::info('Selected workers', ['count' => count($selectedWorkersData), 'data' => $selectedWorkersData]);
 
         if (empty($selectedWorkersData)) {
-            $this->errorMessage = 'Please select at least one worker to submit payroll.';
+            \Flux::toast(
+                variant: 'warning',
+                heading: 'No Workers Selected',
+                text: 'Please select at least one worker to submit payroll.'
+            );
             \Log::error('No workers selected');
             return;
         }
@@ -496,7 +610,11 @@ class Timesheet extends Component
                 \Log::info('Calling savePayrollDraft', ['month' => $month, 'year' => $year]);
                 $submission = $this->payrollService->savePayrollDraft($clabNo, $selectedWorkersData, $month, $year);
                 $workerCount = count($selectedWorkersData);
-                $this->successMessage = "Draft saved successfully. {$workerCount} worker(s) included.";
+                \Flux::toast(
+                    variant: 'success',
+                    heading: 'Draft Saved',
+                    text: "Draft saved successfully with {$workerCount} worker(s) included."
+                );
                 \Log::info('Draft saved', ['submission_id' => $submission->id]);
 
                 // Log activity
@@ -513,7 +631,7 @@ class Timesheet extends Component
                 \Log::info('Calling savePayrollSubmission', ['month' => $month, 'year' => $year]);
                 $submission = $this->payrollService->savePayrollSubmission($clabNo, $selectedWorkersData, $month, $year);
                 $workerCount = count($selectedWorkersData);
-                $this->successMessage = "Timesheet submitted successfully for {$submission->month_year}. {$workerCount} worker(s) included. Total amount: RM " . number_format($submission->total_amount, 2);
+
                 \Log::info('Submission saved', ['submission_id' => $submission->id]);
 
                 // Log activity
@@ -528,31 +646,40 @@ class Timesheet extends Component
                         'grand_total' => $submission->grand_total,
                     ]
                 );
+
+                // Redirect to invoices page with highlight parameter
+                return redirect()->route('invoices', ['highlight' => $submission->id])
+                    ->with('success', "Timesheet submitted successfully for {$submission->month_year}. {$workerCount} worker(s) included. Total amount: RM " . number_format($submission->total_amount, 2));
             }
 
             // Reload data
             $this->loadData();
         } catch (\Exception $e) {
             \Log::error('Failed to save', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            $this->errorMessage = 'Failed to save timesheet: ' . $e->getMessage();
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save timesheet: ' . $e->getMessage()
+            );
         }
     }
 
-    protected function checkOutstandingIssues($clabNo)
+    protected function validatePeriodAccess($clabNo, $month, $year)
     {
         $currentMonth = now()->month;
         $currentYear = now()->year;
         $currentDate = now();
 
-        // Reset blocking state
-        $this->isBlocked = false;
-        $this->blockReasons = [];
-        $this->outstandingDrafts = [];
-        $this->overduePayments = [];
-        $this->missingSubmissions = [];
+        // Always allow current month
+        if ($month == $currentMonth && $year == $currentYear) {
+            return true;
+        }
 
-        // Check for draft submissions (excluding current month)
-        $this->outstandingDrafts = PayrollSubmission::where('contractor_clab_no', $clabNo)
+        // Collect all outstanding periods
+        $outstandingPeriods = collect();
+
+        // 1. Check for draft submissions
+        $drafts = PayrollSubmission::where('contractor_clab_no', $clabNo)
             ->where('status', 'draft')
             ->where(function($query) use ($currentMonth, $currentYear) {
                 $query->where('year', '<', $currentYear)
@@ -561,12 +688,18 @@ class Timesheet extends Component
                             ->where('month', '<', $currentMonth);
                       });
             })
-            ->orderBy('year', 'desc')
-            ->orderBy('month', 'desc')
             ->get();
 
-        // Check for overdue payments (unpaid and past deadline, excluding current month)
-        $this->overduePayments = PayrollSubmission::where('contractor_clab_no', $clabNo)
+        foreach ($drafts as $draft) {
+            $outstandingPeriods->push([
+                'month' => $draft->month,
+                'year' => $draft->year,
+                'sort_key' => $draft->year * 100 + $draft->month,
+            ]);
+        }
+
+        // 2. Check for overdue payments
+        $overdue = PayrollSubmission::where('contractor_clab_no', $clabNo)
             ->whereNotIn('status', ['paid', 'draft'])
             ->where('payment_deadline', '<', now())
             ->where(function($query) use ($currentMonth, $currentYear) {
@@ -576,11 +709,134 @@ class Timesheet extends Component
                             ->where('month', '<', $currentMonth);
                       });
             })
-            ->orderBy('payment_deadline', 'asc')
             ->get();
 
-        // Check for missing submissions (excluding current month)
-        // Check last 6 months for periods where workers existed but no submission was created
+        foreach ($overdue as $payment) {
+            $outstandingPeriods->push([
+                'month' => $payment->month,
+                'year' => $payment->year,
+                'sort_key' => $payment->year * 100 + $payment->month,
+            ]);
+        }
+
+        // 3. Check for missing submissions
+        for ($i = 1; $i <= 6; $i++) {
+            $checkDate = $currentDate->copy()->subMonths($i);
+            $checkMonth = $checkDate->month;
+            $checkYear = $checkDate->year;
+
+            $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
+                ->where('con_end', '>=', $checkDate->startOfMonth()->toDateString())
+                ->where('con_start', '<=', $checkDate->endOfMonth()->toDateString())
+                ->pluck('con_wkr_id')
+                ->unique();
+
+            if ($activeWorkerIds->isEmpty()) {
+                continue;
+            }
+
+            // Get ALL submissions for that period (to find submitted worker IDs)
+            $allSubmissionsForPeriod = PayrollSubmission::where('contractor_clab_no', $clabNo)
+                ->where('month', $checkMonth)
+                ->where('year', $checkYear)
+                ->with('workers')
+                ->get();
+
+            // Get IDs of workers already submitted
+            $submittedWorkerIds = $allSubmissionsForPeriod->flatMap(function($submission) {
+                return $submission->workers->pluck('worker_id');
+            })->unique()->toArray();
+
+            // Find workers that were active but not submitted
+            $unsubmittedWorkerIds = $activeWorkerIds->diff($submittedWorkerIds);
+
+            // If there are unsubmitted workers, add this period to outstanding
+            if ($unsubmittedWorkerIds->count() > 0) {
+                $outstandingPeriods->push([
+                    'month' => $checkMonth,
+                    'year' => $checkYear,
+                    'sort_key' => $checkYear * 100 + $checkMonth,
+                ]);
+            }
+        }
+
+        // If no outstanding periods, allow any past month
+        if ($outstandingPeriods->isEmpty()) {
+            return true;
+        }
+
+        // Sort and get the oldest outstanding period
+        $outstandingPeriods = $outstandingPeriods->sortBy('sort_key')->values();
+        $oldest = $outstandingPeriods->first();
+
+        // Only allow access to the oldest outstanding period
+        return ($month == $oldest['month'] && $year == $oldest['year']);
+    }
+
+    protected function checkOutstandingIssues($clabNo)
+    {
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+        $currentDate = now();
+
+        // Reset state
+        $this->isBlocked = false;
+        $this->blockReasons = [];
+        $this->outstandingDrafts = [];
+        $this->overduePayments = [];
+        $this->missingSubmissions = [];
+
+        // Collect ALL outstanding periods (drafts, overdue, missing) in chronological order
+        $outstandingPeriods = collect();
+
+        // 1. Check for draft submissions (excluding current month)
+        $drafts = PayrollSubmission::where('contractor_clab_no', $clabNo)
+            ->where('status', 'draft')
+            ->where(function($query) use ($currentMonth, $currentYear) {
+                $query->where('year', '<', $currentYear)
+                      ->orWhere(function($q) use ($currentMonth, $currentYear) {
+                          $q->where('year', '=', $currentYear)
+                            ->where('month', '<', $currentMonth);
+                      });
+            })
+            ->get();
+
+        foreach ($drafts as $draft) {
+            $outstandingPeriods->push([
+                'type' => 'draft',
+                'month' => $draft->month,
+                'year' => $draft->year,
+                'month_year' => $draft->month_year,
+                'data' => $draft,
+                'sort_key' => $draft->year * 100 + $draft->month,
+            ]);
+        }
+
+        // 2. Check for overdue payments (unpaid and past deadline, excluding current month)
+        $overdue = PayrollSubmission::where('contractor_clab_no', $clabNo)
+            ->whereNotIn('status', ['paid', 'draft'])
+            ->where('payment_deadline', '<', now())
+            ->where(function($query) use ($currentMonth, $currentYear) {
+                $query->where('year', '<', $currentYear)
+                      ->orWhere(function($q) use ($currentMonth, $currentYear) {
+                          $q->where('year', '=', $currentYear)
+                            ->where('month', '<', $currentMonth);
+                      });
+            })
+            ->get();
+
+        foreach ($overdue as $payment) {
+            $outstandingPeriods->push([
+                'type' => 'overdue',
+                'month' => $payment->month,
+                'year' => $payment->year,
+                'month_year' => $payment->month_year,
+                'data' => $payment,
+                'sort_key' => $payment->year * 100 + $payment->month,
+            ]);
+        }
+
+        // 3. Check for missing submissions (excluding current month)
         for ($i = 1; $i <= 6; $i++) {
             $checkDate = $currentDate->copy()->subMonths($i);
             $month = $checkDate->month;
@@ -594,49 +850,79 @@ class Timesheet extends Component
                 ->unique();
 
             if ($activeWorkerIds->isEmpty()) {
-                continue; // No workers that month, skip
+                continue;
             }
 
-            // Check if ANY submission exists for that period (draft or finalized)
-            $anySubmission = PayrollSubmission::where('contractor_clab_no', $clabNo)
+            // Get ALL submissions for that period (to find submitted worker IDs)
+            $allSubmissionsForPeriod = PayrollSubmission::where('contractor_clab_no', $clabNo)
                 ->where('month', $month)
                 ->where('year', $year)
-                ->exists();
+                ->with('workers')
+                ->get();
 
-            // If no submission exists at all, this is a missing submission
-            if (!$anySubmission) {
-                $this->missingSubmissions[] = (object)[
+            // Get IDs of workers already submitted
+            $submittedWorkerIds = $allSubmissionsForPeriod->flatMap(function($submission) {
+                return $submission->workers->pluck('worker_id');
+            })->unique()->toArray();
+
+            // Find workers that were active but not submitted
+            $unsubmittedWorkerIds = $activeWorkerIds->diff($submittedWorkerIds);
+
+            // If there are unsubmitted workers, add this period to outstanding
+            if ($unsubmittedWorkerIds->count() > 0) {
+                $outstandingPeriods->push([
+                    'type' => 'missing',
                     'month' => $month,
                     'year' => $year,
                     'month_year' => $checkDate->format('F Y'),
-                    'total_workers' => $activeWorkerIds->count(),
-                ];
+                    'total_workers' => $unsubmittedWorkerIds->count(),
+                    'sort_key' => $year * 100 + $month,
+                ]);
             }
         }
 
-        // Determine if blocked
-        if ($this->outstandingDrafts->count() > 0) {
-            $this->isBlocked = true;
-            $this->blockReasons[] = [
-                'type' => 'draft',
-                'message' => 'You have ' . $this->outstandingDrafts->count() . ' unfinalized draft ' . \Str::plural('submission', $this->outstandingDrafts->count()) . ' from previous months that must be completed or deleted before submitting new payroll.',
-            ];
-        }
+        // Sort by oldest first (ascending)
+        $outstandingPeriods = $outstandingPeriods->sortBy('sort_key')->values();
 
-        if ($this->overduePayments->count() > 0) {
-            $this->isBlocked = true;
-            $this->blockReasons[] = [
-                'type' => 'overdue',
-                'message' => 'You have ' . $this->overduePayments->count() . ' overdue ' . \Str::plural('payment', $this->overduePayments->count()) . ' from previous months that must be paid before submitting new payroll.',
-            ];
-        }
+        // Store total count
+        $this->totalOutstandingCount = $outstandingPeriods->count();
 
-        if (count($this->missingSubmissions) > 0) {
-            $this->isBlocked = true;
-            $this->blockReasons[] = [
-                'type' => 'missing',
-                'message' => 'You have ' . count($this->missingSubmissions) . ' missing payroll ' . \Str::plural('submission', count($this->missingSubmissions)) . ' from previous months that must be submitted before submitting new payroll.',
-            ];
+        // If there are outstanding periods, redirect to the OLDEST one
+        if ($outstandingPeriods->count() > 0) {
+            $oldest = $outstandingPeriods->first();
+
+            // Store all outstanding for display
+            $this->outstandingDrafts = $outstandingPeriods->where('type', 'draft')->pluck('data');
+            $this->overduePayments = $outstandingPeriods->where('type', 'overdue')->pluck('data');
+            $this->missingSubmissions = $outstandingPeriods->where('type', 'missing')->all();
+
+            // If NOT viewing the oldest period, redirect to it
+            if ($this->targetMonth != $oldest['month'] || $this->targetYear != $oldest['year']) {
+                $this->isBlocked = true;
+
+                // Determine redirect URL based on status
+                $redirectUrl = route('timesheet', ['month' => $oldest['month'], 'year' => $oldest['year']]);
+                $actionText = 'Go to ' . $oldest['month_year'] . ' Payroll';
+
+                if ($oldest['type'] === 'overdue') {
+                    // For overdue payments, redirect to invoices page
+                    $redirectUrl = route('invoices.client');
+                    $actionText = 'Pay ' . $oldest['month_year'] . ' Invoice';
+                } elseif ($oldest['type'] === 'draft' && isset($oldest['data'])) {
+                    // For drafts, redirect to edit page
+                    $redirectUrl = route('timesheet.edit', $oldest['data']->id);
+                    $actionText = 'Complete ' . $oldest['month_year'] . ' Draft';
+                }
+
+                $this->blockReasons[] = [
+                    'type' => $oldest['type'],
+                    'message' => 'Please complete payroll submissions in chronological order. The next period to complete is ' . $oldest['month_year'] . '.',
+                    'redirect_month' => $oldest['month'],
+                    'redirect_year' => $oldest['year'],
+                    'redirect_url' => $redirectUrl,
+                    'action_text' => $actionText,
+                ];
+            }
         }
     }
 

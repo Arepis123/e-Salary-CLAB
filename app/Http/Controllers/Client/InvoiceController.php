@@ -61,6 +61,9 @@ class InvoiceController extends Controller
             ->where('contractor_clab_no', $clabNo)
             ->firstOrFail();
 
+        // Update penalty if invoice is overdue
+        $invoice->updatePenalty();
+
         return view('client.invoice-detail', compact('invoice'));
     }
 

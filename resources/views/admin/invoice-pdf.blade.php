@@ -87,23 +87,26 @@
             border-bottom: 1px solid #e0e0e0;
         }
         .items-table .worker-name {
-            width: 12%;
+            width: 15%;
         }
         .items-table .basic-salary {
-            width: 8%;
+            width: 9%;
             text-align: right;
         }
         .items-table .ot-col {
-            width: 8%;
+            width: 9%;
             text-align: right;
         }
-        .items-table .transactions {
+        .items-table .deduction-col {
             width: 12%;
             text-align: right;
         }
         .items-table .gross-salary,
-        .items-table .deductions,
+        .items-table .worker-epf,
+        .items-table .worker-socso,
         .items-table .net-salary,
+        .items-table .employer-epf,
+        .items-table .employer-socso,
         .items-table .total-cost {
             width: 8%;
             text-align: right;
@@ -134,31 +137,31 @@
             color: #dc3545;
         }
         .totals-section {
-            margin-top: 8px;
+            margin-top: 3px;
             text-align: right;
         }
         .total-row {
-            margin-bottom: 5px;
-            font-size: 9px;
+            margin-bottom: 2px;
+            font-size: 8px;
         }
         .total-label {
             display: inline-block;
-            width: 100px;
+            width: 110px;
             text-align: right;
-            padding-right: 15px;
+            padding-right: 10px;
         }
         .total-value {
             display: inline-block;
-            width: 100px;
+            width: 70px;
             text-align: right;
         }
         .grand-total {
             background-color: #000;
             color: #fff;
-            padding: 8px 15px;
-            margin-top: 5px;
+            padding: 5px 10px;
+            margin-top: 3px;
             display: inline-block;
-            min-width: 220px;
+            min-width: 195px;
         }
         .grand-total .total-label {
             font-weight: bold;
@@ -166,7 +169,7 @@
         }
         .grand-total .total-value {
             font-weight: bold;
-            font-size: 11px;
+            font-size: 9px;
         }
         .signature-section {
             margin-top: 15px;
@@ -193,8 +196,8 @@
             padding-top: 8px;
         }
         .penalty-notice {
-            background-color: #fef4d2;
-            border-left: 4px solid #ffd045;
+            background-color: #f5f5f5;
+            border-left: 4px solid rgb(255, 229, 151);
             padding: 5px 8px;
             margin: 7px 0;
             font-size: 7px;
@@ -202,8 +205,8 @@
             border-top-right-radius: 1px;
         }
         .payment-status {
-            background-color: #d6e9db;
-            border-left: 4px solid #43c862;
+            background-color: #f5f5f5;
+            border-left: 4px solid rgb(133, 215, 152);
             padding: 5px 8px;
             margin: 7px 0;
             font-size: 7px;
@@ -273,49 +276,24 @@
         </table>
 
         <!-- Items Table -->
-        @php
-            // Get previous month's submission to show previous OT being paid this month
-            $previousMonth = $invoice->month - 1;
-            $previousYear = $invoice->year;
-            if ($previousMonth < 1) {
-                $previousMonth = 12;
-                $previousYear--;
-            }
-            $previousSubmission = App\Models\PayrollSubmission::where('contractor_clab_no', $invoice->contractor_clab_no)
-                ->where('month', $previousMonth)
-                ->where('year', $previousYear)
-                ->with('workers')
-                ->first();
-
-            // Create map of worker_id => previous OT
-            $previousOtMap = [];
-            if ($previousSubmission) {
-                foreach ($previousSubmission->workers as $prevWorker) {
-                    $previousOtMap[$prevWorker->worker_id] = $prevWorker->total_ot_pay;
-                }
-            }
-        @endphp
         <table class="items-table">
             <thead>
                 <tr>
                     <th class="worker-name">WORKER</th>
                     <th class="basic-salary">BASIC<br>SALARY</th>
-                    <th class="ot-col">PREV MONTH<br>OT</th>
-                    <th class="ot-col">OT<br>NORMAL</th>
-                    <th class="ot-col">OT<br>REST</th>
-                    <th class="ot-col">OT<br>PUBLIC</th>
-                    <th class="transactions">TRANSACTIONS</th>
+                    <th class="ot-col">OVERTIME<br>(OT)</th>
+                    <th class="deduction-col">DEDUCTION</th>
                     <th class="gross-salary">GROSS<br>SALARY</th>
-                    <th class="deductions">DEDUCTIONS<br>(EPF+SOCSO)</th>
+                    <th class="worker-epf">WORKER<br>EPF</th>
+                    <th class="worker-socso">WORKER<br>SOCSO</th>
                     <th class="net-salary">NET<br>SALARY</th>
+                    <th class="employer-epf">EMPLOYER<br>EPF</th>
+                    <th class="employer-socso">EMPLOYER<br>SOCSO</th>
                     <th class="total-cost">TOTAL<br>PAYMENT</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($invoice->workers as $worker)
-                @php
-                    $previousOt = $previousOtMap[$worker->worker_id] ?? 0;
-                @endphp
                 <tr>
                     <td class="worker-name">
                         <div class="description-main">{{ $worker->worker_name }}</div>
@@ -323,26 +301,13 @@
                     </td>
                     <td class="basic-salary">{{ number_format($worker->basic_salary, 2) }}</td>
                     <td class="ot-col">
-                        @if($previousOt > 0)
-                            <div>{{ number_format($previousOt, 2) }}</div>
-                            <div class="ot-amount">Paid now</div>
+                        @if($worker->total_ot_pay > 0)
+                            {{ number_format($worker->total_ot_pay, 2) }}
                         @else
-                            <div>-</div>
+                            -
                         @endif
                     </td>
-                    <td class="ot-col">
-                        <div class="ot-hours">{{ $worker->ot_normal_hours }}h</div>
-                        <div class="ot-amount">RM {{ number_format($worker->ot_normal_pay, 2) }}</div>
-                    </td>
-                    <td class="ot-col">
-                        <div class="ot-hours">{{ $worker->ot_rest_hours }}h</div>
-                        <div class="ot-amount">RM {{ number_format($worker->ot_rest_pay, 2) }}</div>
-                    </td>
-                    <td class="ot-col">
-                        <div class="ot-hours">{{ $worker->ot_public_hours }}h</div>
-                        <div class="ot-amount">RM {{ number_format($worker->ot_public_pay, 2) }}</div>
-                    </td>
-                    <td class="transactions">
+                    <td class="deduction-col">
                         @php
                             $workerTransactions = $worker->transactions ?? collect([]);
                             $advancePayments = $workerTransactions->where('type', 'advance_payment');
@@ -354,6 +319,7 @@
                                     <strong>Advance:</strong>
                                     @foreach($advancePayments as $transaction)
                                         <div>-RM {{ number_format($transaction->amount, 2) }}</div>
+                                        <div style="font-style: italic;">({{ $transaction->remarks }})</div>
                                     @endforeach
                                 </div>
                             @endif
@@ -362,20 +328,21 @@
                                     <strong>Deduction:</strong>
                                     @foreach($deductions as $transaction)
                                         <div>-RM {{ number_format($transaction->amount, 2) }}</div>
+                                        <div style="font-style: italic;">({{ $transaction->remarks }})</div>
                                     @endforeach
                                 </div>
                             @endif
                         @else
-                            <div>-</div>
+                            -
                         @endif
                     </td>
                     <td class="gross-salary">{{ number_format($worker->gross_salary, 2) }}</td>
-                    <td class="deductions">{{ number_format($worker->total_deductions, 2) }}</td>
-                    <td class="net-salary">{{ number_format($worker->net_salary, 2) }}</td>
-                    <td class="total-cost">
-                        <div style="font-weight: bold;">{{ number_format($worker->total_payment, 2) }}</div>
-                        <div class="ot-amount">(+{{ number_format($worker->total_employer_contribution, 2) }} contrib.)</div>
-                    </td>
+                    <td class="worker-epf">{{ number_format($worker->epf_employee, 2) }}</td>
+                    <td class="worker-socso">{{ number_format($worker->socso_employee, 2) }}</td>
+                    <td class="net-salary" style="font-weight: bold;">{{ number_format($worker->net_salary, 2) }}</td>
+                    <td class="employer-epf">{{ number_format($worker->epf_employer, 2) }}</td>
+                    <td class="employer-socso">{{ number_format($worker->socso_employer, 2) }}</td>
+                    <td class="total-cost" style="font-weight: bold;">{{ number_format($worker->total_payment, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -384,13 +351,15 @@
         <!-- Notices and Totals Side by Side -->
         <table style="width: 100%; margin-top: 8px;">
             <tr>
-                <td style="width: 70%; vertical-align: top; padding-right: 15px;">
+                <td style="width: 50%; vertical-align: top; padding-right: 15px;">
                     <!-- Important Notice about OT -->
-                    <div style="background-color: #ddeafd; border-left: 4px solid #2b80ff; padding: 5px 8px; margin-bottom: 7px; font-size: 7px; border-top-right-radius: 1px; border-bottom-right-radius: 1px;">
-                        <strong>IMPORTANT - DEFERRED OT PAYMENT:</strong><br>
-                        • <strong>"PREV MONTH OT (PAID)"</strong> column shows last month's overtime that is INCLUDED in this month's payment<br>
-                        • <strong>"OT NORMAL/REST/PUBLIC"</strong> columns show THIS month's overtime hours, which will be PAID NEXT MONTH<br>
-                        • Gross Salary = Basic Salary + Previous Month OT - Advance Payment - Deductions
+                    <div style="background-color: #f5f5f5; border-left: 4px solid rgb(110, 165, 247); padding: 5px 8px; margin-bottom: 7px; font-size: 7px; border-top-right-radius: 1px; border-bottom-right-radius: 1px;">
+                        <strong>OVERTIME (OT) INFORMATION:</strong><br>
+                        • The OT hours shown are from the PREVIOUS month and are paid in this month's invoice<br>
+                        • Example: November payroll includes October's OT hours<br>
+                        • Gross Salary = Basic Salary + OT - Advance Payment - Deductions<br>
+                        • EPF is calculated on Basic Salary only (2%)<br>
+                        • SOCSO is calculated on Gross Salary using contribution table
                     </div>
 
                     <!-- Penalty Notice -->
@@ -410,7 +379,7 @@
                     </div>
                     @endif
                 </td>
-                <td style="width: 30%; vertical-align: top;">
+                <td style="width: 50%; vertical-align: top;">
                     <!-- Totals -->
                     <div class="totals-section">
                         <div class="total-row">
@@ -425,7 +394,7 @@
                             <span class="total-label">SST 8% (RM):</span>
                             <span class="total-value">{{ number_format($invoice->sst, 2) }}</span>
                         </div>
-                        <div class="total-row" style="font-weight: bold; font-size: 10px;">
+                        <div class="total-row" style="font-weight: bold; font-size: 8px;">
                             <span class="total-label">GRAND TOTAL (RM):</span>
                             <span class="total-value">{{ number_format($invoice->grand_total, 2) }}</span>
                         </div>
@@ -437,7 +406,7 @@
                         @endif
                         <div class="grand-total">
                             <span class="total-label">TOTAL DUE (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->has_penalty ? ($invoice->grand_total + $invoice->penalty_amount) : $invoice->grand_total, 2) }}</span>
+                            <span class="total-value">{{ number_format($invoice->total_with_penalty, 2) }}</span>
                         </div>
                     </div>
                 </td>

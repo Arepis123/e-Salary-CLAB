@@ -251,7 +251,7 @@
                                     <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Workers that need submission:</p>
                                     <div class="space-y-1.5 max-h-60 overflow-y-auto">
                                         @foreach($missing['missing_worker_details'] as $worker)
-                                        <div class="flex items-center justify-between p-2 bg-white dark:bg-zinc-900 rounded text-sm">
+                                        <div class="flex items-center justify-between p-2 rounded text-sm">
                                             <div class="flex items-center gap-2">
                                                 <flux:avatar size="xs" name="{{ $worker['name'] }}" />
                                                 <div>
@@ -261,7 +261,6 @@
                                                     </p>
                                                 </div>
                                             </div>
-                                            <flux:badge color="orange" size="xs">Not Submitted</flux:badge>
                                         </div>
                                         @endforeach
                                     </div>
