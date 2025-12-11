@@ -110,18 +110,28 @@ class DashboardController extends Controller
         }
 
         // Get outstanding balance (only finalized unpaid submissions, excluding drafts)
-        $outstandingBalance = PayrollSubmission::byContractor($clabNo)
+        // Use total_due accessor to include penalty calculation
+        $outstandingSubmissions = PayrollSubmission::byContractor($clabNo)
             ->whereIn('status', ['pending_payment', 'overdue'])
-            ->sum('total_with_penalty');
+            ->get();
 
-        // Get year to date paid amount
-        $yearToDatePaid = PayrollSubmission::byContractor($clabNo)
+        $outstandingBalance = $outstandingSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
+
+        // Get year to date paid amount (including penalties)
+        // Use total_due accessor to include penalty calculation
+        $paidSubmissions = PayrollSubmission::byContractor($clabNo)
             ->where('year', $currentYear)
             ->where('status', 'paid')
-            ->sum('total_amount');
+            ->get();
+
+        $yearToDatePaid = $paidSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         $paymentStats = [
-            'this_month_amount' => $thisMonthSubmission ? $thisMonthSubmission->total_with_penalty : 0,
+            'this_month_amount' => $thisMonthSubmission ? $thisMonthSubmission->total_due : 0,
             'this_month_deadline' => $thisMonthSubmission ? $thisMonthSubmission->payment_deadline : null,
             'this_month_status' => $thisMonthSubmission ? $thisMonthSubmission->status : null,
             'this_month_workers' => $thisMonthSubmission ? $thisMonthSubmission->total_workers : 0,

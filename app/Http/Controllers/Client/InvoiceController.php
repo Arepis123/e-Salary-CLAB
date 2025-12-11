@@ -37,8 +37,11 @@ class InvoiceController extends Controller
             ->where('status', 'paid')
             ->count();
 
-        $totalInvoiced = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->sum('total_with_penalty');
+        // Use total_due accessor to include dynamic penalty calculation
+        $allSubmissions = PayrollSubmission::where('contractor_clab_no', $clabNo)->get();
+        $totalInvoiced = $allSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         $stats = [
             'pending_invoices' => $pendingInvoices,
@@ -63,6 +66,7 @@ class InvoiceController extends Controller
 
         // Update penalty if invoice is overdue
         $invoice->updatePenalty();
+        $invoice->refresh();
 
         return view('client.invoice-detail', compact('invoice'));
     }

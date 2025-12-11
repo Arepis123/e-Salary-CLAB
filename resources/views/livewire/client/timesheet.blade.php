@@ -114,8 +114,7 @@
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime</h2>
             <flux:button wire:click="openCalculationModal" variant="outline" size="sm">
-                <flux:icon.calculator class="size-4" />
-                View Calculation Formula
+                Calculation Formula
             </flux:button>
         </div>
 
@@ -127,57 +126,60 @@
                     <flux:subheading>Understanding how worker salaries and payments are calculated</flux:subheading>
                 </div>
 
-                <div class="grid gap-3 lg:grid-cols-2">
+                <div class="grid gap-3 lg:grid-cols-1">
+                    <!-- Salary Breakdown Info -->
                     <flux:callout icon="currency-dollar" color="green">
-                <flux:callout.heading>Salary Calculation Formula:</flux:callout.heading>
-                <flux:callout.text>
-                    <div class="mt-2 space-y-2 text-xs">
-                        <div class="font-semibold text-green-800 dark:text-green-200">Calculation Steps:</div>
-                        <div class="pl-3 space-y-1">
-                            <div><strong>1. Gross Salary</strong> = Basic + OT</div>
-                            <div><strong>2. Worker EPF</strong> = 2% of Basic (RM 1,700 × 2% = RM 34.00)</div>
-                            <div><strong>3. Worker SOCSO</strong> = Based on Gross from official table (e.g., RM 1,700 = RM 8.25)</div>
-                            <div><strong>4. Statutory Deductions</strong> = Worker EPF + Worker SOCSO</div>
-                            <div><strong>5. Net Salary</strong> = Gross - Statutory - Advances/Deductions</div>
-                        </div>
-                        <div class="pt-2 border-t border-green-300 dark:border-green-700">
-                            <div class="font-semibold text-green-800 dark:text-green-200">Example 1 (Basic RM 1,700, no OT, no deductions):</div>
-                            <div class="pl-3 mt-1 space-y-1">
-                                <div>• Gross: RM 1,700 | EPF: RM 34 | SOCSO: RM 8.25</div>
-                                <div><strong>Worker Receives (Net):</strong> RM 1,657.75</div>
-                                <div><strong>System Collects:</strong> RM 1,762.85</div>
+                        <flux:callout.heading>Salary Calculation Formula:</flux:callout.heading>
+                        <flux:callout.text>
+                            <div class="mt-2 space-y-2 text-xs">
+                                <div class="font-semibold text-green-800 dark:text-green-200">Calculation Steps:</div>
+                                <div class="pl-3 space-y-1">
+                                    <div><strong>1. Gross Salary</strong> = Basic + OT</div>
+                                    <div><strong>2. Worker EPF</strong> = 2% of Basic (RM 1,700 × 2% = RM 34.00)</div>
+                                    <div><strong>3. Worker SOCSO</strong> = Based on Gross from official table (e.g., RM 1,700 = RM 8.25)</div>
+                                    <div><strong>4. Statutory Deductions</strong> = Worker EPF + Worker SOCSO</div>
+                                    <div><strong>5. Net Salary</strong> = Gross - Statutory - Advances/Deductions</div>
+                                </div>
+                                <div class="pt-2 border-t border-green-300 dark:border-green-700">
+                                    <flux:accordion variant="reverse">
+                                        <div class="font-semibold text-green-800 dark:text-green-200">Example 1 (Basic RM 1,700, no OT, no deductions):</div>
+                                        <div class="pl-3 mt-1 space-y-1">
+                                            <div>• Gross: RM 1,700 | EPF: RM 34 | SOCSO: RM 8.25</div>
+                                            <div><strong>Worker Receives (Net):</strong> RM 1,657.75</div>
+                                            <div><strong>System Collects:</strong> RM 1,762.85</div>
+                                        </div>
+                                    </flux:accordion>
+                                </div>
+                                <div class="pt-2 border-t border-green-300 dark:border-green-700">
+                                    <div class="font-semibold text-green-800 dark:text-green-200">Example 2 (Basic RM 1,700 + OT RM 118.47 + Advance RM 100):</div>
+                                    <div class="pl-3 mt-1 space-y-1">
+                                        <div>• Gross: RM 1,818.47 | EPF: RM 34 (on basic) | SOCSO: RM 8.75 (on gross)</div>
+                                        <div>• Statutory: RM 42.75 | Advance: RM 100</div>
+                                        <div><strong>Worker Receives (Net):</strong> RM 1,675.72 (RM 1,818.47 - RM 42.75 - RM 100)</div>
+                                        <div><strong>System Collects:</strong> RM 1,783.12 (RM 1,818.47 + Employer RM 64.65 - RM 100)</div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="pt-2 border-t border-green-300 dark:border-green-700">
-                            <div class="font-semibold text-green-800 dark:text-green-200">Example 2 (Basic RM 1,700 + OT RM 118.47 + Advance RM 100):</div>
-                            <div class="pl-3 mt-1 space-y-1">
-                                <div>• Gross: RM 1,818.47 | EPF: RM 34 (on basic) | SOCSO: RM 8.75 (on gross)</div>
-                                <div>• Statutory: RM 42.75 | Advance: RM 100</div>
-                                <div><strong>Worker Receives (Net):</strong> RM 1,675.72 (RM 1,818.47 - RM 42.75 - RM 100)</div>
-                                <div><strong>System Collects:</strong> RM 1,783.12 (RM 1,818.47 + Employer RM 64.65 - RM 100)</div>
+                            <div class="mt-3 pt-3 border-t border-green-300 dark:border-green-700 text-xs">
+                                <p><strong>Important:</strong> EPF is calculated on <strong>Basic Salary only</strong>. SOCSO is calculated on <strong>Gross Salary (Basic + OT)</strong> using official contribution table.</p>
                             </div>
-                        </div>
-                    </div>
-                    <div class="mt-3 pt-3 border-t border-green-300 dark:border-green-700 text-xs">
-                        <p><strong>Important:</strong> EPF is calculated on <strong>Basic Salary only</strong>. SOCSO is calculated on <strong>Gross Salary (Basic + OT)</strong> using official contribution table.</p>
-                    </div>
-                </flux:callout.text>
-            </flux:callout>
+                        </flux:callout.text>
+                    </flux:callout>
 
-            <!-- Overtime Rates Info -->
-            <flux:callout icon="currency-dollar" color="blue">
-                <flux:callout.heading>Overtime Rates (Hourly Rate: RM 8.17):</flux:callout.heading>
-                <flux:callout.text>
-                    <div class="text-sm">
-                        <div class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
-                            <div><strong>Normal Day:</strong> RM 12.26/hr (1.5x)</div>
-                            <div><strong>Rest Day:</strong> RM 16.34/hr (2.0x)</div>
-                            <div><strong>Public Holiday:</strong> RM 24.51/hr (3.0x)</div>
-                        </div>
-                        <p class="mt-2 text-xs italic">Note: Enter PREVIOUS month's OT hours. Example: In November payroll, enter October's OT hours. EPF applies to Basic Salary only, SOCSO applies to Gross (Basic + OT).</p>
-                    </div>
-                </flux:callout.text>
-            </flux:callout>
+                    <!-- Overtime Rates Info -->
+                    <flux:callout icon="currency-dollar" color="blue">
+                        <flux:callout.heading>Overtime Rates (Hourly Rate: RM 8.17):</flux:callout.heading>
+                        <flux:callout.text>
+                            <div class="text-sm">
+                                <div class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                                    <div><strong>Normal Day:</strong> RM 12.26/hr (1.5x)</div>
+                                    <div><strong>Rest Day:</strong> RM 16.34/hr (2.0x)</div>
+                                    <div><strong>Public Holiday:</strong> RM 24.51/hr (3.0x)</div>
+                                </div>
+                                <p class="mt-2 text-xs italic">Note: Enter PREVIOUS month's OT hours. Example: In November payroll, enter October's OT hours. EPF applies to Basic Salary only, SOCSO applies to Gross (Basic + OT).</p>
+                            </div>
+                        </flux:callout.text>
+                    </flux:callout>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
@@ -283,17 +285,24 @@
                             </td>
                             <td class="py-3 text-center">
                                 @php
-                                    // EPF: 2% of basic salary only (not including OT)
-                                    $epfWorker = $worker['basic_salary'] * 0.02;
+                                    // If gross salary is 0 (worker ended contract), no statutory contributions
+                                    if ($grossSalary <= 0) {
+                                        $epfWorker = 0;
+                                        $socsoWorker = 0;
+                                        $totalStatutory = 0;
+                                    } else {
+                                        // EPF: 2% of basic salary only (not including OT)
+                                        $epfWorker = $worker['basic_salary'] * 0.02;
 
-                                    // SOCSO: Based on gross salary (basic + OT) using official contribution table
-                                    $calculator = new \App\Services\PaymentCalculatorService();
-                                    $socsoWorker = $calculator->calculateWorkerSOCSO($grossSalary);
+                                        // SOCSO: Based on gross salary (basic + OT) using official contribution table
+                                        $calculator = new \App\Services\PaymentCalculatorService();
+                                        $socsoWorker = $calculator->calculateWorkerSOCSO($grossSalary);
 
-                                    $totalStatutory = $epfWorker + $socsoWorker;
+                                        $totalStatutory = $epfWorker + $socsoWorker;
+                                    }
                                 @endphp
-                                <span class="text-sm text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($totalStatutory, 2) }}
+                                <span class="text-sm {{ $totalStatutory > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ $totalStatutory > 0 ? 'RM ' . number_format($totalStatutory, 2) : '-' }}
                                 </span>
                             </td>
                             <td class="py-3 text-center">
@@ -324,7 +333,7 @@
                                         wire:click="openOTModal({{ $index }})"
                                         variant="filled"
                                         size="sm"
-                                        :disabled="$isBlocked || ($worker['contract_ended'] ?? false)"
+                                        :disabled="$isBlocked"
                                     >
                                         Overtime
                                     </flux:button>
@@ -332,7 +341,7 @@
                                         wire:click="openTransactionModal({{ $index }})"
                                         variant="filled"
                                         size="sm"
-                                        :disabled="$isBlocked || ($worker['contract_ended'] ?? false)"
+                                        :disabled="$isBlocked"
                                     >
                                         Manage
                                     </flux:button>

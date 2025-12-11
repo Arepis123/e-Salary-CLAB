@@ -41,29 +41,39 @@ class PaymentHistoryController extends Controller
         $currentYear = now()->year;
 
         // This month (pending + paid in current month)
-        $thisMonthAmount = PayrollSubmission::where('contractor_clab_no', $clabNo)
+        // Use total_due accessor to include dynamic penalty calculation
+        $thisMonthSubmissions = PayrollSubmission::where('contractor_clab_no', $clabNo)
             ->where('month', $currentMonth)
             ->where('year', $currentYear)
-            ->sum('total_with_penalty');
+            ->get();
 
-        $thisMonthStatus = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->where('month', $currentMonth)
-            ->where('year', $currentYear)
-            ->value('status');
+        $thisMonthAmount = $thisMonthSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
+
+        $thisMonthStatus = $thisMonthSubmissions->first()?->status;
 
         // Last month (paid)
         $lastMonth = now()->subMonth();
-        $lastMonthAmount = PayrollSubmission::where('contractor_clab_no', $clabNo)
+        $lastMonthSubmissions = PayrollSubmission::where('contractor_clab_no', $clabNo)
             ->where('month', $lastMonth->month)
             ->where('year', $lastMonth->year)
             ->where('status', 'paid')
-            ->sum('total_with_penalty');
+            ->get();
+
+        $lastMonthAmount = $lastMonthSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         // This year total
-        $thisYearAmount = PayrollSubmission::where('contractor_clab_no', $clabNo)
+        $thisYearSubmissions = PayrollSubmission::where('contractor_clab_no', $clabNo)
             ->where('year', $currentYear)
             ->where('status', 'paid')
-            ->sum('total_with_penalty');
+            ->get();
+
+        $thisYearAmount = $thisYearSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         $thisYearCount = PayrollSubmission::where('contractor_clab_no', $clabNo)
             ->where('year', $currentYear)

@@ -119,7 +119,7 @@
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="font-bold text-red-600 dark:text-red-400">
-                                    RM {{ number_format($overdue->total_with_penalty, 2) }}
+                                    RM {{ number_format($overdue->total_due, 2) }}
                                 </span>
                                 <flux:button variant="primary" size="sm" href="{{ route('invoices') }}" wire:navigate>
                                     Pay Now
@@ -439,7 +439,7 @@
                                     <tr>
                                         <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $payment->month_year }}</td>
                                         <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                            RM {{ number_format($payment->total_with_penalty, 2) }}
+                                            RM {{ number_format($payment->total_due, 2) }}
                                         </td>
                                         <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $payment->total_workers }} {{ Str::plural('worker', $payment->total_workers) }}</td>
                                         <td class="py-3">

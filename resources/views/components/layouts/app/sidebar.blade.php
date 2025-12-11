@@ -9,8 +9,8 @@
                 <flux:sidebar.brand
                     href="{{ route('dashboard') }}"
                     wire:navigate
-                    logo="{{ asset('favicon.svg') }}"
-                    logo:dark="{{ asset('favicon.svg') }}"
+                    logo="{{ asset('logo-clab.png') }}"
+                    logo:dark="{{ asset('logo-clab.png') }}"
                     name="e-Salary CLAB"
                 />
 

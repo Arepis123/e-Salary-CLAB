@@ -83,7 +83,7 @@
                             <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $invoice->month_year }}</td>
                             <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $invoice->total_workers }}</td>
                             <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_with_penalty, 2) }}
+                                RM {{ number_format($invoice->total_due, 2) }}
                             </td>
                             <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">
                                 {{ $invoice->submitted_at ? $invoice->submitted_at->format('M d, Y') : '-' }}

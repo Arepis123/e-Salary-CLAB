@@ -84,8 +84,13 @@ class Dashboard extends Component
             ->sum('amount');
 
         // Outstanding balance (pending + overdue submissions)
-        $outstandingBalance = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
-            ->sum('total_with_penalty');
+        // Use total_due accessor to include penalty calculation
+        $outstandingSubmissions = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
+            ->get();
+
+        $outstandingBalance = $outstandingSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         // Calculate growth
         $paymentsGrowth = $lastMonthPayments > 0

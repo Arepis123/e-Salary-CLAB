@@ -177,12 +177,12 @@
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">All Payments</h2>
-            <div class="flex gap-2">
+            <!-- <div class="flex gap-2">
                 <flux:button variant="filled" size="sm">
                     <flux:icon.arrow-down-tray class="size-4" />
                     Export
                 </flux:button>
-            </div>
+            </div> -->
         </div>
 
         <flux:table>

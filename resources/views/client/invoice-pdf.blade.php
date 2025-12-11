@@ -277,10 +277,10 @@
                     <th class="worker-name">WORKER</th>
                     <th class="basic-salary">BASIC<br>SALARY</th>
                     <th class="ot-col">OVERTIME<br>(OT)</th>
-                    <th class="deduction-col">DEDUCTION</th>
                     <th class="gross-salary">GROSS<br>SALARY</th>
                     <th class="worker-epf">WORKER<br>EPF</th>
                     <th class="worker-socso">WORKER<br>SOCSO</th>
+                    <th class="deduction-col">DEDUCTION</th>
                     <th class="net-salary">NET<br>SALARY</th>
                     <th class="employer-epf">EMPLOYER<br>EPF</th>
                     <th class="employer-socso">EMPLOYER<br>SOCSO</th>
@@ -302,6 +302,9 @@
                             -
                         @endif
                     </td>
+                    <td class="gross-salary">{{ number_format($worker->gross_salary, 2) }}</td>
+                    <td class="worker-epf">{{ number_format($worker->epf_employee, 2) }}</td>
+                    <td class="worker-socso">{{ number_format($worker->socso_employee, 2) }}</td>
                     <td class="deduction-col">
                         @php
                             $workerTransactions = $worker->transactions ?? collect([]);
@@ -313,7 +316,7 @@
                                 <div class="advance-payment transaction-item">
                                     <strong>Advance:</strong>
                                     @foreach($advancePayments as $transaction)
-                                        <div>RM {{ number_format($transaction->amount, 2) }}</div>
+                                        <div>-RM {{ number_format($transaction->amount, 2) }}</div>
                                         <div style="font-style: italic;">({{ $transaction->remarks }})</div>
                                     @endforeach
                                 </div>
@@ -322,7 +325,7 @@
                                 <div class="deduction transaction-item">
                                     <strong>Deduction:</strong>
                                     @foreach($deductions as $transaction)
-                                        <div>RM {{ number_format($transaction->amount, 2) }}</div>
+                                        <div>-RM {{ number_format($transaction->amount, 2) }}</div>
                                         <div style="font-style: italic;">({{ $transaction->remarks }})</div>
                                     @endforeach
                                 </div>
@@ -331,9 +334,6 @@
                             -
                         @endif
                     </td>
-                    <td class="gross-salary">{{ number_format($worker->gross_salary, 2) }}</td>
-                    <td class="worker-epf">{{ number_format($worker->epf_employee, 2) }}</td>
-                    <td class="worker-socso">{{ number_format($worker->socso_employee, 2) }}</td>
                     <td class="net-salary" style="font-weight: bold;">{{ number_format($worker->net_salary, 2) }}</td>
                     <td class="employer-epf">{{ number_format($worker->epf_employer, 2) }}</td>
                     <td class="employer-socso">{{ number_format($worker->socso_employer, 2) }}</td>
@@ -352,7 +352,7 @@
                         <strong>OVERTIME (OT) INFORMATION:</strong><br>
                         • The OT hours shown are from the PREVIOUS month and are paid in this month's invoice<br>
                         • Example: November payroll includes October's OT hours<br>
-                        • Gross Salary = Basic Salary + OT - Advance Payment - Deductions<br>
+                        • Gross Salary = Basic Salary + OT<br>
                         • EPF is calculated on Basic Salary only (2%)<br>
                         • SOCSO is calculated on Gross Salary using contribution table
                     </div>
@@ -401,7 +401,7 @@
                         @endif
                         <div class="grand-total">
                             <span class="total-label">TOTAL DUE (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->total_with_penalty, 2) }}</span>
+                            <span class="total-value">{{ number_format($invoice->total_due, 2) }}</span>
                         </div>
                     </div>
                 </td>

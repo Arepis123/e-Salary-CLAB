@@ -26,7 +26,7 @@ class PayrollSubmission extends Model
     ];
 
     protected $casts = [
-        'payment_deadline' => 'date',
+        'payment_deadline' => 'datetime',
         'has_penalty' => 'boolean',
         'penalty_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
@@ -109,10 +109,17 @@ class PayrollSubmission extends Model
      */
     public function getTotalDueAttribute(): float
     {
+        // If penalty was already applied and saved, use it
+        if ($this->has_penalty && $this->penalty_amount > 0) {
+            return $this->grand_total + $this->penalty_amount;
+        }
+
+        // Otherwise, calculate dynamically if overdue
         if ($this->isOverdue() && $this->status !== 'paid') {
             $penalty = $this->calculatePenalty();
             return $this->grand_total + $penalty;
         }
+
         return $this->grand_total;
     }
 

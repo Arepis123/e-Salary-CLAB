@@ -162,19 +162,29 @@ class PayrollWorker extends Model
         // This is the total earnings before statutory and transaction deductions
         $this->gross_salary = $this->basic_salary + $this->total_ot_pay + $additionalOtPay;
 
-        // Employee statutory deductions
-        // EPF: Calculated on BASIC SALARY only (OT NOT included)
-        // SOCSO: Calculated on GROSS SALARY (Basic + OT, before deductions)
-        $this->epf_employee = $calculator->calculateWorkerEPF($this->basic_salary);
-        $this->socso_employee = $calculator->calculateWorkerSOCSO($this->gross_salary);
-        $this->total_deductions = $this->epf_employee + $this->socso_employee;
+        // If gross salary is 0 (e.g., worker ended contract), no statutory contributions
+        if ($this->gross_salary <= 0) {
+            $this->epf_employee = 0;
+            $this->socso_employee = 0;
+            $this->total_deductions = 0;
+            $this->epf_employer = 0;
+            $this->socso_employer = 0;
+            $this->total_employer_contribution = 0;
+        } else {
+            // Employee statutory deductions
+            // EPF: Calculated on BASIC SALARY only (OT NOT included)
+            // SOCSO: Calculated on GROSS SALARY (Basic + OT, before deductions)
+            $this->epf_employee = $calculator->calculateWorkerEPF($this->basic_salary);
+            $this->socso_employee = $calculator->calculateWorkerSOCSO($this->gross_salary);
+            $this->total_deductions = $this->epf_employee + $this->socso_employee;
 
-        // Employer contributions
-        // EPF: Calculated on BASIC SALARY only (OT NOT included)
-        // SOCSO: Calculated on GROSS SALARY (Basic + OT, before deductions)
-        $this->epf_employer = $calculator->calculateEmployerEPF($this->basic_salary);
-        $this->socso_employer = $calculator->calculateEmployerSOCSO($this->gross_salary);
-        $this->total_employer_contribution = $this->epf_employer + $this->socso_employer;
+            // Employer contributions
+            // EPF: Calculated on BASIC SALARY only (OT NOT included)
+            // SOCSO: Calculated on GROSS SALARY (Basic + OT, before deductions)
+            $this->epf_employer = $calculator->calculateEmployerEPF($this->basic_salary);
+            $this->socso_employer = $calculator->calculateEmployerSOCSO($this->gross_salary);
+            $this->total_employer_contribution = $this->epf_employer + $this->socso_employer;
+        }
 
         // Final amounts
         // Net salary = Gross - Statutory Deductions - Transaction Deductions (Advances/Deductions)

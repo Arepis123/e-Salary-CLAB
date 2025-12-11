@@ -32,7 +32,8 @@
       "Bash(copy C:xampphtdocse-payrollresourcesviewsadmininvoice-pdf.blade.php C:xampphtdocse-payrollresourcesviewsclientinvoice-pdf.blade.php)",
       "Bash(if not exist \"C:\\xampp\\htdocs\\e-payroll\\app\\Exports\" mkdir \"C:\\xampp\\htdocs\\e-payroll\\app\\Exports\")",
       "Bash(del check_worker.php)",
-      "Bash(del test_pending_ot.php)"
+      "Bash(del test_pending_ot.php)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []

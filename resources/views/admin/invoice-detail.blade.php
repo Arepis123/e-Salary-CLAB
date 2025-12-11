@@ -120,10 +120,10 @@
                             <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Overtime (OT)</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Gross Salary</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker EPF</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker SOCSO</th>
+                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Net Salary</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Employer EPF</th>
                             <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Employer SOCSO</th>
@@ -155,6 +155,15 @@
                                     <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                 @endif
                             </td>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->gross_salary, 2) }}
+                            </td>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->epf_employee, 2) }}
+                            </td>
+                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                RM {{ number_format($worker->socso_employee, 2) }}
+                            </td>
                             <td class="py-3">
                                 @php
                                     $workerTransactions = $worker->transactions ?? collect([]);
@@ -185,15 +194,6 @@
                                 @else
                                     <div class="text-sm text-center text-zinc-400 dark:text-zinc-500">-</div>
                                 @endif
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->gross_salary, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->epf_employee, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->socso_employee, 2) }}
                             </td>
                             <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                 RM {{ number_format($worker->net_salary, 2) }}
@@ -258,7 +258,7 @@
                                 Total Amount Due:
                             </td>
                             <td class="py-3 text-right text-base font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_with_penalty, 2) }}
+                                RM {{ number_format($invoice->total_due, 2) }}
                             </td>
                         </tr>
                     </tfoot>

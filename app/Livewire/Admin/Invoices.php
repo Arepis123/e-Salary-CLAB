@@ -172,7 +172,10 @@ class Invoices extends Component
 
         $pendingInvoices = $allSubmissions->whereIn('status', ['pending_payment', 'overdue'])->count();
         $paidInvoices = $allSubmissions->where('status', 'paid')->count();
-        $totalInvoiced = $allSubmissions->sum('total_with_penalty');
+        // Use total_due accessor to include dynamic penalty calculation
+        $totalInvoiced = $allSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         // Get all contractors for filter
         $contractors = User::where('role', 'client')

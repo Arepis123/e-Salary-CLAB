@@ -209,7 +209,10 @@ class Invoices extends Component
 
         $pendingInvoices = $allSubmissions->whereIn('status', ['draft', 'pending_payment', 'overdue'])->count();
         $paidInvoices = $allSubmissions->where('status', 'paid')->count();
-        $totalInvoiced = $allSubmissions->sum('total_with_penalty');
+        // Use total_due accessor to include dynamic penalty calculation
+        $totalInvoiced = $allSubmissions->sum(function($submission) {
+            return $submission->total_due;
+        });
 
         // Available years for filter
         $availableYears = PayrollSubmission::where('contractor_clab_no', $clabNo)

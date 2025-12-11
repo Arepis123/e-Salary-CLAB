@@ -232,7 +232,7 @@
                                 Total Amount Due:
                             </td>
                             <td class="py-3 text-right text-base font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_with_penalty, 2) }}
+                                RM {{ number_format($invoice->total_due, 2) }}
                             </td>
                         </tr>
                     </tfoot>

@@ -204,17 +204,24 @@
                             </td>
                             <td class="py-3 text-center">
                                 @php
-                                    // EPF: 2% of basic salary only (not including OT)
-                                    $epfWorker = $worker['basic_salary'] * 0.02;
+                                    // If gross salary is 0 (worker ended contract), no statutory contributions
+                                    if ($grossSalary <= 0) {
+                                        $epfWorker = 0;
+                                        $socsoWorker = 0;
+                                        $totalStatutory = 0;
+                                    } else {
+                                        // EPF: 2% of basic salary only (not including OT)
+                                        $epfWorker = $worker['basic_salary'] * 0.02;
 
-                                    // SOCSO: Based on gross salary (basic + OT) using official contribution table
-                                    $calculator = new \App\Services\PaymentCalculatorService();
-                                    $socsoWorker = $calculator->calculateWorkerSOCSO($grossSalary);
+                                        // SOCSO: Based on gross salary (basic + OT) using official contribution table
+                                        $calculator = new \App\Services\PaymentCalculatorService();
+                                        $socsoWorker = $calculator->calculateWorkerSOCSO($grossSalary);
 
-                                    $totalStatutory = $epfWorker + $socsoWorker;
+                                        $totalStatutory = $epfWorker + $socsoWorker;
+                                    }
                                 @endphp
-                                <span class="text-sm text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($totalStatutory, 2) }}
+                                <span class="text-sm {{ $totalStatutory > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ $totalStatutory > 0 ? 'RM ' . number_format($totalStatutory, 2) : '-' }}
                                 </span>
                             </td>
                             <td class="py-3 text-center">
@@ -245,7 +252,6 @@
                                         wire:click="openOTModal({{ $index }})"
                                         variant="filled"
                                         size="sm"
-                                        :disabled="$worker['contract_ended'] ?? false"
                                     >
                                         Overtime
                                     </flux:button>
@@ -253,7 +259,6 @@
                                         wire:click="openTransactionModal({{ $index }})"
                                         variant="filled"
                                         size="sm"
-                                        :disabled="$worker['contract_ended'] ?? false"
                                     >
                                         Manage
                                     </flux:button>
