@@ -33,7 +33,9 @@
       "Bash(if not exist \"C:\\xampp\\htdocs\\e-payroll\\app\\Exports\" mkdir \"C:\\xampp\\htdocs\\e-payroll\\app\\Exports\")",
       "Bash(del check_worker.php)",
       "Bash(del test_pending_ot.php)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(if not exist \"C:\\xampp\\htdocs\\e-payroll\\resources\\views\\errors\" mkdir \"C:\\xampp\\htdocs\\e-payroll\\resources\\views\\errors\")",
+      "Bash(if exist delete_december_payroll.php del delete_december_payroll.php)"
     ],
     "deny": [],
     "ask": []

@@ -240,12 +240,13 @@ class PaymentController extends Controller
         $paid = $request->input('paid') === 'true';
         $state = $request->input('state');
         $amount = $request->input('paid_amount');
-        $transactionId = $request->input('transaction_id');
+        $billplzBillId = $request->input('id'); // Billplz Bill ID is the transaction identifier
         $transactionStatus = $request->input('transaction_status');
 
-        // Store callback response
+        // Store callback response and transaction ID (use Billplz Bill ID as transaction ID)
         $payment->payment_response = json_encode($request->all());
-        $payment->transaction_id = $transactionId;
+        $payment->transaction_id = $billplzBillId; // Billplz Bill ID is the transaction reference
+        $payment->save(); // Save transaction_id before marking as completed
 
         if ($paid && $state === 'active' && $transactionStatus === 'completed') {
             // Payment successful
@@ -255,7 +256,7 @@ class PaymentController extends Controller
                 'payment_id' => $payment->id,
                 'submission_id' => $payment->payroll_submission_id,
                 'bill_id' => $billplzId,
-                'transaction_id' => $transactionId,
+                'transaction_id' => $billplzBillId,
                 'amount' => $amount,
             ]);
 
@@ -274,7 +275,7 @@ class PaymentController extends Controller
                 'properties' => [
                     'submission_id' => $submission->id,
                     'amount' => $amount,
-                    'transaction_id' => $transactionId,
+                    'transaction_id' => $billplzBillId,
                     'period' => $submission->month_year,
                 ],
                 'ip_address' => $request->ip(),

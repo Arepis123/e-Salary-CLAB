@@ -64,7 +64,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         };
     })->name('invoices.show');
 
-    // Invoice Download - Unified route
+    // Invoice Download - Unified route (Pro Forma Invoice)
     Route::get('invoices/{id}/download', function ($id) {
         return match(auth()->user()->role) {
             'admin', 'super_admin' => app(\App\Http\Controllers\Admin\InvoiceController::class)->download($id),
@@ -72,6 +72,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             default => abort(403)
         };
     })->name('invoices.download');
+
+    // Tax Invoice Download - Unified route (Only for paid invoices)
+    Route::get('invoices/{id}/download-tax-invoice', function ($id) {
+        return match(auth()->user()->role) {
+            'admin', 'super_admin' => app(\App\Http\Controllers\Admin\InvoiceController::class)->downloadTaxInvoice($id),
+            'client' => app(\App\Http\Controllers\Client\InvoiceController::class)->downloadTaxInvoice($id),
+            default => abort(403)
+        };
+    })->name('invoices.download-tax');
 
     // ========================================================================
     // ADMIN-ONLY ROUTES (No client equivalent)

@@ -23,6 +23,8 @@ class PayrollSubmission extends Model
         'total_workers',
         'submitted_at',
         'paid_at',
+        'tax_invoice_number',
+        'tax_invoice_generated_at',
     ];
 
     protected $casts = [
@@ -36,6 +38,7 @@ class PayrollSubmission extends Model
         'total_with_penalty' => 'decimal:2',
         'submitted_at' => 'datetime',
         'paid_at' => 'datetime',
+        'tax_invoice_generated_at' => 'datetime',
     ];
 
     /**
@@ -170,6 +173,51 @@ class PayrollSubmission extends Model
     public function calculateSST(): float
     {
         return $this->calculateServiceCharge() * 0.08;
+    }
+
+    /**
+     * Generate tax invoice number for this submission
+     * Format: TINV-YYYY-NNNN (e.g., TINV-2025-0001)
+     */
+    public function generateTaxInvoiceNumber(): string
+    {
+        if ($this->tax_invoice_number) {
+            return $this->tax_invoice_number;
+        }
+
+        // Get the latest tax invoice number for this year
+        $year = $this->year;
+        $latestInvoice = static::whereNotNull('tax_invoice_number')
+            ->where('year', $year)
+            ->orderBy('tax_invoice_generated_at', 'desc')
+            ->first();
+
+        if ($latestInvoice && $latestInvoice->tax_invoice_number) {
+            // Extract the number from format TINV-YYYY-NNNN
+            $parts = explode('-', $latestInvoice->tax_invoice_number);
+            $lastNumber = isset($parts[2]) ? (int)$parts[2] : 0;
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        $taxInvoiceNumber = sprintf('TINV-%d-%04d', $year, $nextNumber);
+
+        // Save the tax invoice number and generation timestamp
+        $this->update([
+            'tax_invoice_number' => $taxInvoiceNumber,
+            'tax_invoice_generated_at' => now(),
+        ]);
+
+        return $taxInvoiceNumber;
+    }
+
+    /**
+     * Check if tax invoice has been generated
+     */
+    public function hasTaxInvoice(): bool
+    {
+        return !empty($this->tax_invoice_number) && !empty($this->tax_invoice_generated_at);
     }
 
     /**

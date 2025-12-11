@@ -72,10 +72,13 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Download invoice as PDF
+     * Download Pro Forma Invoice as PDF (before payment)
      */
     public function download($id)
     {
+        // Increase timeout for PDF generation (especially for large payrolls)
+        set_time_limit(env('PHP_MAX_EXECUTION_TIME', 300));
+
         $clabNo = auth()->user()->contractor_clab_no;
         $contractor = auth()->user();
 
@@ -87,7 +90,43 @@ class InvoiceController extends Controller
         $pdf = \PDF::loadView('client.invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'Invoice-INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT) . '-' . $invoice->month_year . '.pdf';
+        $filename = 'ProForma-Invoice-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT) . '-' . $invoice->month_year . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Download Tax Invoice as PDF (after payment)
+     * Only available for paid invoices
+     */
+    public function downloadTaxInvoice($id)
+    {
+        // Increase timeout for PDF generation (especially for large payrolls)
+        set_time_limit(env('PHP_MAX_EXECUTION_TIME', 300));
+
+        $clabNo = auth()->user()->contractor_clab_no;
+        $contractor = auth()->user();
+
+        $invoice = PayrollSubmission::with(['workers.transactions', 'payment'])
+            ->where('id', $id)
+            ->where('contractor_clab_no', $clabNo)
+            ->firstOrFail();
+
+        // Only allow tax invoice download for paid invoices
+        if ($invoice->status !== 'paid') {
+            return redirect()->back()->with('error', 'Tax invoice is only available for paid invoices.');
+        }
+
+        // Generate tax invoice number if not already generated
+        if (!$invoice->hasTaxInvoice()) {
+            $invoice->generateTaxInvoiceNumber();
+            $invoice->refresh();
+        }
+
+        $pdf = \PDF::loadView('client.tax-invoice-pdf', compact('invoice', 'contractor'))
+            ->setPaper('a4', 'landscape');
+
+        $filename = 'Tax-Invoice-' . $invoice->tax_invoice_number . '-' . $invoice->month_year . '.pdf';
 
         return $pdf->download($filename);
     }

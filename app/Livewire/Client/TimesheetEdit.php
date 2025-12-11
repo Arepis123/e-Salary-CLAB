@@ -348,6 +348,9 @@ class TimesheetEdit extends Component
 
     private function saveSubmission($action)
     {
+        // Increase timeout for large payroll submissions
+        set_time_limit(env('PHP_MAX_EXECUTION_TIME', 300));
+
         $clabNo = auth()->user()->contractor_clab_no;
 
         if (!$clabNo) {
@@ -375,6 +378,13 @@ class TimesheetEdit extends Component
                 // Workers with ended contracts must have exactly RM 0 basic salary
                 if (($worker['contract_ended'] ?? false) && $worker['basic_salary'] != 0) {
                     throw new \Exception("Worker {$worker['worker_name']} has an ended contract and cannot receive basic salary.");
+                }
+                // Workers with ended contracts must have OT to be included (no service charge for nothing)
+                if (($worker['contract_ended'] ?? false) && in_array($worker['worker_id'], $this->selectedWorkers)) {
+                    $totalOT = ($worker['ot_normal_hours'] ?? 0) + ($worker['ot_rest_hours'] ?? 0) + ($worker['ot_public_hours'] ?? 0);
+                    if ($totalOT <= 0) {
+                        throw new \Exception("Worker {$worker['worker_name']} has ended contract with no overtime. Please unselect this worker as there's nothing to pay.");
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -452,9 +462,15 @@ class TimesheetEdit extends Component
                 }
             }
 
-            // Calculate service charge, SST, and grand total (only for selected workers)
+            // Calculate service charge, SST, and grand total (only for selected active workers)
             $selectedWorkerCount = count($this->selectedWorkers);
-            $serviceCharge = $selectedWorkerCount * 200; // RM200 per worker
+            // Only charge service fee for active workers (exclude workers with ended contracts)
+            $activeSelectedWorkers = collect($this->workers)
+                ->filter(function($worker) {
+                    return in_array($worker['worker_id'], $this->selectedWorkers) && !($worker['contract_ended'] ?? false);
+                })
+                ->count();
+            $serviceCharge = $activeSelectedWorkers * 200; // RM200 per active worker only
             $sst = $serviceCharge * 0.08; // 8% SST on service charge
             $grandTotal = $totalAmount + $serviceCharge + $sst;
 

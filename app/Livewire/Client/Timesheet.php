@@ -538,6 +538,9 @@ class Timesheet extends Component
 
     private function saveSubmission($action)
     {
+        // Increase timeout for large payroll submissions
+        set_time_limit(env('PHP_MAX_EXECUTION_TIME', 300));
+
         \Log::info('saveSubmission called', ['action' => $action]);
 
         $clabNo = auth()->user()->contractor_clab_no;
@@ -572,6 +575,14 @@ class Timesheet extends Component
                 // Workers with ended contracts must have exactly RM 0 basic salary
                 if (($worker['contract_ended'] ?? false) && $worker['basic_salary'] != 0) {
                     throw new \Exception("Worker {$worker['worker_name']} has an ended contract and cannot receive basic salary.");
+                }
+                // Workers with ended contracts must have OT to be included (no service charge for nothing)
+                // Only validate if worker is selected
+                if (($worker['contract_ended'] ?? false) && in_array($worker['worker_id'], $this->selectedWorkers)) {
+                    $totalOT = ($worker['ot_normal_hours'] ?? 0) + ($worker['ot_rest_hours'] ?? 0) + ($worker['ot_public_hours'] ?? 0);
+                    if ($totalOT <= 0) {
+                        throw new \Exception("Worker {$worker['worker_name']} has ended contract with no overtime. Please unselect this worker as there's nothing to pay.");
+                    }
                 }
             }
         } catch (\Exception $e) {

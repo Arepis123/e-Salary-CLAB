@@ -96,7 +96,11 @@ class PayrollService
         }
 
         // Calculate service charge, SST, and grand total
-        $serviceCharge = count($workersData) * 200; // RM200 per worker
+        // Only charge service fee for active workers (exclude workers with ended contracts)
+        $activeWorkersCount = count(array_filter($workersData, function($worker) {
+            return !($worker['contract_ended'] ?? false);
+        }));
+        $serviceCharge = $activeWorkersCount * 200; // RM200 per active worker only
         $sst = $serviceCharge * 0.08; // 8% SST on service charge
         $grandTotal = $totalAmount + $serviceCharge + $sst;
 
@@ -173,7 +177,11 @@ class PayrollService
         }
 
         // Calculate service charge, SST, and grand total
-        $serviceCharge = count($workersData) * 200; // RM200 per worker
+        // Only charge service fee for active workers (exclude workers with ended contracts)
+        $activeWorkersCount = count(array_filter($workersData, function($worker) {
+            return !($worker['contract_ended'] ?? false);
+        }));
+        $serviceCharge = $activeWorkersCount * 200; // RM200 per active worker only
         $sst = $serviceCharge * 0.08; // 8% SST on service charge
         $grandTotal = $totalAmount + $serviceCharge + $sst;
 

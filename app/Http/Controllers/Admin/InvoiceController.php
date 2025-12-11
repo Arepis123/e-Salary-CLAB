@@ -30,7 +30,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Download invoice as PDF (Admin can download any invoice)
+     * Download Pro Forma Invoice as PDF (Admin can download any invoice)
      */
     public function download($id)
     {
@@ -43,7 +43,37 @@ class InvoiceController extends Controller
         $pdf = \PDF::loadView('admin.invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'Invoice-INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT) . '-' . $invoice->month_year . '.pdf';
+        $filename = 'ProForma-Invoice-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT) . '-' . $invoice->month_year . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Download Tax Invoice as PDF (Admin can download any paid invoice)
+     */
+    public function downloadTaxInvoice($id)
+    {
+        $invoice = PayrollSubmission::with(['workers.transactions', 'payment', 'user'])
+            ->where('id', $id)
+            ->firstOrFail();
+
+        // Only allow tax invoice download for paid invoices
+        if ($invoice->status !== 'paid') {
+            return redirect()->back()->with('error', 'Tax invoice is only available for paid invoices.');
+        }
+
+        // Generate tax invoice number if not already generated
+        if (!$invoice->hasTaxInvoice()) {
+            $invoice->generateTaxInvoiceNumber();
+            $invoice->refresh();
+        }
+
+        $contractor = $invoice->user;
+
+        $pdf = \PDF::loadView('admin.tax-invoice-pdf', compact('invoice', 'contractor'))
+            ->setPaper('a4', 'landscape');
+
+        $filename = 'Tax-Invoice-' . $invoice->tax_invoice_number . '-' . $invoice->month_year . '.pdf';
 
         return $pdf->download($filename);
     }
