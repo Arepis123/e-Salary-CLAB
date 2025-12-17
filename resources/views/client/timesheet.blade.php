@@ -28,7 +28,7 @@
                     <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} Payroll</h3>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                         Payment deadline: <span class="font-semibold {{ $period['days_until_deadline'] < 7 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400' }}">
-                            {{ $period['deadline']->format('F d, Y') }} ({{ $period['days_until_deadline'] }} days remaining)
+                            {{ $period['deadline']->format('F d, Y') }} ({{ floor($period['days_until_deadline']) }} days remaining)
                         </span>
                     </p>
                 </div>

@@ -26,5 +26,19 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Handle timeout errors with user-friendly message
+        $exceptions->render(function (\Symfony\Component\ErrorHandler\Error\FatalError $e) {
+            if (str_contains($e->getMessage(), 'Maximum execution time')) {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'message' => 'The request took too long to process. Please try again or contact support if the issue persists.',
+                        'error' => 'timeout'
+                    ], 504);
+                }
+
+                return response()->view('errors.timeout', [
+                    'message' => 'The operation took too long to complete.',
+                ], 504);
+            }
+        });
     })->create();

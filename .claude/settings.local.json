@@ -34,8 +34,8 @@
       "Bash(del check_worker.php)",
       "Bash(del test_pending_ot.php)",
       "Bash(del:*)",
-      "Bash(ping:*)",
-      "Bash(powershell -Command \"Test-NetConnection -ComputerName 103.6.196.135 -Port 3306\")"
+      "Bash(if not exist \"C:\\xampp\\htdocs\\e-payroll\\resources\\views\\errors\" mkdir \"C:\\xampp\\htdocs\\e-payroll\\resources\\views\\errors\")",
+      "Bash(if exist delete_december_payroll.php del delete_december_payroll.php)"
     ],
     "deny": [],
     "ask": []

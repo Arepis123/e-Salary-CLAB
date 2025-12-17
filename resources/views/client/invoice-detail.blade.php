@@ -7,10 +7,24 @@
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ $invoice->month_year }} Payroll Invoice</p>
             </div>
             <div class="flex gap-2">
-                <flux:button variant="outline" href="{{ route('invoices.download', $invoice->id) }}">
-                    <flux:icon.arrow-down-tray class="size-4" />
-                    Download PDF
-                </flux:button>
+                @if($invoice->status === 'paid')
+                    <!-- Tax Invoice (for paid invoices) -->
+                    <flux:button variant="primary" href="{{ route('invoices.download-tax', $invoice->id) }}">
+                        <flux:icon.arrow-down-tray class="size-4" />
+                        Download Tax Invoice
+                    </flux:button>
+                    <!-- Pro Forma Invoice (still available) -->
+                    <flux:button variant="outline" href="{{ route('invoices.download', $invoice->id) }}">
+                        <flux:icon.arrow-down-tray class="size-4" />
+                        Download Pro Forma
+                    </flux:button>
+                @else
+                    <!-- Pro Forma Invoice only (for unpaid invoices) -->
+                    <flux:button variant="outline" href="{{ route('invoices.download', $invoice->id) }}">
+                        <flux:icon.arrow-down-tray class="size-4" />
+                        Download Pro Forma Invoice
+                    </flux:button>
+                @endif
                 <flux:button variant="outline" href="{{ route('invoices') }}">
                     <flux:icon.arrow-left class="size-4" />
                     Back to Invoices
