@@ -145,14 +145,13 @@
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <div class="text-xs text-zinc-600 dark:text-zinc-400 hidden">
-                                Total: RM {{ number_format($submission->total_amount, 2) }}<br>
-                                + Service: RM {{ number_format($submission->service_charge, 2) }}<br>
-                                + SST: RM {{ number_format($submission->sst, 2) }}
-                            </div>
-                            <div class="font-semibold text-zinc-900 dark:text-zinc-100 mt-1">
-                                RM {{ number_format($submission->grand_total, 2) }}
-                            </div>
+                            @if($submission->hasAdminReview())
+                                <div class="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($submission->client_total, 2) }}
+                                </div>
+                            @else
+                                <span class="text-sm text-orange-600 dark:text-orange-400">Pending Review</span>
+                            @endif
                         </flux:table.cell>
 
                         <flux:table.cell>
@@ -261,7 +260,7 @@
                             </p>
                             <div class="mt-2 flex flex-wrap gap-2 items-center hidden">
                                 <flux:badge color="blue" size="sm">
-                                    RM {{ number_format($selectedSubmission->grand_total, 2) }}
+                                    RM {{ number_format($selectedSubmission->client_total, 2) }}
                                 </flux:badge>
                                 @if($selectedSubmission->payment && $selectedSubmission->payment->status === 'completed')
                                     <flux:badge color="green" size="sm" icon="check">Paid</flux:badge>

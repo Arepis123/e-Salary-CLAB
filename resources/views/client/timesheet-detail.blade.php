@@ -58,22 +58,12 @@
                 </div>
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Amount Due</p>
-                    <p class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</p>
-                    <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1 hidden">
-                        + Service Charge: RM {{ number_format($submission->service_charge, 2) }}
-                    </p>
-                    <p class="text-xs text-zinc-600 dark:text-zinc-400 hidden">
-                        + SST 8%: RM {{ number_format($submission->sst, 2) }}
-                    </p>
-                    <p class="text-sm font-bold text-zinc-900 dark:text-zinc-100 mt-1 hidden">
-                        Grand Total: RM {{ number_format($submission->grand_total, 2) }}
-                    </p>
-                    @if($submission->has_penalty)
-                        <p class="text-xs text-red-600 dark:text-red-400 mt-2 hidden">
-                            + Late Penalty: RM {{ number_format($submission->penalty_amount, 2) }}
-                        </p>
-                        <p class="text-sm font-bold text-red-600 dark:text-red-400 hidden">
-                            Total Due: RM {{ number_format($submission->total_due, 2) }}
+                    @if($submission->hasAdminReview())
+                        <p class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</p>
+                    @else
+                        <p class="text-lg font-semibold text-orange-600 dark:text-orange-400">Pending Admin Review</p>
+                        <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                            Amount will be available after admin approval
                         </p>
                     @endif
                 </div>
@@ -110,158 +100,176 @@
             @endif
         </flux:card>
 
-        <!-- Workers Details -->
-        <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
-            <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Worker Breakdown</h2>
+        @if(!$submission->hasAdminReview())
+            <!-- Pending Admin Review Notice -->
+            <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
+                    <div class="flex gap-3">
+                        <flux:icon.information-circle class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                        <div class="text-sm text-blue-900 dark:text-blue-100">
+                            <p class="font-medium">Payroll Processing in Progress</p>
+                            <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                Your submission is being processed by our certified external payroll system. The salary breakdown and invoice will be available after admin approval.
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Overtime (OT)</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Gross Salary</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker EPF</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker SOCSO</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Net Salary</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Employer EPF</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Employer SOCSO</th>
-                            <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Total Payment</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                        @foreach($submission->workers as $worker)
-                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                            <td class="py-3">
-                                <div class="flex items-center gap-3">
-                                    <flux:avatar size="sm" name="{{ $worker->worker_name }}" />
-                                    <div>
-                                        <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->worker_name }}</p>
-                                        <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $worker->worker_id }}</p>
+                <!-- Client Input Summary -->
+                <div class="mt-6">
+                    <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Your Submission Summary</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker</th>
+                                    <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</th>
+                                    <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Hours</th>
+                                    <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                                @foreach($submission->workers as $worker)
+                                <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                    <td class="py-3">
+                                        <div class="flex items-center gap-3">
+                                            <flux:avatar size="sm" name="{{ $worker->worker_name }}" />
+                                            <div>
+                                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->worker_name }}</p>
+                                                <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $worker->worker_id }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        RM {{ number_format($worker->basic_salary, 2) }}
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @php
+                                            $totalOTHours = ($worker->ot_normal_hours ?? 0) + ($worker->ot_rest_hours ?? 0) + ($worker->ot_public_hours ?? 0);
+                                        @endphp
+                                        @if($totalOTHours > 0)
+                                            {{ $totalOTHours }} hours
+                                            <div class="text-xs text-zinc-500 dark:text-zinc-400">
+                                                @if($worker->ot_normal_hours > 0)Normal: {{ $worker->ot_normal_hours }}h @endif
+                                                @if($worker->ot_rest_hours > 0)Rest: {{ $worker->ot_rest_hours }}h @endif
+                                                @if($worker->ot_public_hours > 0)Public: {{ $worker->ot_public_hours }}h @endif
+                                            </div>
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3">
+                                        @php
+                                            $workerTransactions = $worker->transactions ?? collect([]);
+                                            $advancePayments = $workerTransactions->where('type', 'advance_payment');
+                                            $deductions = $workerTransactions->where('type', 'deduction');
+                                        @endphp
+                                        @if($workerTransactions->count() > 0)
+                                            <div class="space-y-1 text-right">
+                                                @if($advancePayments->count() > 0)
+                                                    <div class="text-sm font-medium text-orange-600 dark:text-orange-400">Advance:</div>
+                                                    @foreach($advancePayments as $transaction)
+                                                        <div class="text-xs text-zinc-600 dark:text-zinc-400">
+                                                            RM {{ number_format($transaction->amount, 2) }}
+                                                            <div class="italic">({{ $transaction->remarks }})</div>
+                                                        </div>
+                                                    @endforeach
+                                                @endif
+                                                @if($deductions->count() > 0)
+                                                    <div class="text-sm font-medium text-red-600 dark:text-red-400">Deduction:</div>
+                                                    @foreach($deductions as $transaction)
+                                                        <div class="text-xs text-zinc-600 dark:text-zinc-400">
+                                                            RM {{ number_format($transaction->amount, 2) }}
+                                                            <div class="italic">({{ $transaction->remarks }})</div>
+                                                        </div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        @else
+                                            <div class="text-sm text-center text-zinc-400 dark:text-zinc-500">-</div>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </flux:card>
+        @else
+            <!-- After Admin Review: Show Breakdown File and Invoice -->
+            <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+                <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Salary Breakdown</h2>
+
+                @if($submission->hasBreakdownFile())
+                    <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex gap-3">
+                                <flux:icon.document-check class="size-5 flex-shrink-0 text-green-600 dark:text-green-400" />
+                                <div class="text-sm text-green-900 dark:text-green-100">
+                                    <p class="font-medium">Salary breakdown has been processed</p>
+                                    <p class="text-xs text-green-700 dark:text-green-300 mt-1">
+                                        Download the detailed breakdown file to view complete salary calculations for all workers.
+                                    </p>
+                                </div>
+                            </div>
+                            <flux:button variant="filled" size="sm" wire:click="downloadBreakdown({{ $submission->id }})">
+                                <flux:icon.arrow-down-tray class="size-4 inline me-1" />
+                                Download Breakdown
+                            </flux:button>
+                        </div>
+                    </div>
+                @else
+                    <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800/50 p-4 border border-zinc-200 dark:border-zinc-700 mb-6">
+                        <div class="flex gap-3">
+                            <flux:icon.information-circle class="size-5 flex-shrink-0 text-zinc-600 dark:text-zinc-400" />
+                            <div class="text-sm text-zinc-900 dark:text-zinc-100">
+                                <p class="font-medium">No breakdown file uploaded</p>
+                                <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                                    The admin has not uploaded a detailed breakdown file yet.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Invoice Summary -->
+                <div class="mt-6">
+                    <h3 class="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">Invoice Summary</h3>
+                    <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-600 dark:text-zinc-400">Total Amount (Payroll)</span>
+                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_amount, 2) }}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->total_workers }} {{ Str::plural('worker', $submission->total_workers) }})</span>
+                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->service_charge, 2) }}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-zinc-600 dark:text-zinc-400">SST (8%)</span>
+                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->sst, 2) }}</span>
+                            </div>
+                            <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2 flex justify-between">
+                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">Grand Total</span>
+                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
+                            </div>
+                            @if($submission->has_penalty)
+                                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2">
+                                    <div class="flex justify-between text-sm text-red-600 dark:text-red-400">
+                                        <span>Late Payment Penalty (8%)</span>
+                                        <span class="font-medium">RM {{ number_format($submission->penalty_amount, 2) }}</span>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->basic_salary, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                @if($worker->total_ot_pay > 0)
-                                    RM {{ number_format($worker->total_ot_pay, 2) }}
-                                @else
-                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
-                                @endif
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->gross_salary, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->epf_employee, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->socso_employee, 2) }}
-                            </td>
-                            <td class="py-3">
-                                @php
-                                    $workerTransactions = $worker->transactions ?? collect([]);
-                                    $advancePayments = $workerTransactions->where('type', 'advance_payment');
-                                    $deductions = $workerTransactions->where('type', 'deduction');
-                                @endphp
-                                @if($workerTransactions->count() > 0)
-                                    <div class="space-y-1 text-right">
-                                        @if($advancePayments->count() > 0)
-                                            <div class="text-sm font-medium text-orange-600 dark:text-orange-400">Advance:</div>
-                                            @foreach($advancePayments as $transaction)
-                                                <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                    RM {{ number_format($transaction->amount, 2) }}
-                                                    <div class="italic">({{ $transaction->remarks }})</div>
-                                                </div>
-                                            @endforeach
-                                        @endif
-                                        @if($deductions->count() > 0)
-                                            <div class="text-sm font-medium text-red-600 dark:text-red-400">Deduction:</div>
-                                            @foreach($deductions as $transaction)
-                                                <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                    RM {{ number_format($transaction->amount, 2) }}
-                                                    <div class="italic">({{ $transaction->remarks }})</div>
-                                                </div>
-                                            @endforeach
-                                        @endif
-                                    </div>
-                                @else
-                                    <div class="text-sm text-center text-zinc-400 dark:text-zinc-500">-</div>
-                                @endif
-                            </td>
-                            <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->net_salary, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->epf_employer, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->socso_employer, 2) }}
-                            </td>
-                            <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($worker->total_payment, 2) }}
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot>
-                        <tr class="border-t-2 border-zinc-300 dark:border-zinc-600">
-                            <td colspan="10" class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                Total Amount:
-                            </td>
-                            <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($submission->total_amount, 2) }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="10" class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                Service Charge (RM200 × {{ $submission->total_workers }} {{ Str::plural('worker', $submission->total_workers) }}):
-                            </td>
-                            <td class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                RM {{ number_format($submission->service_charge, 2) }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="10" class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                SST 8%:
-                            </td>
-                            <td class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                RM {{ number_format($submission->sst, 2) }}
-                            </td>
-                        </tr>
-                        <tr class="border-t border-zinc-300 dark:border-zinc-600">
-                            <td colspan="10" class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                Grand Total:
-                            </td>
-                            <td class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($submission->grand_total, 2) }}
-                            </td>
-                        </tr>
-                        @if($submission->has_penalty)
-                        <tr>
-                            <td colspan="10" class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                Late Payment Penalty (8%):
-                            </td>
-                            <td class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                RM {{ number_format($submission->penalty_amount, 2) }}
-                            </td>
-                        </tr>
-                        @endif
-                        <tr class="border-t border-zinc-300 dark:border-zinc-600">
-                            <td colspan="10" class="py-3 text-right text-base font-bold text-zinc-900 dark:text-zinc-100">
-                                Total Amount Due:
-                            </td>
-                            <td class="py-3 text-right text-base font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($submission->total_due, 2) }}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </flux:card>
+                            @endif
+                            <div class="border-t-2 border-zinc-300 dark:border-zinc-600 pt-2 flex justify-between">
+                                <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due</span>
+                                <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </flux:card>
+        @endif
     </div>
 </x-layouts.app>

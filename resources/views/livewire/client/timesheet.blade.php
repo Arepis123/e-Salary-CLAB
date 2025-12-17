@@ -334,6 +334,8 @@
                                 <flux:menu>
                                     @if($submission->status !== 'draft')
                                         <flux:menu.item icon="eye" icon:variant="outline" href="{{ route('timesheet.show', $submission->id) }}">View Details</flux:menu.item>
+                                    @endif
+                                    @if($submission->hasAdminReview())
                                         <flux:menu.item icon="document-text" icon:variant="outline" href="{{ route('invoices.show', $submission->id) }}">View Invoice</flux:menu.item>
                                     @endif
 

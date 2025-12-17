@@ -254,7 +254,7 @@
                                 Grand Total:
                             </td>
                             <td class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->grand_total, 2) }}
+                                RM {{ number_format($invoice->client_total, 2) }}
                             </td>
                         </tr>
                         @if($invoice->has_penalty)

@@ -252,11 +252,15 @@
                                     {{ $submission->total_workers }}
                                 </flux:table.cell>
                                 <flux:table.cell variant="strong">
-                                    RM {{ number_format($submission->grand_total, 2) }}
-                                    @if($submission->has_penalty)
-                                        <span class="text-xs text-red-600 dark:text-red-400">
-                                            (+{{ number_format($submission->penalty_amount, 2) }})
-                                        </span>
+                                    @if($submission->hasAdminReview())
+                                        RM {{ number_format($submission->client_total, 2) }}
+                                        @if($submission->has_penalty)
+                                            <span class="text-xs text-red-600 dark:text-red-400">
+                                                (+{{ number_format($submission->penalty_amount, 2) }})
+                                            </span>
+                                        @endif
+                                    @else
+                                        <span class="text-sm text-orange-600 dark:text-orange-400">Pending Review</span>
                                     @endif
                                 </flux:table.cell>
                                 <flux:table.cell>

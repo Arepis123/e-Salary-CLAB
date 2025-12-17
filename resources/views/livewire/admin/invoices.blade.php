@@ -189,17 +189,20 @@
                         <flux:table.cell variant="strong">{{ $invoice->total_workers }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <div class="text-xs text-zinc-600 dark:text-zinc-400 hidden">
-                                Total: RM {{ number_format($invoice->total_amount, 2) }}<br>
-                                + Service & SST: RM {{ number_format($invoice->service_charge + $invoice->sst, 2) }}
-                            </div>
-                            <div class="font-semibold text-zinc-900 dark:text-zinc-100 mt-1">
-                                RM {{ number_format($invoice->total_with_penalty, 2) }}
-                            </div>
-                            @if($invoice->has_penalty)
-                                <span class="text-xs text-red-600 dark:text-red-400">
-                                    (+RM {{ number_format($invoice->penalty_amount, 2) }} penalty)
-                                </span>
+                            @if($invoice->hasAdminReview())
+                                <div class="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($invoice->client_total, 2) }}
+                                </div>
+                                @if($invoice->has_penalty)
+                                    <div class="text-xs text-red-600 dark:text-red-400">
+                                        +RM {{ number_format($invoice->penalty_amount, 2) }} penalty
+                                    </div>
+                                    <div class="text-xs font-semibold text-red-600 dark:text-red-400">
+                                        Total: RM {{ number_format($invoice->total_due, 2) }}
+                                    </div>
+                                @endif
+                            @else
+                                <span class="text-sm text-orange-600 dark:text-orange-400">Pending Review</span>
                             @endif
                         </flux:table.cell>
 
