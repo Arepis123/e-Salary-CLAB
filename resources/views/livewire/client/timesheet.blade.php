@@ -111,84 +111,9 @@
     <!-- Payroll Entry Form -->
     @if(!$errorMessage && !$isBlocked)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-        <div class="mb-4 flex items-center justify-between">
+        <div class="mb-4">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime</h2>
-            <flux:button wire:click="openCalculationModal" variant="outline" size="sm">
-                Calculation Formula
-            </flux:button>
         </div>
-
-        <!-- Calculation Information Modal -->
-        <flux:modal name="calculation-info" wire:model="showCalculationModal">
-            <div class="space-y-4">
-                <div>
-                    <flux:heading size="lg">Salary Calculation Formula</flux:heading>
-                    <flux:subheading>Understanding how worker salaries and payments are calculated</flux:subheading>
-                </div>
-
-                <div class="grid gap-3 lg:grid-cols-1">
-                    <!-- Salary Breakdown Info -->
-                    <flux:callout icon="currency-dollar" color="green">
-                        <flux:callout.heading>Salary Calculation Formula:</flux:callout.heading>
-                        <flux:callout.text>
-                            <div class="mt-2 space-y-2 text-xs">
-                                <div class="font-semibold text-green-800 dark:text-green-200">Calculation Steps:</div>
-                                <div class="pl-3 space-y-1">
-                                    <div><strong>1. Gross Salary</strong> = Basic + OT</div>
-                                    <div><strong>2. Worker EPF</strong> = 2% of Basic (RM 1,700 × 2% = RM 34.00)</div>
-                                    <div><strong>3. Worker SOCSO</strong> = Based on Gross from official table (e.g., RM 1,700 = RM 8.25)</div>
-                                    <div><strong>4. Statutory Deductions</strong> = Worker EPF + Worker SOCSO</div>
-                                    <div><strong>5. Net Salary</strong> = Gross - Statutory - Advances/Deductions</div>
-                                </div>
-                                <div class="pt-2 border-t border-green-300 dark:border-green-700">
-                                    <flux:accordion variant="reverse">
-                                        <div class="font-semibold text-green-800 dark:text-green-200">Example 1 (Basic RM 1,700, no OT, no deductions):</div>
-                                        <div class="pl-3 mt-1 space-y-1">
-                                            <div>• Gross: RM 1,700 | EPF: RM 34 | SOCSO: RM 8.25</div>
-                                            <div><strong>Worker Receives (Net):</strong> RM 1,657.75</div>
-                                            <div><strong>System Collects:</strong> RM 1,762.85</div>
-                                        </div>
-                                    </flux:accordion>
-                                </div>
-                                <div class="pt-2 border-t border-green-300 dark:border-green-700">
-                                    <div class="font-semibold text-green-800 dark:text-green-200">Example 2 (Basic RM 1,700 + OT RM 118.47 + Advance RM 100):</div>
-                                    <div class="pl-3 mt-1 space-y-1">
-                                        <div>• Gross: RM 1,818.47 | EPF: RM 34 (on basic) | SOCSO: RM 8.75 (on gross)</div>
-                                        <div>• Statutory: RM 42.75 | Advance: RM 100</div>
-                                        <div><strong>Worker Receives (Net):</strong> RM 1,675.72 (RM 1,818.47 - RM 42.75 - RM 100)</div>
-                                        <div><strong>System Collects:</strong> RM 1,783.12 (RM 1,818.47 + Employer RM 64.65 - RM 100)</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-3 pt-3 border-t border-green-300 dark:border-green-700 text-xs">
-                                <p><strong>Important:</strong> EPF is calculated on <strong>Basic Salary only</strong>. SOCSO is calculated on <strong>Gross Salary (Basic + OT)</strong> using official contribution table.</p>
-                            </div>
-                        </flux:callout.text>
-                    </flux:callout>
-
-                    <!-- Overtime Rates Info -->
-                    <flux:callout icon="currency-dollar" color="blue">
-                        <flux:callout.heading>Overtime Rates (Hourly Rate: RM 8.17):</flux:callout.heading>
-                        <flux:callout.text>
-                            <div class="text-sm">
-                                <div class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
-                                    <div><strong>Normal Day:</strong> RM 12.26/hr (1.5x)</div>
-                                    <div><strong>Rest Day:</strong> RM 16.34/hr (2.0x)</div>
-                                    <div><strong>Public Holiday:</strong> RM 24.51/hr (3.0x)</div>
-                                </div>
-                                <p class="mt-2 text-xs italic">Note: Enter PREVIOUS month's OT hours. Example: In November payroll, enter October's OT hours. EPF applies to Basic Salary only, SOCSO applies to Gross (Basic + OT).</p>
-                            </div>
-                        </flux:callout.text>
-                    </flux:callout>
-                </div>
-
-                <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                    <flux:button wire:click="closeCalculationModal" variant="primary">
-                        Got it!
-                    </flux:button>
-                </div>
-            </div>
-        </flux:modal>
 
         @if(count($workers) > 0)
             <!-- Selection Controls -->
@@ -213,15 +138,12 @@
                                 />
                             </th>
                             <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[20%]">Worker</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Basic Salary">Basic Salary</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Previous Month OT Normal Amount">OT Normal</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Previous Month OT Rest Day Amount">OT Rest Day</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Previous Month OT Public Holiday Amount">OT Public Holiday</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Gross Salary (Basic + All OT)">Gross Salary</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Statutory Deductions (EPF + SOCSO)">Statutory</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Total Deductions (Advances + Deductions)">Deductions</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="Net Salary (Gross - Statutory - Deductions)">Net Salary</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[120px]">Actions</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[120px]" title="Basic Salary">Basic Salary</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Normal Hours">OT Normal (hrs)</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Rest Day Hours">OT Rest (hrs)</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Public Holiday Hours">OT Public (hrs)</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[140px]" title="Advances & Deductions">Advances/Deductions</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
@@ -248,63 +170,33 @@
                                     </div>
                                 </div>
                             </td>
+                            <!-- Basic Salary -->
                             <td class="py-3 text-center">
-                                <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($worker['basic_salary'], 2) }}</span>
+                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($worker['basic_salary'], 2) }}</span>
                             </td>
-                            <td class="py-3 text-center">
-                                @php
-                                    $otNormalAmount = ($worker['ot_normal_hours'] ?? 0) * 12.26;
-                                @endphp
-                                <span class="text-sm {{ $otNormalAmount > 0 ? 'text-zinc-900 dark:text-zinc-100 font-sm' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ $otNormalAmount > 0 ? 'RM ' . number_format($otNormalAmount, 2) : '-' }}
-                                </span>
-                            </td>
-                            <td class="py-3 text-center">
-                                @php
-                                    $otRestAmount = ($worker['ot_rest_hours'] ?? 0) * 16.34;
-                                @endphp
-                                <span class="text-sm {{ $otRestAmount > 0 ? 'text-zinc-900 dark:text-zinc-100 font-sm' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ $otRestAmount > 0 ? 'RM ' . number_format($otRestAmount, 2) : '-' }}
-                                </span>
-                            </td>
-                            <td class="py-3 text-center">
-                                @php
-                                    $otPublicAmount = ($worker['ot_public_hours'] ?? 0) * 24.51;
-                                @endphp
-                                <span class="text-sm {{ $otPublicAmount > 0 ? 'text-zinc-900 dark:text-zinc-100 font-sm' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ $otPublicAmount > 0 ? 'RM ' . number_format($otPublicAmount, 2) : '-' }}
-                                </span>
-                            </td>
-                            <td class="py-3 text-center">
-                                @php
-                                    $grossSalary = $worker['basic_salary'] + $otNormalAmount + $otRestAmount + $otPublicAmount;
-                                @endphp
-                                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($grossSalary, 2) }}
-                                </span>
-                            </td>
-                            <td class="py-3 text-center">
-                                @php
-                                    // If gross salary is 0 (worker ended contract), no statutory contributions
-                                    if ($grossSalary <= 0) {
-                                        $epfWorker = 0;
-                                        $socsoWorker = 0;
-                                        $totalStatutory = 0;
-                                    } else {
-                                        // EPF: 2% of basic salary only (not including OT)
-                                        $epfWorker = $worker['basic_salary'] * 0.02;
 
-                                        // SOCSO: Based on gross salary (basic + OT) using official contribution table
-                                        $calculator = new \App\Services\PaymentCalculatorService();
-                                        $socsoWorker = $calculator->calculateWorkerSOCSO($grossSalary);
-
-                                        $totalStatutory = $epfWorker + $socsoWorker;
-                                    }
-                                @endphp
-                                <span class="text-sm {{ $totalStatutory > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ $totalStatutory > 0 ? 'RM ' . number_format($totalStatutory, 2) : '-' }}
+                            <!-- OT Normal Hours -->
+                            <td class="py-3 text-center">
+                                <span class="text-sm {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? number_format($worker['ot_normal_hours'], 1) . ' hrs' : '-' }}
                                 </span>
                             </td>
+
+                            <!-- OT Rest Day Hours -->
+                            <td class="py-3 text-center">
+                                <span class="text-sm {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? number_format($worker['ot_rest_hours'], 1) . ' hrs' : '-' }}
+                                </span>
+                            </td>
+
+                            <!-- OT Public Holiday Hours -->
+                            <td class="py-3 text-center">
+                                <span class="text-sm {{ ($worker['ot_public_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                    {{ ($worker['ot_public_hours'] ?? 0) > 0 ? number_format($worker['ot_public_hours'], 1) . ' hrs' : '-' }}
+                                </span>
+                            </td>
+
+                            <!-- Advances/Deductions -->
                             <td class="py-3 text-center">
                                 @php
                                     $transactions = $worker['transactions'] ?? [];
@@ -312,20 +204,11 @@
                                 @endphp
                                 <div class="flex items-center justify-center gap-1">
                                     @if($totalTransactions > 0)
-                                        <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($totalTransactions, 2) }}</span>
+                                        <span class="text-sm text-red-600 dark:text-red-400">-RM {{ number_format($totalTransactions, 2) }}</span>
                                     @else
                                         <span class="text-sm text-zinc-400 dark:text-zinc-600">-</span>
                                     @endif
                                 </div>
-                            </td>
-                            <td class="py-3 text-center">
-                                @php
-                                    // Net Salary = Gross Salary - Statutory Deductions - Transaction Deductions
-                                    $netSalary = $grossSalary - $totalStatutory - $totalTransactions;
-                                @endphp
-                                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($netSalary, 2) }}
-                                </span>
                             </td>
                             <td class="py-3 px-2">
                                 <div class="flex items-center justify-center gap-2">
@@ -359,7 +242,7 @@
                     Save as Draft
                 </flux:button>
                 <flux:button wire:click="submitForPayment" variant="primary" :disabled="$isBlocked">
-                    Submit for Payment
+                    Submit for Admin Review
                 </flux:button>
             </div>
         @else
@@ -412,14 +295,17 @@
                         <flux:table.cell variant="strong">{{ $submission->total_workers }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <div class="text-xs text-zinc-600 dark:text-zinc-400 hidden">
-                                Total: RM {{ number_format($submission->total_amount, 2) }}<br>
-                                + Service: RM {{ number_format($submission->service_charge, 2) }}<br>
-                                + SST: RM {{ number_format($submission->sst, 2) }}
-                            </div>
-                            <div class="font-semibold text-zinc-900 dark:text-zinc-100 mt-1">
-                                RM {{ number_format($submission->grand_total, 2) }}
-                            </div>
+                            @if($submission->status === 'draft')
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">Draft</span>
+                            @elseif($submission->status === 'submitted')
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">Pending Admin Review</span>
+                            @elseif($submission->hasAdminReview())
+                                <div class="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($submission->admin_final_amount, 2) }}
+                                </div>
+                            @else
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">-</span>
+                            @endif
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -446,12 +332,15 @@
                             <flux:dropdown>
                                 <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" inset="top bottom" />
                                 <flux:menu>
-                                    <flux:menu.item icon="eye" icon:variant="outline" href="{{ route('timesheet.show', $submission->id) }}">View Details</flux:menu.item>
-                                    <flux:menu.item icon="document-text" icon:variant="outline" href="{{ route('invoices.show', $submission->id) }}">View Invoice</flux:menu.item>
+                                    @if($submission->status !== 'draft')
+                                        <flux:menu.item icon="eye" icon:variant="outline" href="{{ route('timesheet.show', $submission->id) }}">View Details</flux:menu.item>
+                                        <flux:menu.item icon="document-text" icon:variant="outline" href="{{ route('invoices.show', $submission->id) }}">View Invoice</flux:menu.item>
+                                    @endif
+
                                     @if($submission->status === 'draft')
                                         <flux:menu.separator />
                                         <flux:menu.item icon="pencil" icon:variant="outline" href="{{ route('timesheet.edit', $submission->id) }}">Edit Draft</flux:menu.item>
-                                        <flux:menu.item icon="paper-airplane" icon:variant="outline" wire:click="submitDraftForPayment({{ $submission->id }})">Submit for Payment</flux:menu.item>
+                                        <flux:menu.item icon="paper-airplane" icon:variant="outline" wire:click="submitDraftForPayment({{ $submission->id }})">Submit for Admin Review</flux:menu.item>
                                     @endif
                                     @if($submission->status === 'pending_payment' || $submission->status === 'overdue')
                                         <flux:menu.separator />
@@ -620,7 +509,6 @@
                                 label="Normal Day OT (hours)"
                                 placeholder="0.0"
                             />
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Rate: RM 12.26/hr (1.5x)</p>
                         </div>
 
                         <div>
@@ -632,7 +520,6 @@
                                 label="Rest Day OT (hours)"
                                 placeholder="0.0"
                             />
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Rate: RM 16.34/hr (2.0x)</p>
                         </div>
 
                         <div>
@@ -644,7 +531,6 @@
                                 label="Public Holiday OT (hours)"
                                 placeholder="0.0"
                             />
-                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Rate: RM 24.51/hr (3.0x)</p>
                         </div>
                     </div>
                 </flux:card>

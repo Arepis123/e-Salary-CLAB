@@ -25,6 +25,13 @@ class PayrollSubmission extends Model
         'paid_at',
         'tax_invoice_number',
         'tax_invoice_generated_at',
+        'admin_reviewed_by',
+        'admin_reviewed_at',
+        'admin_final_amount',
+        'admin_notes',
+        'breakdown_file_path',
+        'breakdown_file_name',
+        'is_legacy_submission',
     ];
 
     protected $casts = [
@@ -39,6 +46,9 @@ class PayrollSubmission extends Model
         'submitted_at' => 'datetime',
         'paid_at' => 'datetime',
         'tax_invoice_generated_at' => 'datetime',
+        'admin_reviewed_at' => 'datetime',
+        'admin_final_amount' => 'decimal:2',
+        'is_legacy_submission' => 'boolean',
     ];
 
     /**
@@ -47,6 +57,14 @@ class PayrollSubmission extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'contractor_clab_no', 'contractor_clab_no');
+    }
+
+    /**
+     * Get the admin user who reviewed this submission
+     */
+    public function adminReviewer()
+    {
+        return $this->belongsTo(User::class, 'admin_reviewed_by');
     }
 
     /**
@@ -108,22 +126,52 @@ class PayrollSubmission extends Model
     }
 
     /**
+     * Calculate service charge (RM 200 per worker)
+     */
+    public function getCalculatedServiceChargeAttribute(): float
+    {
+        return $this->total_workers * 200;
+    }
+
+    /**
+     * Calculate SST (8% of service charge)
+     */
+    public function getCalculatedSstAttribute(): float
+    {
+        return $this->calculated_service_charge * 0.08;
+    }
+
+    /**
+     * Get client total (payroll + service charge + SST)
+     * This is what the client actually pays
+     */
+    public function getClientTotalAttribute(): float
+    {
+        // Use admin_final_amount if reviewed, otherwise use grand_total (legacy)
+        $payrollAmount = $this->admin_final_amount ?? $this->grand_total;
+
+        return $payrollAmount + $this->calculated_service_charge + $this->calculated_sst;
+    }
+
+    /**
      * Get the total amount including penalty (dynamic calculation)
      */
     public function getTotalDueAttribute(): float
     {
+        $baseAmount = $this->client_total;
+
         // If penalty was already applied and saved, use it
         if ($this->has_penalty && $this->penalty_amount > 0) {
-            return $this->grand_total + $this->penalty_amount;
+            return $baseAmount + $this->penalty_amount;
         }
 
         // Otherwise, calculate dynamically if overdue
         if ($this->isOverdue() && $this->status !== 'paid') {
-            $penalty = $this->calculatePenalty();
-            return $this->grand_total + $penalty;
+            $penalty = $baseAmount * 0.08;
+            return $baseAmount + $penalty;
         }
 
-        return $this->grand_total;
+        return $baseAmount;
     }
 
     /**
@@ -234,5 +282,64 @@ class PayrollSubmission extends Model
     public function getMonthYearAttribute(): string
     {
         return Carbon::create($this->year, $this->month, 1)->format('F Y');
+    }
+
+    /**
+     * Check if submission has been reviewed by admin
+     */
+    public function hasAdminReview(): bool
+    {
+        return !is_null($this->admin_final_amount);
+    }
+
+    /**
+     * Check if submission has a breakdown file attached
+     */
+    public function hasBreakdownFile(): bool
+    {
+        return !is_null($this->breakdown_file_path);
+    }
+
+    /**
+     * Check if submission can be reviewed by admin
+     */
+    public function canBeReviewed(): bool
+    {
+        return in_array($this->status, ['submitted']);
+    }
+
+    /**
+     * Check if payment can be created for this submission
+     */
+    public function canCreatePayment(): bool
+    {
+        return $this->status === 'approved' && $this->hasAdminReview();
+    }
+
+    /**
+     * Get the URL for downloading the breakdown file
+     */
+    public function getBreakdownFileUrl(): ?string
+    {
+        if (!$this->hasBreakdownFile()) {
+            return null;
+        }
+        return route('payroll.breakdown.download', $this->id);
+    }
+
+    /**
+     * Scope to filter submissions awaiting admin review
+     */
+    public function scopeAwaitingReview($query)
+    {
+        return $query->where('status', 'submitted');
+    }
+
+    /**
+     * Scope to filter approved submissions
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('status', 'approved');
     }
 }

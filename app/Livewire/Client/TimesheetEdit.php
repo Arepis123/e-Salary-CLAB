@@ -484,13 +484,13 @@ class TimesheetEdit extends Component
             ]);
 
             if ($action === 'submit') {
-                // Convert draft to pending_payment
+                // Convert draft to submitted (pending admin review)
                 $submission->update([
-                    'status' => 'pending_payment',
+                    'status' => 'submitted',
                     'submitted_at' => now(),
                 ]);
                 return redirect()->route('timesheet')
-                    ->with('success', "Draft submitted successfully for {$submission->month_year}. {$selectedWorkerCount} worker(s) included. Total amount: RM " . number_format($submission->grand_total, 2));
+                    ->with('success', "Draft submitted successfully for {$submission->month_year}. {$selectedWorkerCount} worker(s) included. Awaiting admin review and approval.");
             } else {
                 // Keep as draft
                 \Flux::toast(

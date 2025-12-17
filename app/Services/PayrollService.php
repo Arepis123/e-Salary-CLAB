@@ -88,8 +88,14 @@ class PayrollService
 
             // Calculate salary with OT included THIS MONTH (no deferral)
             // The OT hours entered are for PREVIOUS month and paid THIS month
-            $payrollWorker->calculateSalary(0); // No previous month OT to add, it's already in the hours
-            $payrollWorker->save();
+            // Only calculate if auto-calculation is enabled (disabled in admin review workflow)
+            if (config('payroll.use_auto_calculations', false)) {
+                $payrollWorker->calculateSalary(0); // No previous month OT to add, it's already in the hours
+                $payrollWorker->save();
+            } else {
+                // Just save inputs, no calculations (admin will enter final amount)
+                $payrollWorker->save();
+            }
 
             // Total amount is what the system collects (Gross + Employer contributions)
             $totalAmount += $payrollWorker->total_payment;
@@ -142,7 +148,7 @@ class PayrollService
             'month' => $month,
             'year' => $year,
             'payment_deadline' => $deadline,
-            'status' => 'pending_payment',
+            'status' => 'submitted', // Changed from 'pending_payment' for admin review workflow
             'submitted_at' => now(),
         ]);
 
@@ -169,8 +175,14 @@ class PayrollService
 
             // Calculate salary with OT included THIS MONTH (no deferral)
             // The OT hours entered are for PREVIOUS month and paid THIS month
-            $payrollWorker->calculateSalary(0); // No previous month OT to add, it's already in the hours
-            $payrollWorker->save();
+            // Only calculate if auto-calculation is enabled (disabled in admin review workflow)
+            if (config('payroll.use_auto_calculations', false)) {
+                $payrollWorker->calculateSalary(0); // No previous month OT to add, it's already in the hours
+                $payrollWorker->save();
+            } else {
+                // Just save inputs, no calculations (admin will enter final amount)
+                $payrollWorker->save();
+            }
 
             // Total amount is what the system collects (Gross + Employer contributions)
             $totalAmount += $payrollWorker->total_payment;

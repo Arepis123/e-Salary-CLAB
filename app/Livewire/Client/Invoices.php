@@ -94,13 +94,13 @@ class Invoices extends Component
                 ->where('status', 'draft')
                 ->firstOrFail();
 
-            // Update status to pending_payment
+            // Update status to submitted (pending admin review)
             $submission->update([
-                'status' => 'pending_payment',
+                'status' => 'submitted',
                 'submitted_at' => now(),
             ]);
 
-            session()->flash('success', "Draft for {$submission->month_year} has been finalized and submitted. You can now proceed with payment.");
+            session()->flash('success', "Draft for {$submission->month_year} has been submitted for admin review. Payment will be available after admin approval.");
         } catch (\Exception $e) {
             session()->flash('error', 'Failed to finalize draft: ' . $e->getMessage());
         }
@@ -246,5 +246,27 @@ class Invoices extends Component
             'pagination' => $pagination,
             'availableYears' => $availableYears,
         ])->layout('components.layouts.app', ['title' => __('Invoices')]);
+    }
+
+    /**
+     * Download breakdown file for a submission
+     */
+    public function downloadBreakdown($submissionId)
+    {
+        $submission = PayrollSubmission::findOrFail($submissionId);
+
+        // Authorization check - user can only download their own breakdown
+        if ($submission->contractor_clab_no !== auth()->user()->contractor_clab_no) {
+            \Flux\Flux::toast(variant: 'danger', text: 'Unauthorized access.');
+            return;
+        }
+
+        if (!$submission->hasBreakdownFile()) {
+            \Flux\Flux::toast(variant: 'warning', text: 'No breakdown file available for this invoice.');
+            return;
+        }
+
+        // Redirect to breakdown download route
+        return redirect()->route('payroll.breakdown.download', $submission);
     }
 }

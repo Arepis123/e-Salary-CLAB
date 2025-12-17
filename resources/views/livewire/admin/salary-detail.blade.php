@@ -58,8 +58,96 @@
         @endif
     </div>
 
+    <!-- Awaiting Review Banner -->
+    @if($submission->canBeReviewed())
+    <flux:card class="p-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-yellow-900 dark:text-yellow-100">
+                    <flux:icon.exclamation-triangle class="inline size-5" /> Awaiting Admin Review
+                </h3>
+                <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    This submission requires admin review before payment can be processed.
+                </p>
+            </div>
+            <flux:button variant="filled" wire:click="openReviewModal" icon="clipboard-document-check">
+                Review & Approve
+            </flux:button>
+        </div>
+    </flux:card>
+    @endif
+
+    <!-- Approved Info -->
+    @if($submission->hasAdminReview())
+    <flux:card class="p-6 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500">
+        <h3 class="text-lg font-semibold text-green-900 dark:text-green-100 mb-4">
+            <flux:icon.check-circle class="inline size-5" /> Admin Review Completed
+        </h3>
+        <div class="grid gap-4 md:grid-cols-2">
+            <div>
+                <p class="text-sm text-green-700 dark:text-green-300">Reviewed By:</p>
+                <p class="font-medium">{{ $submission->adminReviewer->name ?? 'Unknown' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-green-700 dark:text-green-300">Reviewed At:</p>
+                <p class="font-medium">{{ $submission->admin_reviewed_at->format('d M Y, H:i') }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-green-700 dark:text-green-300">Breakdown File:</p>
+                @if($submission->hasBreakdownFile())
+                    <flux:button size="sm" variant="ghost" wire:click="downloadBreakdown" icon="arrow-down-tray">
+                        {{ $submission->breakdown_file_name }}
+                    </flux:button>
+                @else
+                    <p class="text-sm text-zinc-500">No file uploaded</p>
+                @endif
+            </div>
+        </div>
+
+        <!-- Amount Breakdown for Client -->
+        <div class="mt-6 bg-white dark:bg-zinc-800 p-4 rounded-lg border border-green-200 dark:border-green-700">
+            <h4 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Client Payment Breakdown:</h4>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $submission->total_workers }} workers):</span>
+                    <span class="font-medium">RM {{ number_format($submission->admin_final_amount, 2) }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->total_workers }}):</span>
+                    <span class="font-medium">RM {{ number_format($submission->calculated_service_charge, 2) }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-zinc-600 dark:text-zinc-400">SST (8% of service charge):</span>
+                    <span class="font-medium">RM {{ number_format($submission->calculated_sst, 2) }}</span>
+                </div>
+                <div class="border-t border-green-200 dark:border-green-700 pt-2 mt-2 flex justify-between">
+                    <span class="font-bold text-zinc-900 dark:text-zinc-100">Client Total:</span>
+                    <span class="text-lg font-bold text-green-600">RM {{ number_format($submission->client_total, 2) }}</span>
+                </div>
+                @if($submission->has_penalty || $submission->isOverdue())
+                <div class="flex justify-between mt-2">
+                    <span class="text-red-600 dark:text-red-400">Late Payment Penalty (8%):</span>
+                    <span class="font-medium text-red-600 dark:text-red-400">+ RM {{ number_format($submission->penalty_amount ?? ($submission->client_total * 0.08), 2) }}</span>
+                </div>
+                <div class="border-t border-red-200 dark:border-red-700 pt-2 mt-2 flex justify-between">
+                    <span class="font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
+                    <span class="text-xl font-bold text-red-600 dark:text-red-400">RM {{ number_format($submission->total_due, 2) }}</span>
+                </div>
+                @endif
+            </div>
+        </div>
+
+        @if($submission->admin_notes)
+        <div class="mt-4">
+            <p class="text-sm text-green-700 dark:text-green-300">Admin Notes:</p>
+            <p class="text-sm bg-white dark:bg-zinc-800 p-3 rounded mt-1">{{ $submission->admin_notes }}</p>
+        </div>
+        @endif
+    </flux:card>
+    @endif
+
     <!-- Summary Cards -->
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="space-y-2">
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Workers</p>
@@ -72,15 +160,6 @@
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Current Month OT Hours</p>
                 <p class="text-2xl font-bold ">{{ number_format($stats['total_ot_hours'], 2) }}</p>
                 <p class="text-xs ">To be paid next month</p>
-            </div>
-        </flux:card>
-
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="space-y-2">
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Grand Total</p>
-                <p class="text-2xl font-bold text-green-600 dark:text-green-400">
-                    RM {{ number_format($submission->grand_total, 2) }}
-                </p>
             </div>
         </flux:card>
 
@@ -103,68 +182,11 @@
         </flux:card>
     </div>
 
-    <!-- OT Payment Flow Information -->
-    <div class="grid gap-4 md:grid-cols-2">
-        <!-- Previous Month OT (Paid This Month) -->
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-start gap-3">
-                <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400 mt-0.5" />
-                <div class="flex-1">
-                    <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Previous Month OT Paid</h3>
-                    @if($previousSubmission)
-                        <div class="space-y-2 text-sm">
-                            <p class="text-zinc-600 dark:text-zinc-400">
-                                OT from <span class="font-medium text-green-600 dark:text-green-400">{{ $previousSubmission->month_year }}</span> included in this month's payment
-                            </p>
-                            <div class="grid grid-cols-2 gap-2 mt-3">
-                                <div class="bg-green-50 dark:bg-green-900/20 p-2 rounded">
-                                    <p class="text-xs text-zinc-600 dark:text-zinc-400">Total Hours</p>
-                                    <p class="text-lg font-bold text-green-600 dark:text-green-400">{{ number_format($previousOtStats['total_ot_hours'], 2) }}h</p>
-                                </div>
-                                <div class="bg-green-50 dark:bg-green-900/20 p-2 rounded">
-                                    <p class="text-xs text-zinc-600 dark:text-zinc-400">Total Amount</p>
-                                    <p class="text-lg font-bold text-green-600 dark:text-green-400">RM {{ number_format($previousOtStats['total_ot_pay'], 2) }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    @else
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400">No previous month OT data found</p>
-                    @endif
-                </div>
-            </div>
-        </flux:card>
 
-        <!-- Current Month OT (To be Paid Next Month) -->
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-start gap-3">
-                <flux:icon.clock class="size-6 text-orange-600 dark:text-orange-400 mt-0.5" />
-                <div class="flex-1">
-                    <h3 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Current Month OT Deferred</h3>
-                    <div class="space-y-2 text-sm">
-                        <p class="text-zinc-600 dark:text-zinc-400">
-                            OT from <span class="font-medium text-orange-600 dark:text-orange-400">{{ $submission->month_year }}</span> will be paid next month
-                        </p>
-                        <div class="grid grid-cols-2 gap-2 mt-3">
-                            <div class="bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
-                                <p class="text-xs text-zinc-600 dark:text-zinc-400">Total Hours</p>
-                                <p class="text-lg font-bold text-orange-600 dark:text-orange-400">{{ number_format($stats['total_ot_hours'], 2) }}h</p>
-                            </div>
-                            <div class="bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
-                                <p class="text-xs text-zinc-600 dark:text-zinc-400">Total Amount</p>
-                                <p class="text-lg font-bold text-orange-600 dark:text-orange-400">RM {{ number_format($stats['total_ot_pay'], 2) }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </flux:card>
-    </div>
-
-    <!-- Submission & Payment Information -->
-    <div class="grid gap-4 md:grid-cols-2">
-        <!-- Submission Information -->
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Submission Information</h2>
+    <!-- Submission Information -->
+    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Submission Information</h2>
+        <div class="grid gap-4 md:grid-cols-2">
             <div class="space-y-3">
                 <div class="flex justify-between">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Submission ID:</span>
@@ -184,6 +206,8 @@
                         {{ $submission->contractor_clab_no }}
                     </span>
                 </div>
+            </div>
+            <div class="space-y-3">
                 <div class="flex justify-between">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Period:</span>
                     <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
@@ -205,53 +229,8 @@
                 </div>
                 @endif
             </div>
-        </flux:card>
-
-        <!-- Amount Breakdown -->
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Amount Breakdown</h2>
-            <div class="space-y-3">
-                <div class="flex justify-between">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Total Amount (Workers):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        RM {{ number_format($submission->total_amount, 2) }}
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Service Charge:</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        RM {{ number_format($submission->service_charge, 2) }}
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">SST (8%):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        RM {{ number_format($submission->sst, 2) }}
-                    </span>
-                </div>
-                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-3 flex justify-between">
-                    <span class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Grand Total:</span>
-                    <span class="text-base font-bold text-green-600 dark:text-green-400">
-                        RM {{ number_format($submission->grand_total, 2) }}
-                    </span>
-                </div>
-                @if($submission->has_penalty)
-                <div class="flex justify-between">
-                    <span class="text-sm text-red-600 dark:text-red-400">Penalty (8%):</span>
-                    <span class="text-sm font-medium text-red-600 dark:text-red-400">
-                        + RM {{ number_format($submission->penalty_amount, 2) }}
-                    </span>
-                </div>
-                <div class="border-t border-red-200 dark:border-red-800 pt-3 flex justify-between">
-                    <span class="text-base font-semibold text-red-900 dark:text-red-100">Total with Penalty:</span>
-                    <span class="text-base font-bold text-red-600 dark:text-red-400">
-                        RM {{ number_format($submission->total_with_penalty, 2) }}
-                    </span>
-                </div>
-                @endif
-            </div>
-        </flux:card>
-    </div>
+        </div>
+    </flux:card>
 
     <!-- Payment Information -->
     @if($submission->payment)
@@ -286,10 +265,10 @@
     </flux:card>
     @endif
 
-    <!-- Workers List -->
+    <!-- Workers List - RAW DATA ONLY (No Calculations) -->
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Workers Payroll</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Client Submission</h2>
             <span class="text-sm text-zinc-600 dark:text-zinc-400">{{ $stats['total_workers'] }} {{ Str::plural('worker', $stats['total_workers']) }}</span>
         </div>
 
@@ -309,28 +288,19 @@
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span>
                     </flux:table.column>
                     <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Deferred)</span>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span>
                     </flux:table.column>
                     <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Deferred)</span>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span>
                     </flux:table.column>
                     <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Deferred)</span>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span>
                     </flux:table.column>
                     <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total OT<br>(Next Month)</span>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total OT Hours</span>
                     </flux:table.column>
                     <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Gross Salary</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Net Salary</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total Payment</span>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Advances/<br>Deductions (RM)</span>
                     </flux:table.column>
                 </flux:table.columns>
 
@@ -348,116 +318,111 @@
                             </flux:table.cell>
 
                             <flux:table.cell align="right">
-                                RM {{ number_format($worker->basic_salary, 2) }}
+                                @if($worker->basic_salary > 0)
+                                    RM {{ number_format($worker->basic_salary, 2) }}
+                                @else
+                                    <span class="text-zinc-500">-</span>
+                                @endif
                             </flux:table.cell>
 
-                            <!-- Weekday OT -->
+                            <!-- Weekday OT Hours Only -->
                             <flux:table.cell align="center">
-                                <div class="text-xs ">
-                                    @if($worker->ot_normal_hours > 0)
-                                        <div class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}h</div>
-                                        <div class="text-xs">RM {{ number_format($worker->ot_normal_pay, 2) }}</div>
-                                    @else
-                                        <div class="text-zinc-600 dark:text-zinc-400">-</div>
-                                    @endif
-                                </div>
+                                @if($worker->ot_normal_hours > 0)
+                                    <span class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}h</span>
+                                @else
+                                    <span class="text-zinc-500">-</span>
+                                @endif
                             </flux:table.cell>
 
-                            <!-- Rest Day OT -->
+                            <!-- Rest Day OT Hours Only -->
                             <flux:table.cell align="center">
-                                <div class="text-xs ">
-                                    @if($worker->ot_rest_hours > 0)
-                                        <div class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}h</div>
-                                        <div class="text-xs">RM {{ number_format($worker->ot_rest_pay, 2) }}</div>
-                                    @else
-                                        <div class="text-zinc-600 dark:text-zinc-400">-</div>
-                                    @endif
-                                </div>
+                                @if($worker->ot_rest_hours > 0)
+                                    <span class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}h</span>
+                                @else
+                                    <span class="text-zinc-500">-</span>
+                                @endif
                             </flux:table.cell>
 
-                            <!-- Public Holiday OT -->
+                            <!-- Public Holiday OT Hours Only -->
                             <flux:table.cell align="center">
-                                <div class="text-xs ">
-                                    @if($worker->ot_public_hours > 0)
-                                        <div class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}h</div>
-                                        <div class="text-xs">RM {{ number_format($worker->ot_public_pay, 2) }}</div>
-                                    @else
-                                        <div class="text-zinc-600 dark:text-zinc-400">-</div>
-                                    @endif
-                                </div>
+                                @if($worker->ot_public_hours > 0)
+                                    <span class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}h</span>
+                                @else
+                                    <span class="text-zinc-500">-</span>
+                                @endif
                             </flux:table.cell>
 
-                            <!-- Total OT -->
+                            <!-- Total OT Hours -->
                             <flux:table.cell align="center">
-                                <div class="text-xs ">
-                                    @if($worker->total_overtime_hours > 0)
-                                        <div class="font-semibold">{{ number_format($worker->total_overtime_hours, 2) }}h</div>
-                                        <div class="font-medium">RM {{ number_format($worker->total_ot_pay, 2) }}</div>
-                                    @else
-                                        <div class="text-zinc-600 dark:text-zinc-400">-</div>
-                                    @endif
-                                </div>
+                                @if($worker->total_overtime_hours > 0)
+                                    <span class="font-semibold text-blue-600 dark:text-blue-400">{{ number_format($worker->total_overtime_hours, 2) }}h</span>
+                                @else
+                                    <span class="text-zinc-500">-</span>
+                                @endif
                             </flux:table.cell>
 
+                            <!-- Advances/Deductions (RAW INPUT) -->
                             <flux:table.cell align="right">
-                                RM {{ number_format($worker->gross_salary, 2) }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right">
-                                <div class="text-xs text-red-600 dark:text-red-400">
-                                    - RM {{ number_format($worker->total_deductions, 2) }}
+                                <div class="text-xs space-y-1">
+                                    @if($worker->total_advance_payment > 0)
+                                        <div class="text-orange-600 dark:text-orange-400">
+                                            Advance: -RM {{ number_format($worker->total_advance_payment, 2) }}
+                                        </div>
+                                    @endif
+                                    @if($worker->total_deduction > 0)
+                                        <div class="text-red-600 dark:text-red-400">
+                                            Deduction: -RM {{ number_format($worker->total_deduction, 2) }}
+                                        </div>
+                                    @endif
+                                    @if($worker->total_advance_payment == 0 && $worker->total_deduction == 0)
+                                        <span class="text-zinc-500">-</span>
+                                    @endif
                                 </div>
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right" variant="strong">
-                                RM {{ number_format($worker->net_salary, 2) }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right" variant="strong" class="text-green-600 dark:text-green-400">
-                                RM {{ number_format($worker->total_payment, 2) }}
                             </flux:table.cell>
                         </flux:table.rows>
                     @endforeach
 
                     <!-- Summary Row -->
                     <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800">
-                        <flux:table.cell colspan="3" variant="strong" class="font-bold">
-                            <span class="flex justify-center">TOTAL</span>
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold">
-                            RM {{ number_format($stats['total_basic_salary'], 2) }}
+                        <flux:table.cell colspan="4" variant="strong" class="font-bold">
+                            <span class="flex justify-center">TOTALS (Reference Only)</span>
                         </flux:table.cell>
                         <!-- Weekday OT Total -->
                         <flux:table.cell align="center" variant="strong" class="font-bold">
-                            <div class="text-xs">{{ number_format($workers->sum('ot_normal_hours'), 2) }}h</div>
-                            <div class="text-xs">RM {{ number_format($workers->sum('ot_normal_pay'), 2) }}</div>
+                            {{ number_format($workers->sum('ot_normal_hours'), 2) }}h
                         </flux:table.cell>
                         <!-- Rest Day OT Total -->
                         <flux:table.cell align="center" variant="strong" class="font-bold">
-                            <div class="text-xs">{{ number_format($workers->sum('ot_rest_hours'), 2) }}h</div>
-                            <div class="text-xs">RM {{ number_format($workers->sum('ot_rest_pay'), 2) }}</div>
+                            {{ number_format($workers->sum('ot_rest_hours'), 2) }}h
                         </flux:table.cell>
                         <!-- Public Holiday OT Total -->
                         <flux:table.cell align="center" variant="strong" class="font-bold">
-                            <div class="text-xs">{{ number_format($workers->sum('ot_public_hours'), 2) }}h</div>
-                            <div class="text-xs">RM {{ number_format($workers->sum('ot_public_pay'), 2) }}</div>
+                            {{ number_format($workers->sum('ot_public_hours'), 2) }}h
                         </flux:table.cell>
                         <!-- Total OT -->
-                        <flux:table.cell align="center" variant="strong" class="font-bold">
-                            <div class="text-xs">{{ number_format($stats['total_ot_hours'], 2) }}h</div>
-                            <div class="text-xs">RM {{ number_format($stats['total_ot_pay'], 2) }}</div>
+                        <flux:table.cell align="center" variant="strong" class="font-bold text-blue-600 dark:text-blue-400">
+                            {{ number_format($stats['total_ot_hours'], 2) }}h
                         </flux:table.cell>
                         <flux:table.cell align="right" variant="strong" class="font-bold">
-                            RM {{ number_format($stats['total_gross_salary'], 2) }}
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold text-red-600 dark:text-red-400">
-                            - RM {{ number_format($stats['total_deductions'], 2) }}
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold">
-                            RM {{ number_format($stats['total_net_salary'], 2) }}
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold text-green-600 dark:text-green-400">
-                            RM {{ number_format($stats['total_payment'], 2) }}
+                            <div class="text-xs space-y-1">
+                                @php
+                                    $totalAdvances = $workers->sum('total_advance_payment');
+                                    $totalDeductions = $workers->sum('total_deduction');
+                                @endphp
+                                @if($totalAdvances > 0)
+                                    <div class="text-orange-600 dark:text-orange-400">
+                                        Adv: -RM {{ number_format($totalAdvances, 2) }}
+                                    </div>
+                                @endif
+                                @if($totalDeductions > 0)
+                                    <div class="text-red-600 dark:text-red-400">
+                                        Ded: -RM {{ number_format($totalDeductions, 2) }}
+                                    </div>
+                                @endif
+                                @if($totalAdvances == 0 && $totalDeductions == 0)
+                                    -
+                                @endif
+                            </div>
                         </flux:table.cell>
                     </flux:table.rows>
                 </flux:table.rows>
@@ -465,257 +430,60 @@
         </div>
     </flux:card>
 
-    <!-- Previous Month OT Breakdown (Paid This Month) -->
-    @if($previousSubmission && $previousOtStats['total_ot_hours'] > 0)
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-t-4 border-green-500">
-        <div class="mb-4">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Previous Month OT Breakdown <span class="text-green-600 dark:text-green-400">(Paid this month)</span></h2>
-            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">This OT was calculated for {{ $previousSubmission->month_year }} and is included in {{ $submission->month_year }}'s payment</p>
-        </div>
 
-        <div class="overflow-x-auto">
-            <flux:table>
-                <flux:table.columns>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span>
-                    </flux:table.column>
-                    <flux:table.column>
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday Pay</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day Pay</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday Pay</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total Hours</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total OT Pay</span>
-                    </flux:table.column>
-                </flux:table.columns>
+    <!-- Review Modal -->
+    <flux:modal wire:model="showReviewModal" size="lg">
+        <form wire:submit.prevent="approveSubmission">
+            <flux:heading size="lg">Review & Approve Submission</flux:heading>
+            <flux:subheading class="mb-4">
+                Review #{{ $submission->id }} for {{ $submission->month_year }}
+            </flux:subheading>
 
-                <flux:table.rows>
-                    @foreach($previousWorkers as $index => $worker)
-                        @if($worker->total_overtime_hours > 0)
-                        <flux:table.rows :key="'prev-' . $worker->id">
-                            <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
+            <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 mb-6">
+                <p class="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Process the raw data above in your external certified payroll system, then enter the final amount below.</strong>
+                </p>
+            </div>
 
-                            <flux:table.cell variant="strong">
-                                {{ $worker->worker_name }}
-                            </flux:table.cell>
+            <!-- Final Amount Input -->
+            <flux:field>
+                <flux:label required>Final Amount (RM)</flux:label>
+                <flux:input type="number" step="0.01" wire:model="reviewFinalAmount" placeholder="0.00" />
+                <flux:error name="reviewFinalAmount" />
+                <flux:description>Enter final amount from your certified external payroll system</flux:description>
+            </flux:field>
 
-                            <flux:table.cell align="center">
-                                {{ $worker->ot_normal_hours > 0 ? number_format($worker->ot_normal_hours, 2) . 'h' : '-' }}
-                            </flux:table.cell>
+            <!-- File Upload -->
+            <flux:field>
+                <flux:label required>Breakdown File (Excel/PDF)</flux:label>
+                <input type="file" wire:model="breakdownFile" accept=".xlsx,.xls,.pdf"
+                    class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
+                <flux:error name="breakdownFile" />
+                <flux:description>Upload from external payroll system (max 10MB)</flux:description>
+                @if($breakdownFile)
+                    <p class="text-xs text-green-600 mt-2">Ready: {{ $breakdownFile->getClientOriginalName() }}</p>
+                @endif
+            </flux:field>
 
-                            <flux:table.cell align="right">
-                                {{ $worker->ot_normal_pay > 0 ? 'RM ' . number_format($worker->ot_normal_pay, 2) : '-' }}
-                            </flux:table.cell>
+            <!-- Notes -->
+            <flux:field>
+                <flux:label>Internal Notes (Optional)</flux:label>
+                <flux:textarea wire:model="reviewNotes" rows="3" placeholder="Internal notes..." />
+                <flux:error name="reviewNotes" />
+            </flux:field>
 
-                            <flux:table.cell align="center">
-                                {{ $worker->ot_rest_hours > 0 ? number_format($worker->ot_rest_hours, 2) . 'h' : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right">
-                                {{ $worker->ot_rest_pay > 0 ? 'RM ' . number_format($worker->ot_rest_pay, 2) : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="center">
-                                {{ $worker->ot_public_hours > 0 ? number_format($worker->ot_public_hours, 2) . 'h' : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right">
-                                {{ $worker->ot_public_pay > 0 ? 'RM ' . number_format($worker->ot_public_pay, 2) : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="center" variant="strong" class="text-green-600 dark:text-green-400">
-                                {{ number_format($worker->total_overtime_hours, 2) }}h
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right" variant="strong" class="text-green-600 dark:text-green-400">
-                                RM {{ number_format($worker->total_ot_pay, 2) }}
-                            </flux:table.cell>
-                        </flux:table.rows>
-                        @endif
-                    @endforeach
-
-                    <!-- Summary Row -->
-                    <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-green-50 dark:bg-green-900/20">
-                        <flux:table.cell colspan="2" variant="strong" class="font-bold">
-                            TOTAL PAID THIS MONTH
-                        </flux:table.cell>
-                        <flux:table.cell align="center" variant="strong" class="font-bold">
-                            {{ number_format($previousOtStats['total_weekday_ot_hours'], 2) }}h
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold">
-                            RM {{ number_format($previousOtStats['total_weekday_ot_pay'], 2) }}
-                        </flux:table.cell>
-                        <flux:table.cell align="center" variant="strong" class="font-bold">
-                            {{ number_format($previousOtStats['total_rest_ot_hours'], 2) }}h
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold">
-                            RM {{ number_format($previousOtStats['total_rest_ot_pay'], 2) }}
-                        </flux:table.cell>
-                        <flux:table.cell align="center" variant="strong" class="font-bold">
-                            {{ number_format($previousOtStats['total_public_ot_hours'], 2) }}h
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold">
-                            RM {{ number_format($previousOtStats['total_public_ot_pay'], 2) }}
-                        </flux:table.cell>
-                        <flux:table.cell align="center" variant="strong" class="font-bold text-green-600 dark:text-green-400">
-                            {{ number_format($previousOtStats['total_ot_hours'], 2) }}h
-                        </flux:table.cell>
-                        <flux:table.cell align="right" variant="strong" class="font-bold text-green-600 dark:text-green-400">
-                            RM {{ number_format($previousOtStats['total_ot_pay'], 2) }}
-                        </flux:table.cell>
-                    </flux:table.rows>
-                </flux:table.rows>
-            </flux:table>
-        </div>
-    </flux:card>
-    @endif
-
-    <!-- Current Month Deferred OT Breakdown by Worker -->
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-        <div class="mb-4">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Current Month OT Breakdown <span class="text-zinc-600 dark:text-zinc-400">(To be paid next month)</span></h2>
-            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">This OT was calculated for {{ $submission->month_year }} and will be included in next month's payment</p>
-        </div>
-
-        <div class="overflow-x-auto">
-            <flux:table>
-                <flux:table.columns>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span>
-                    </flux:table.column>
-                    <flux:table.column>
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday Pay</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day Pay</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday Pay</span>
-                    </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total Hours</span>
-                    </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total OT Pay</span>
-                    </flux:table.column>
-                </flux:table.columns>
-
-                <flux:table.rows>
-                    @foreach($workers as $index => $worker)
-                        @if($worker->total_overtime_hours > 0)
-                        <flux:table.rows :key="$worker->id">
-                            <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
-
-                            <flux:table.cell variant="strong">
-                                {{ $worker->worker_name }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="center">
-                                {{ $worker->ot_normal_hours > 0 ? number_format($worker->ot_normal_hours, 2) . 'h' : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right">
-                                {{ $worker->ot_normal_pay > 0 ? 'RM ' . number_format($worker->ot_normal_pay, 2) : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="center">
-                                {{ $worker->ot_rest_hours > 0 ? number_format($worker->ot_rest_hours, 2) . 'h' : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right">
-                                {{ $worker->ot_rest_pay > 0 ? 'RM ' . number_format($worker->ot_rest_pay, 2) : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="center">
-                                {{ $worker->ot_public_hours > 0 ? number_format($worker->ot_public_hours, 2) . 'h' : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right">
-                                {{ $worker->ot_public_pay > 0 ? 'RM ' . number_format($worker->ot_public_pay, 2) : '-' }}
-                            </flux:table.cell>
-
-                            <flux:table.cell align="center" variant="strong" class="">
-                                {{ number_format($worker->total_overtime_hours, 2) }}h
-                            </flux:table.cell>
-
-                            <flux:table.cell align="right" variant="strong" class="">
-                                RM {{ number_format($worker->total_ot_pay, 2) }}
-                            </flux:table.cell>
-                        </flux:table.rows>
-                        @endif
-                    @endforeach
-
-                    @if($stats['total_ot_hours'] == 0)
-                        <flux:table.rows>
-                            <flux:table.cell colspan="10" class="text-center text-zinc-600 dark:text-zinc-400">
-                                No overtime recorded for this month
-                            </flux:table.cell>
-                        </flux:table.rows>
+            <div class="flex gap-2 mt-6">
+                <flux:button type="submit" variant="filled" icon="check-circle" :disabled="$isReviewing">
+                    @if($isReviewing)
+                        Approving...
                     @else
-                        <!-- Summary Row -->
-                        <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-orange-50 dark:bg-orange-900/20">
-                            <flux:table.cell colspan="2" variant="strong" class="font-bold">
-                                <div class="ms-2">TOTAL DEFERRED OT</div>
-                            </flux:table.cell>
-                            <flux:table.cell align="center" variant="strong" class="font-bold">
-                                {{ number_format($workers->sum('ot_normal_hours'), 2) }}h
-                            </flux:table.cell>
-                            <flux:table.cell align="right" variant="strong" class="font-bold">
-                                RM {{ number_format($workers->sum('ot_normal_pay'), 2) }}
-                            </flux:table.cell>
-                            <flux:table.cell align="center" variant="strong" class="font-bold">
-                                {{ number_format($workers->sum('ot_rest_hours'), 2) }}h
-                            </flux:table.cell>
-                            <flux:table.cell align="right" variant="strong" class="font-bold">
-                                RM {{ number_format($workers->sum('ot_rest_pay'), 2) }}
-                            </flux:table.cell>
-                            <flux:table.cell align="center" variant="strong" class="font-bold">
-                                {{ number_format($workers->sum('ot_public_hours'), 2) }}h
-                            </flux:table.cell>
-                            <flux:table.cell align="right" variant="strong" class="font-bold">
-                                RM {{ number_format($workers->sum('ot_public_pay'), 2) }}
-                            </flux:table.cell>
-                            <flux:table.cell align="center" variant="strong" class="font-bold ">
-                                {{ number_format($stats['total_ot_hours'], 2) }}h
-                            </flux:table.cell>
-                            <flux:table.cell align="right" variant="strong" class="font-bold ">
-                                RM {{ number_format($stats['total_ot_pay'], 2) }}
-                            </flux:table.cell>
-                        </flux:table.rows>
+                        Approve Submission
                     @endif
-                </flux:table.rows>
-            </flux:table>
-        </div>
-    </flux:card>
+                </flux:button>
+                <flux:button type="button" wire:click="closeReviewModal" variant="ghost">
+                    Cancel
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
 </div>

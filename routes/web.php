@@ -82,6 +82,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         };
     })->name('invoices.download-tax');
 
+    // Payroll Breakdown File Download - Unified route (Admin-uploaded breakdown from external system)
+    Route::get('payroll/breakdown/{submission}', [\App\Http\Controllers\PayrollBreakdownController::class, 'download'])
+        ->name('payroll.breakdown.download');
+
     // ========================================================================
     // ADMIN-ONLY ROUTES (No client equivalent)
     // ========================================================================

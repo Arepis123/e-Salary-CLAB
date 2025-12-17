@@ -5,15 +5,25 @@ namespace App\Livewire\Admin;
 use App\Models\PayrollSubmission;
 use Flux\Flux;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class SalaryDetail extends Component
 {
+    use WithFileUploads;
+
     public PayrollSubmission $submission;
     public $workers = [];
     public $stats = [];
     public $previousSubmission = null;
     public $previousWorkers = [];
     public $previousOtStats = [];
+
+    // Review modal properties
+    public $showReviewModal = false;
+    public $reviewFinalAmount = '';
+    public $reviewNotes = '';
+    public $breakdownFile;
+    public $isReviewing = false;
 
     public function mount($id)
     {
@@ -134,6 +144,95 @@ class SalaryDetail extends Component
     {
         // TODO: Implement export worker list functionality
         Flux::toast(variant: 'info', text: 'Export functionality coming soon!');
+    }
+
+    public function openReviewModal()
+    {
+        if (!$this->submission->canBeReviewed()) {
+            Flux::toast(variant: 'warning', text: 'Cannot review this submission.');
+            return;
+        }
+
+        // Do NOT pre-fill amount - admin must enter from external system
+        $this->reviewFinalAmount = '';
+        $this->reviewNotes = $this->submission->admin_notes ?? '';
+        $this->showReviewModal = true;
+    }
+
+    public function closeReviewModal()
+    {
+        $this->showReviewModal = false;
+        $this->resetValidation();
+    }
+
+    public function approveSubmission()
+    {
+        $this->validate([
+            'reviewFinalAmount' => 'required|numeric|min:0.01',
+            'breakdownFile' => 'required|file|mimes:xlsx,xls,pdf|max:10240', // 10MB max
+            'reviewNotes' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $this->isReviewing = true;
+
+            // Generate custom filename: worker_breakdown_CLAB000000_DEC_2025.xlsx
+            $extension = $this->breakdownFile->getClientOriginalExtension();
+            $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));
+            $customFileName = sprintf(
+                'worker_breakdown_%s_%s_%s.%s',
+                $this->submission->contractor_clab_no,
+                $monthName,
+                $this->submission->year,
+                $extension
+            );
+
+            // Store breakdown file with custom name
+            $directory = 'payroll-breakdowns/' . $this->submission->year . '/' . $this->submission->month;
+            $filePath = $this->breakdownFile->storeAs($directory, $customFileName, 'local');
+
+            // Update submission with admin review
+            $this->submission->update([
+                'status' => 'approved',
+                'admin_reviewed_by' => auth()->id(),
+                'admin_reviewed_at' => now(),
+                'admin_final_amount' => $this->reviewFinalAmount,
+                'admin_notes' => $this->reviewNotes,
+                'breakdown_file_path' => $filePath,
+                'breakdown_file_name' => $customFileName,
+            ]);
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Submission Approved',
+                text: 'Submission has been approved with final amount RM ' . number_format($this->reviewFinalAmount, 2)
+            );
+
+            $this->closeReviewModal();
+            $this->mount($this->submission->id); // Refresh data
+
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to approve submission: ' . $e->getMessage()
+            );
+        } finally {
+            $this->isReviewing = false;
+        }
+    }
+
+    public function downloadBreakdown()
+    {
+        if (!$this->submission->hasBreakdownFile()) {
+            Flux::toast(variant: 'warning', text: 'No breakdown file available.');
+            return;
+        }
+
+        return response()->download(
+            storage_path('app/' . $this->submission->breakdown_file_path),
+            $this->submission->breakdown_file_name
+        );
     }
 
     public function render()

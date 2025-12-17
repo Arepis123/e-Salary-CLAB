@@ -201,10 +201,10 @@
                     <tfoot>
                         <tr class="border-t-2 border-zinc-300 dark:border-zinc-600">
                             <td colspan="10" class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                Total Amount:
+                                Payroll Amount:
                             </td>
                             <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_amount, 2) }}
+                                RM {{ number_format($invoice->admin_final_amount ?? $invoice->total_amount, 2) }}
                             </td>
                         </tr>
                         <tr>
@@ -212,7 +212,7 @@
                                 Service Charge (RM200 × {{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }}):
                             </td>
                             <td class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                RM {{ number_format($invoice->service_charge, 2) }}
+                                RM {{ number_format($invoice->calculated_service_charge, 2) }}
                             </td>
                         </tr>
                         <tr>
@@ -220,15 +220,15 @@
                                 SST 8%:
                             </td>
                             <td class="py-2 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                RM {{ number_format($invoice->sst, 2) }}
+                                RM {{ number_format($invoice->calculated_sst, 2) }}
                             </td>
                         </tr>
                         <tr class="border-t border-zinc-300 dark:border-zinc-600">
                             <td colspan="10" class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                Grand Total:
+                                Client Total:
                             </td>
                             <td class="py-3 text-right text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->grand_total, 2) }}
+                                RM {{ number_format($invoice->client_total, 2) }}
                             </td>
                         </tr>
                         @if($invoice->has_penalty)

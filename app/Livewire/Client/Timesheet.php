@@ -500,16 +500,16 @@ class Timesheet extends Component
                 ->where('status', 'draft')
                 ->firstOrFail();
 
-            // Update status to pending_payment
+            // Update status to submitted (pending admin review)
             $submission->update([
-                'status' => 'pending_payment',
+                'status' => 'submitted',
                 'submitted_at' => now(),
             ]);
 
             \Flux::toast(
                 variant: 'success',
                 heading: 'Draft Submitted',
-                text: "Draft submitted successfully for {$submission->month_year}. Total amount: RM " . number_format($submission->total_amount, 2)
+                text: "Draft submitted successfully for {$submission->month_year}. Awaiting admin review and approval."
             );
 
             // Log activity

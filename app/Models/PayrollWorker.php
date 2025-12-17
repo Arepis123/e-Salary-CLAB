@@ -141,6 +141,11 @@ class PayrollWorker extends Model
      */
     public function calculateSalary(float $additionalOtPay = 0): void
     {
+        // Skip if auto-calculation disabled (admin review workflow)
+        if (!config('payroll.use_auto_calculations', false)) {
+            return;
+        }
+
         $calculator = app(PaymentCalculatorService::class);
 
         // Calculate OT for PREVIOUS month (entered this month, paid this month)

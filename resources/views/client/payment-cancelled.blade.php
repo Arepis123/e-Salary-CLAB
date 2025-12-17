@@ -28,12 +28,12 @@
             <!-- <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p class="text-sm text-blue-900 dark:text-blue-100">
                     <strong>Period:</strong> {{ $submission->month_year }}<br>
-                    <strong>Grand Total:</strong> RM {{ number_format($submission->grand_total, 2) }}<br>
+                    <strong>Client Total:</strong> RM {{ number_format($submission->client_total, 2) }}<br>
                     @if($submission->has_penalty)
                         <strong>Penalty (8%):</strong> + RM {{ number_format($submission->penalty_amount, 2) }}<br>
-                        <strong class="text-lg">Total Due:</strong> RM {{ number_format($submission->grand_total + $submission->penalty_amount, 2) }}
+                        <strong class="text-lg">Total Due:</strong> RM {{ number_format($submission->total_due, 2) }}
                     @else
-                        <strong class="text-lg">Total Due:</strong> RM {{ number_format($submission->grand_total, 2) }}
+                        <strong class="text-lg">Total Due:</strong> RM {{ number_format($submission->client_total, 2) }}
                     @endif
                 </p>
             </div> -->

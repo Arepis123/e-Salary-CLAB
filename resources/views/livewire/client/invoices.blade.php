@@ -193,9 +193,15 @@
                         <flux:table.cell variant="strong">{{ $invoice->total_workers }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <div class="font-semibold text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_due, 2) }}
-                            </div>
+                            @if(in_array($invoice->status, ['draft', 'submitted']))
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">Pending Admin Review</span>
+                            @elseif($invoice->hasAdminReview())
+                                <div class="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    RM {{ number_format($invoice->total_due, 2) }}
+                                </div>
+                            @else
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">-</span>
+                            @endif
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -226,6 +232,9 @@
                                 <flux:menu>
                                     <flux:menu.item icon="eye" href="{{ route('invoices.show', $invoice->id) }}">View Invoice</flux:menu.item>
                                     <flux:menu.item icon="arrow-down-tray" href="{{ route('invoices.download', $invoice->id) }}">Download PDF</flux:menu.item>
+                                    @if($invoice->hasBreakdownFile())
+                                        <flux:menu.item icon="document-arrow-down" wire:click="downloadBreakdown({{ $invoice->id }})">Download Breakdown</flux:menu.item>
+                                    @endif
                                     @if($invoice->status === 'draft')
                                         <flux:menu.separator />
                                         <flux:menu.item icon="paper-airplane" wire:click="finalizeDraft({{ $invoice->id }})">Finalize & Submit</flux:menu.item>

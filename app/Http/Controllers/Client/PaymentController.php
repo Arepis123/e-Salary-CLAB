@@ -41,6 +41,12 @@ class PaymentController extends Controller
                 ->with('error', 'This payroll has already been paid.');
         }
 
+        // Block payment if not approved by admin
+        if (!$submission->canCreatePayment()) {
+            return redirect()->route('timesheet')
+                ->with('error', 'This submission must be approved by admin before payment can be created.');
+        }
+
         // Check if there's a recent pending payment (within last 2 hours)
         $recentPendingPayment = null;
         if ($submission->payment && $submission->payment->status === 'pending') {
@@ -104,11 +110,13 @@ class PaymentController extends Controller
         $submission->updatePenalty();
         $submission->refresh();
 
-        // Calculate total amount to pay (includes grand total with service charge + SST, plus penalty if overdue)
-        // Always calculate fresh to ensure accuracy
-        $totalAmount = $submission->grand_total;
+        // Calculate total amount to pay (includes payroll + service charge + SST + penalty if overdue)
+        // Use client_total which includes: admin_final_amount + service_charge + SST
+        $baseAmount = $submission->client_total;
+        $totalAmount = $baseAmount;
+
         if ($submission->isOverdue()) {
-            $penalty = $submission->calculatePenalty();
+            $penalty = $baseAmount * 0.08; // 8% penalty on the client total
             $totalAmount += $penalty;
 
             // Update the submission with penalty info if not already set
