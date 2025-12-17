@@ -33,7 +33,9 @@
       "Bash(if not exist \"C:\\xampp\\htdocs\\e-payroll\\app\\Exports\" mkdir \"C:\\xampp\\htdocs\\e-payroll\\app\\Exports\")",
       "Bash(del check_worker.php)",
       "Bash(del test_pending_ot.php)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(ping:*)",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 103.6.196.135 -Port 3306\")"
     ],
     "deny": [],
     "ask": []
