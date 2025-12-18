@@ -2,7 +2,6 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-            <flux:button variant="ghost" icon="arrow-left" href="{{ route('payroll') }}" />
             <div>
                 <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
                     Payroll Details #PAY{{ str_pad($submission->id, 6, '0', STR_PAD_LEFT) }}
@@ -26,14 +25,10 @@
                 <flux:button variant="filled" size="sm" wire:click="viewPaymentProof" icon="eye" icon-variant="outline">
                     Payment Proof
                 </flux:button>
-            @else
-                <flux:button variant="filled" size="sm" wire:click="sendReminder" icon="bell" icon-variant="outline">
-                    Send Reminder
-                </flux:button>
-                <flux:button variant="filled" size="sm" wire:click="markAsPaid" icon="check-circle" icon-variant="outline">
-                    Mark as Paid
-                </flux:button>
-            @endif
+            @endif            
+            <flux:button variant="filled" size="sm" href="{{ route('payroll') }}" icon="arrow-left" icon-variant="outline">
+                Back to Submissions
+            </flux:button>            
         </div>
     </div>
 
@@ -60,21 +55,15 @@
 
     <!-- Awaiting Review Banner -->
     @if($submission->canBeReviewed())
-    <flux:card class="p-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500">
-        <div class="flex items-start justify-between">
-            <div>
-                <h3 class="text-lg font-semibold text-yellow-900 dark:text-yellow-100">
-                    <flux:icon.exclamation-triangle class="inline size-5" /> Awaiting Admin Review
-                </h3>
-                <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    This submission requires admin review before payment can be processed.
-                </p>
-            </div>
-            <flux:button variant="filled" wire:click="openReviewModal" icon="clipboard-document-check">
-                Review & Approve
-            </flux:button>
-        </div>
-    </flux:card>
+    <flux:callout icon="exclamation-triangle" color="amber" inline>
+        <flux:callout.heading>Awaiting Admin Review</flux:callout.heading>
+        <flux:callout.text>
+            <p>This submission requires admin review before payment can be processed.</p>
+        </flux:callout.text>
+        <x-slot name="actions">
+            <flux:button wire:click="openReviewModal">Review & Approve</flux:button>
+        </x-slot>
+    </flux:callout>    
     @endif
 
     <!-- Approved Info -->
@@ -113,7 +102,7 @@
                     <span class="font-medium">RM {{ number_format($submission->admin_final_amount, 2) }}</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->total_workers }}):</span>
+                    <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }}):</span>
                     <span class="font-medium">RM {{ number_format($submission->calculated_service_charge, 2) }}</span>
                 </div>
                 <div class="flex justify-between">
@@ -279,6 +268,9 @@
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span>
                     </flux:table.column>
                     <flux:table.column>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker ID</span>
+                    </flux:table.column>
+                    <flux:table.column>
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</span>
                     </flux:table.column>
                     <flux:table.column>
@@ -287,20 +279,17 @@
                     <flux:table.column align="right">
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span>
                     </flux:table.column>
-                    <flux:table.column align="center">
+                    <flux:table.column align="right">
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span>
                     </flux:table.column>
-                    <flux:table.column align="center">
+                    <flux:table.column align="right">
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span>
                     </flux:table.column>
-                    <flux:table.column align="center">
+                    <flux:table.column align="right">
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span>
                     </flux:table.column>
-                    <flux:table.column align="center">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Total OT Hours</span>
-                    </flux:table.column>
                     <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Advances/<br>Deductions (RM)</span>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span>
                     </flux:table.column>
                 </flux:table.columns>
 
@@ -310,14 +299,18 @@
                             <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">
+                                {{ $worker->worker_id }}
+                            </flux:table.cell>
+
+                            <flux:table.cell variant="strong">
                                 {{ $worker->worker_name }}
                             </flux:table.cell>
 
-                            <flux:table.cell>
+                            <flux:table.cell variant="strong">
                                 {{ $worker->worker_passport }}
                             </flux:table.cell>
 
-                            <flux:table.cell align="right">
+                            <flux:table.cell align="end" variant="strong">
                                 @if($worker->basic_salary > 0)
                                     RM {{ number_format($worker->basic_salary, 2) }}
                                 @else
@@ -326,7 +319,7 @@
                             </flux:table.cell>
 
                             <!-- Weekday OT Hours Only -->
-                            <flux:table.cell align="center">
+                            <flux:table.cell align="end" variant="strong">
                                 @if($worker->ot_normal_hours > 0)
                                     <span class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}h</span>
                                 @else
@@ -335,7 +328,7 @@
                             </flux:table.cell>
 
                             <!-- Rest Day OT Hours Only -->
-                            <flux:table.cell align="center">
+                            <flux:table.cell align="end" variant="strong">
                                 @if($worker->ot_rest_hours > 0)
                                     <span class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}h</span>
                                 @else
@@ -344,7 +337,7 @@
                             </flux:table.cell>
 
                             <!-- Public Holiday OT Hours Only -->
-                            <flux:table.cell align="center">
+                            <flux:table.cell align="end" variant="strong">
                                 @if($worker->ot_public_hours > 0)
                                     <span class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}h</span>
                                 @else
@@ -352,39 +345,37 @@
                                 @endif
                             </flux:table.cell>
 
-                            <!-- Total OT Hours -->
-                            <flux:table.cell align="center">
-                                @if($worker->total_overtime_hours > 0)
-                                    <span class="font-semibold text-blue-600 dark:text-blue-400">{{ number_format($worker->total_overtime_hours, 2) }}h</span>
+                            <!-- Transactions -->
+                            <flux:table.cell align="end" variant="strong">
+                                @php
+                                    $workerTransactions = $worker->transactions ?? collect([]);
+                                @endphp
+                                @if($workerTransactions->count() > 0)
+                                    <div class="text-xs space-y-1">
+                                        @foreach($workerTransactions as $txn)
+                                            <div class="text-zinc-900 dark:text-zinc-100">
+                                                @if($txn->type === 'allowance')
+                                                    +RM {{ number_format($txn->amount, 2) }} (Allowance)
+                                                @elseif($txn->type === 'npl')
+                                                    {{ $txn->amount }} {{ $txn->amount == 1 ? 'day' : 'days' }} (NPL)
+                                                @elseif($txn->type === 'advance_payment')
+                                                    -RM {{ number_format($txn->amount, 2) }} (Advance)
+                                                @else
+                                                    -RM {{ number_format($txn->amount, 2) }} (Deduction)
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 @else
                                     <span class="text-zinc-500">-</span>
                                 @endif
-                            </flux:table.cell>
-
-                            <!-- Advances/Deductions (RAW INPUT) -->
-                            <flux:table.cell align="right">
-                                <div class="text-xs space-y-1">
-                                    @if($worker->total_advance_payment > 0)
-                                        <div class="text-orange-600 dark:text-orange-400">
-                                            Advance: -RM {{ number_format($worker->total_advance_payment, 2) }}
-                                        </div>
-                                    @endif
-                                    @if($worker->total_deduction > 0)
-                                        <div class="text-red-600 dark:text-red-400">
-                                            Deduction: -RM {{ number_format($worker->total_deduction, 2) }}
-                                        </div>
-                                    @endif
-                                    @if($worker->total_advance_payment == 0 && $worker->total_deduction == 0)
-                                        <span class="text-zinc-500">-</span>
-                                    @endif
-                                </div>
                             </flux:table.cell>
                         </flux:table.rows>
                     @endforeach
 
                     <!-- Summary Row -->
-                    <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800">
-                        <flux:table.cell colspan="4" variant="strong" class="font-bold">
+                    <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 hidden">
+                        <flux:table.cell colspan="5" variant="strong" class="font-bold">
                             <span class="flex justify-center">TOTALS (Reference Only)</span>
                         </flux:table.cell>
                         <!-- Weekday OT Total -->
@@ -398,10 +389,6 @@
                         <!-- Public Holiday OT Total -->
                         <flux:table.cell align="center" variant="strong" class="font-bold">
                             {{ number_format($workers->sum('ot_public_hours'), 2) }}h
-                        </flux:table.cell>
-                        <!-- Total OT -->
-                        <flux:table.cell align="center" variant="strong" class="font-bold text-blue-600 dark:text-blue-400">
-                            {{ number_format($stats['total_ot_hours'], 2) }}h
                         </flux:table.cell>
                         <flux:table.cell align="right" variant="strong" class="font-bold">
                             <div class="text-xs space-y-1">
@@ -439,34 +426,27 @@
                 Review #{{ $submission->id }} for {{ $submission->month_year }}
             </flux:subheading>
 
-            <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 mb-6">
-                <p class="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Process the raw data above in your external certified payroll system, then enter the final amount below.</strong>
-                </p>
-            </div>
-
             <!-- Final Amount Input -->
             <flux:field>
                 <flux:label required>Final Amount (RM)</flux:label>
+                {{-- <flux:description>Enter final amount from external payroll system</flux:description> --}}
                 <flux:input type="number" step="0.01" wire:model="reviewFinalAmount" placeholder="0.00" />
                 <flux:error name="reviewFinalAmount" />
-                <flux:description>Enter final amount from your certified external payroll system</flux:description>
             </flux:field>
 
             <!-- File Upload -->
-            <flux:field>
-                <flux:label required>Breakdown File (Excel/PDF)</flux:label>
+            <flux:field class="mt-3">
+                <flux:label required>Breakdown File</flux:label>
                 <input type="file" wire:model="breakdownFile" accept=".xlsx,.xls,.pdf"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="breakdownFile" />
-                <flux:description>Upload from external payroll system (max 10MB)</flux:description>
                 @if($breakdownFile)
-                    <p class="text-xs text-green-600 mt-2">Ready: {{ $breakdownFile->getClientOriginalName() }}</p>
+                    <p class="text-xs text-green-600">Ready: {{ $breakdownFile->getClientOriginalName() }}</p>
                 @endif
             </flux:field>
 
             <!-- Notes -->
-            <flux:field>
+            <flux:field class="mt-3">
                 <flux:label>Internal Notes (Optional)</flux:label>
                 <flux:textarea wire:model="reviewNotes" rows="3" placeholder="Internal notes..." />
                 <flux:error name="reviewNotes" />

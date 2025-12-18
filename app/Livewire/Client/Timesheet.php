@@ -40,6 +40,7 @@ class Timesheet extends Component
     public $showTransactionModal = false;
     public $currentWorkerIndex = null;
     public $transactions = [];
+    public $newTransactionCategory = 'deduction';
     public $newTransactionType = 'advance_payment';
     public $newTransactionAmount = '';
     public $newTransactionRemarks = '';
@@ -52,6 +53,10 @@ class Timesheet extends Component
 
     // Calculation info modal
     public $showCalculationModal = false;
+
+    // Disclaimer modal
+    public $showDisclaimerModal = false;
+    public $pendingDraftSubmissionId = null;
 
     public function boot(PayrollService $payrollService, ContractWorkerService $contractWorkerService)
     {
@@ -266,6 +271,15 @@ class Timesheet extends Component
                 $this->workers[$index][$field] = 0;
             }
         }
+
+        // When transaction category changes, update type to first valid option
+        if ($propertyName === 'newTransactionCategory') {
+            if ($this->newTransactionCategory === 'deduction') {
+                $this->newTransactionType = 'advance_payment';
+            } else {
+                $this->newTransactionType = 'allowance';
+            }
+        }
     }
 
     public function toggleWorker($workerId)
@@ -309,6 +323,7 @@ class Timesheet extends Component
 
     public function resetNewTransaction()
     {
+        $this->newTransactionCategory = 'deduction';
         $this->newTransactionType = 'advance_payment';
         $this->newTransactionAmount = '';
         $this->newTransactionRemarks = '';
@@ -319,12 +334,12 @@ class Timesheet extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:advance_payment,deduction',
+            'newTransactionType' => 'required|in:advance_payment,deduction,npl,allowance',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [
-            'newTransactionAmount.required' => 'Amount is required',
-            'newTransactionAmount.min' => 'Amount must be greater than 0',
+            'newTransactionAmount.required' => $this->newTransactionType === 'npl' ? 'Days are required' : 'Amount is required',
+            'newTransactionAmount.min' => $this->newTransactionType === 'npl' ? 'Days must be greater than 0' : 'Amount must be greater than 0',
             'newTransactionRemarks.required' => 'Remarks are required',
             'newTransactionRemarks.min' => 'Remarks must be at least 3 characters',
         ]);
@@ -481,15 +496,49 @@ class Timesheet extends Component
 
     public function submitForPayment()
     {
+        // Show disclaimer modal instead of directly submitting
+        $this->showDisclaimerModal = true;
+    }
+
+    public function confirmSubmission()
+    {
+        // Close the modal
+        $this->showDisclaimerModal = false;
+
+        // If we're submitting a draft, process it
+        if ($this->pendingDraftSubmissionId !== null) {
+            $submissionId = $this->pendingDraftSubmissionId;
+            $this->pendingDraftSubmissionId = null;
+            return $this->processDraftSubmission($submissionId);
+        }
+
+        // Otherwise, proceed with normal submission
         return $this->saveSubmission('submit');
+    }
+
+    public function cancelSubmission()
+    {
+        $this->showDisclaimerModal = false;
+        $this->pendingDraftSubmissionId = null;
     }
 
     public function submitDraftForPayment($submissionId)
     {
+        // Store the submission ID and show disclaimer modal
+        $this->pendingDraftSubmissionId = $submissionId;
+        $this->showDisclaimerModal = true;
+    }
+
+    private function processDraftSubmission($submissionId)
+    {
         $clabNo = auth()->user()->contractor_clab_no;
 
         if (!$clabNo) {
-            $this->errorMessage = 'No contractor CLAB number assigned.';
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'No contractor CLAB number assigned.'
+            );
             return;
         }
 

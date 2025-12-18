@@ -23,6 +23,7 @@ class TimesheetEdit extends Component
     public $showTransactionModal = false;
     public $currentWorkerIndex = null;
     public $transactions = [];
+    public $newTransactionCategory = 'deduction';
     public $newTransactionType = 'advance_payment';
     public $newTransactionAmount = '';
     public $newTransactionRemarks = '';
@@ -35,6 +36,9 @@ class TimesheetEdit extends Component
 
     // Calculation info modal
     public $showCalculationModal = false;
+
+    // Disclaimer modal
+    public $showDisclaimerModal = false;
 
     public function boot(PayrollService $payrollService, ContractWorkerService $contractWorkerService)
     {
@@ -150,6 +154,15 @@ class TimesheetEdit extends Component
                 $this->workers[$index][$field] = 0;
             }
         }
+
+        // When transaction category changes, update type to first valid option
+        if ($propertyName === 'newTransactionCategory') {
+            if ($this->newTransactionCategory === 'deduction') {
+                $this->newTransactionType = 'advance_payment';
+            } else {
+                $this->newTransactionType = 'allowance';
+            }
+        }
     }
 
     public function toggleWorker($workerId)
@@ -179,6 +192,7 @@ class TimesheetEdit extends Component
 
     public function resetNewTransaction()
     {
+        $this->newTransactionCategory = 'deduction';
         $this->newTransactionType = 'advance_payment';
         $this->newTransactionAmount = '';
         $this->newTransactionRemarks = '';
@@ -189,12 +203,12 @@ class TimesheetEdit extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:advance_payment,deduction',
+            'newTransactionType' => 'required|in:advance_payment,deduction,npl,allowance',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [
-            'newTransactionAmount.required' => 'Amount is required',
-            'newTransactionAmount.min' => 'Amount must be greater than 0',
+            'newTransactionAmount.required' => $this->newTransactionType === 'npl' ? 'Days are required' : 'Amount is required',
+            'newTransactionAmount.min' => $this->newTransactionType === 'npl' ? 'Days must be greater than 0' : 'Amount must be greater than 0',
             'newTransactionRemarks.required' => 'Remarks are required',
             'newTransactionRemarks.min' => 'Remarks must be at least 3 characters',
         ]);
@@ -343,7 +357,22 @@ class TimesheetEdit extends Component
 
     public function submitForPayment()
     {
+        // Show disclaimer modal instead of directly submitting
+        $this->showDisclaimerModal = true;
+    }
+
+    public function confirmSubmission()
+    {
+        // Close the modal
+        $this->showDisclaimerModal = false;
+
+        // Proceed with submission
         return $this->saveSubmission('submit');
+    }
+
+    public function cancelSubmission()
+    {
+        $this->showDisclaimerModal = false;
     }
 
     private function saveSubmission($action)

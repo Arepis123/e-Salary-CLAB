@@ -153,13 +153,14 @@
         }
         .total-label {
             display: inline-block;
-            width: 110px;
+            width: 200px;
             text-align: right;
             padding-right: 10px;
+            white-space: nowrap;
         }
         .total-value {
             display: inline-block;
-            width: 70px;
+            width: 90px;
             text-align: right;
         }
         .grand-total {
@@ -168,7 +169,7 @@
             padding: 6px 10px;
             margin-top: 3px;
             display: inline-block;
-            min-width: 195px;
+            min-width: 305px;
         }
         .grand-total .total-label {
             font-weight: bold;
@@ -385,7 +386,7 @@
                                 <span class="total-value">{{ number_format($invoice->admin_final_amount, 2) }}</span>
                             </div>
                             <div class="total-row">
-                                <span class="total-label">Service Charge (RM 200 × {{ $invoice->total_workers }}):</span>
+                                <span class="total-label">Service Charge (RM 200 × {{ $invoice->billable_workers_count }}):</span>
                                 <span class="total-value">{{ number_format($invoice->calculated_service_charge, 2) }}</span>
                             </div>
                             <div class="total-row">

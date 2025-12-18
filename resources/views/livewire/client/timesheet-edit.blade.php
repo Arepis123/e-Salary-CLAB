@@ -62,7 +62,7 @@
                             <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Normal Hours">OT Normal (hrs)</th>
                             <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Rest Day Hours">OT Rest (hrs)</th>
                             <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Public Holiday Hours">OT Public (hrs)</th>
-                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[140px]" title="Advances & Deductions">Advances/Deductions</th>
+                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[180px]">Transactions</th>
                             <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]">Actions</th>
                         </tr>
                     </thead>
@@ -115,19 +115,30 @@
                                 </span>
                             </td>
 
-                            <!-- Advances/Deductions -->
-                            <td class="py-3 text-center">
+                            <!-- Transactions -->
+                            <td class="py-3 px-2">
                                 @php
                                     $transactions = $worker['transactions'] ?? [];
-                                    $totalTransactions = collect($transactions)->sum('amount');
                                 @endphp
-                                <div class="flex items-center justify-center gap-1">
-                                    @if($totalTransactions > 0)
-                                        <span class="text-sm text-red-600 dark:text-red-400">-RM {{ number_format($totalTransactions, 2) }}</span>
-                                    @else
-                                        <span class="text-sm text-zinc-400 dark:text-zinc-600">-</span>
-                                    @endif
-                                </div>
+                                @if(count($transactions) > 0)
+                                    <div class="space-y-1">
+                                        @foreach($transactions as $txn)
+                                            <div class="text-xs text-zinc-900 dark:text-zinc-100">
+                                                @if($txn['type'] === 'allowance')
+                                                    +RM {{ number_format($txn['amount'], 2) }} (Allowance)
+                                                @elseif($txn['type'] === 'npl')
+                                                    {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
+                                                @elseif($txn['type'] === 'advance_payment')
+                                                    -RM {{ number_format($txn['amount'], 2) }} (Advance)
+                                                @else
+                                                    -RM {{ number_format($txn['amount'], 2) }} (Deduction)
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-sm text-zinc-400 dark:text-zinc-600">-</span>
+                                @endif
                             </td>
                             <td class="py-3 px-2">
                                 <div class="flex items-center justify-center gap-2">
@@ -163,7 +174,7 @@
                         Update Draft
                     </flux:button>
                     <flux:button wire:click="submitForPayment" variant="primary">
-                        Submit for Admin Review
+                        Submit
                     </flux:button>
                 </div>
             </div>
@@ -200,18 +211,42 @@
                 <flux:card class="p-4 bg-zinc-50 dark:bg-zinc-800">
                     <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Add New Transaction</h3>
                     <div class="grid grid-cols-1 gap-4">
+                        <!-- Category Selection -->
+                        <div>
+                            <flux:select wire:model.live="newTransactionCategory" variant="listbox" label="Category">
+                                <flux:select.option value="deduction">Deduction</flux:select.option>
+                                <flux:select.option value="earning">Earning</flux:select.option>
+                            </flux:select>
+                            @error('newTransactionCategory') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
+                        </div>
+
+                        <!-- Type Selection (based on category) -->
                         <div>
                             <flux:select wire:model.live="newTransactionType" variant="listbox" label="Type">
-                                <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
-                                <flux:select.option value="deduction">Deduction</flux:select.option>
+                                @if($newTransactionCategory === 'deduction')
+                                    <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
+                                    <flux:select.option value="deduction">Other Deduction</flux:select.option>
+                                    <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
+                                @else
+                                    <flux:select.option value="allowance">Allowance</flux:select.option>
+                                @endif
                             </flux:select>
                             @error('newTransactionType') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
                         </div>
 
-                        <div>
-                            <flux:input wire:model.live="newTransactionAmount" type="number" step="0.01" min="0" label="Amount (RM)" placeholder="0.00" />
-                            @error('newTransactionAmount') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
-                        </div>
+                        @if($newTransactionType === 'npl')
+                            <!-- NPL Days Input -->
+                            <div>
+                                <flux:input wire:model.live="newTransactionAmount" type="number" step="0.5" min="0" label="No-Pay Leave Days" placeholder="0.0" />
+                                @error('newTransactionAmount') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
+                            </div>
+                        @else
+                            <!-- Amount Input -->
+                            <div>
+                                <flux:input wire:model.live="newTransactionAmount" type="number" step="0.01" min="0" label="Amount (RM)" placeholder="0.00" />
+                                @error('newTransactionAmount') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
+                            </div>
+                        @endif
 
                         <div>
                             <flux:textarea wire:model.live="newTransactionRemarks" label="Remarks" placeholder="Enter reason for this transaction..." rows="2" />
@@ -239,11 +274,24 @@
                                 <div class="flex items-start justify-between p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg" wire:key="transaction-{{ $index }}-{{ $transaction['amount'] }}">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-semibold text-zinc-900 dark:text-zinc-100">-RM {{ number_format($transaction['amount'], 2) }}</span>
+                                            @if($transaction['type'] === 'allowance')
+                                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($transaction['amount'], 2) }}</span>
+                                            @elseif($transaction['type'] === 'npl')
+                                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">
+                                                    {{ $transaction['amount'] }} {{ $transaction['amount'] == 1 ? 'day' : 'days' }}
+                                                </span>
+                                            @else
+                                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($transaction['amount'], 2) }}</span>
+                                            @endif
+
                                             @if($transaction['type'] === 'advance_payment')
                                                 <flux:badge color="orange" size="sm">Advance Payment</flux:badge>
-                                            @else
-                                                <flux:badge color="red" size="sm">Deduction</flux:badge>
+                                            @elseif($transaction['type'] === 'deduction')
+                                                <flux:badge color="red" size="sm">Other Deduction</flux:badge>
+                                            @elseif($transaction['type'] === 'npl')
+                                                <flux:badge color="purple" size="sm">No-Pay Leave</flux:badge>
+                                            @elseif($transaction['type'] === 'allowance')
+                                                <flux:badge color="green" size="sm">Allowance</flux:badge>
                                             @endif
                                         </div>
                                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{{ $transaction['remarks'] }}</p>
@@ -256,25 +304,66 @@
                         </div>
 
                         <!-- Summary -->
-                        <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                            <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Impact on Worker's Salary</h4>
-                            <div class="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <p class="text-zinc-600 dark:text-zinc-400">Total Advance Payment (Deducted):</p>
-                                    <p class="text-lg font-bold text-orange-600 dark:text-orange-400">
-                                        -RM {{ number_format(collect($currentTransactions)->where('type', 'advance_payment')->sum('amount'), 2) }}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p class="text-zinc-600 dark:text-zinc-400">Total Deduction:</p>
-                                    <p class="text-lg font-bold text-red-600 dark:text-red-400">
-                                        -RM {{ number_format(collect($currentTransactions)->where('type', 'deduction')->sum('amount'), 2) }}
+                        @php
+                            $totalAdvance = collect($currentTransactions)->where('type', 'advance_payment')->sum('amount');
+                            $totalDeduction = collect($currentTransactions)->where('type', 'deduction')->sum('amount');
+                            $totalNPLDays = collect($currentTransactions)->where('type', 'npl')->sum('amount');
+                            $totalAllowance = collect($currentTransactions)->where('type', 'allowance')->sum('amount');
+                            $totalDeductions = $totalAdvance + $totalDeduction;
+                        @endphp
+
+                        <div class="mt-4 space-y-3 hidden">
+                            <!-- Earnings Summary -->
+                            @if($totalAllowance > 0)
+                            <div class="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Earnings</h4>
+                                <div class="flex justify-between items-center text-sm">
+                                    <p class="text-zinc-600 dark:text-zinc-400">Total Allowance:</p>
+                                    <p class="text-lg font-bold text-green-600 dark:text-green-400">
+                                        +RM {{ number_format($totalAllowance, 2) }}
                                     </p>
                                 </div>
                             </div>
-                            <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-700">
+                            @endif
+
+                            <!-- Deductions Summary -->
+                            <div class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Deductions</h4>
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p class="text-zinc-600 dark:text-zinc-400">Advance Payment:</p>
+                                        <p class="text-lg font-bold text-orange-600 dark:text-orange-400">
+                                            -RM {{ number_format($totalAdvance, 2) }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-zinc-600 dark:text-zinc-400">Other Deductions:</p>
+                                        <p class="text-lg font-bold text-red-600 dark:text-red-400">
+                                            -RM {{ number_format($totalDeduction, 2) }}
+                                        </p>
+                                    </div>
+                                    @if($totalNPLDays > 0)
+                                    <div class="col-span-2">
+                                        <p class="text-zinc-600 dark:text-zinc-400">No-Pay Leave (NPL):</p>
+                                        <p class="text-lg font-bold text-purple-600 dark:text-purple-400">
+                                            {{ $totalNPLDays }} {{ $totalNPLDays == 1 ? 'day' : 'days' }}
+                                        </p>
+                                    </div>
+                                    @endif
+                                </div>
+                                <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-700">
+                                    <div class="flex justify-between items-center">
+                                        <p class="font-semibold text-zinc-900 dark:text-zinc-100">Total Deductions:</p>
+                                        <p class="text-xl font-bold text-red-600 dark:text-red-400">
+                                            -RM {{ number_format($totalDeductions, 2) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                                    <strong>Note:</strong> Both advance payments and deductions will be subtracted from the worker's basic salary.
+                                    <strong>Note:</strong> Allowances will be added to salary, while all deductions (advances, deductions, and NPL) will be subtracted.
                                 </p>
                             </div>
                         </div>
@@ -390,6 +479,71 @@
                 <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
                     <flux:button wire:click="closeOTModal" variant="ghost">Cancel</flux:button>
                     <flux:button wire:click="saveOT" variant="primary">Save</flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
+
+    <!-- Disclaimer Modal -->
+    @if($showDisclaimerModal)
+        <flux:modal wire:model="showDisclaimerModal" :dismissible="false" class="min-w-[600px]">
+            <div class="space-y-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0">
+                        <flux:icon.exclamation-triangle class="size-12 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                            Data Accuracy Confirmation
+                        </h2>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                            Please read and confirm before submitting
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Disclaimer Content -->
+                <flux:card class="p-4 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800">
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <flux:icon.information-circle class="size-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Important Notice</h3>
+                                <div class="text-sm text-zinc-700 dark:text-zinc-300 space-y-2">
+                                    <p>
+                                        By submitting this payroll data, you acknowledge and confirm that:
+                                    </p>
+                                    <ul class="list-disc list-inside space-y-1 ml-2">
+                                        <li><strong>All information entered is 100% accurate and true</strong></li>
+                                        <li>You are solely responsible for the accuracy of all worker hours and overtime data</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </flux:card>
+
+                <flux:card class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <div class="flex items-start gap-3">
+                        <flux:icon.shield-check class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div class="text-sm text-zinc-700 dark:text-zinc-300">
+                            <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Your Responsibility</p>
+                            <p>
+                                You confirm that all overtime hours, deductions, and salary information have been verified and are correct.
+                                This data will be used for official payroll processing.
+                            </p>
+                        </div>
+                    </div>
+                </flux:card>
+
+                <!-- Modal Actions -->
+                <div class="flex justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:button wire:click="cancelSubmission" variant="ghost">
+                        Cancel
+                    </flux:button>
+                    <flux:button wire:click="confirmSubmission" variant="primary">
+                        Submit for Processing
+                    </flux:button>
                 </div>
             </div>
         </flux:modal>

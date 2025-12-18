@@ -126,11 +126,35 @@ class PayrollSubmission extends Model
     }
 
     /**
-     * Calculate service charge (RM 200 per worker)
+     * Get the count of billable workers (excludes workers with ended contracts who only have OT)
+     * Workers are excluded from billing if:
+     * - Their contract ended before the payroll period AND
+     * - They only have OT hours (no basic salary)
+     */
+    public function getBillableWorkersCountAttribute(): int
+    {
+        // Get all workers for this submission
+        $workers = $this->workers()->get();
+
+        // Count billable workers
+        $billableCount = 0;
+        foreach ($workers as $worker) {
+            // If worker is not excluded from billing, count them
+            if (!$worker->isExcludedFromBilling()) {
+                $billableCount++;
+            }
+        }
+
+        return $billableCount;
+    }
+
+    /**
+     * Calculate service charge (RM 200 per billable worker)
+     * Excludes workers with ended contracts who only have OT hours
      */
     public function getCalculatedServiceChargeAttribute(): float
     {
-        return $this->total_workers * 200;
+        return $this->billable_workers_count * 200;
     }
 
     /**
@@ -310,10 +334,17 @@ class PayrollSubmission extends Model
 
     /**
      * Check if payment can be created for this submission
+     * Allows payment for reviewed submissions that are not yet paid
      */
     public function canCreatePayment(): bool
     {
-        return $this->status === 'approved' && $this->hasAdminReview();
+        // Must have admin review (final amount calculated)
+        if (!$this->hasAdminReview()) {
+            return false;
+        }
+
+        // Allow payment for any unpaid status after admin review
+        return in_array($this->status, ['approved', 'submitted', 'pending_payment', 'overdue']);
     }
 
     /**

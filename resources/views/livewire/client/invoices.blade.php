@@ -194,7 +194,7 @@
 
                         <flux:table.cell variant="strong">
                             @if(in_array($invoice->status, ['draft', 'submitted']))
-                                <span class="text-sm text-zinc-500 dark:text-zinc-400">Pending Admin Review</span>
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">In Process</span>
                             @elseif($invoice->hasAdminReview())
                                 <div class="font-semibold text-zinc-900 dark:text-zinc-100">
                                     RM {{ number_format($invoice->total_due, 2) }}

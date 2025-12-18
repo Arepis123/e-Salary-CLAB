@@ -1,0 +1,20 @@
+Due to the large size of changes needed for timesheet-edit.blade.php, I'll create a summary document of changes that need to be applied. The changes are identical to those made in timesheet.blade.php:
+
+1. Transaction Type Select (lines 204-207):
+   - Add npl and allowance options
+
+2. Amount Input (lines 211-214):
+   - Add conditional for NPL days vs amount
+
+3. Transaction List Display (lines 238-255):
+   - Add badges for NPL and allowance
+   - Show NPL as days with calculated amount
+   - Show allowance with + prefix
+
+4. Summary Section (lines 258-279):
+   - Split into Earnings and Deductions
+   - Calculate NPL amount from days
+   - Show allowance total in green
+   - Show NPL total in purple
+
+Let me make these changes now...

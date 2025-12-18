@@ -61,16 +61,16 @@
                     @if($submission->hasAdminReview())
                         <p class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</p>
                     @else
-                        <p class="text-lg font-semibold text-orange-600 dark:text-orange-400">Pending Admin Review</p>
+                        <p class="text-lg font-semibold text-orange-600 dark:text-orange-400">In Process</p>
                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                            Amount will be available after admin approval
+                            Amount will be available after processing
                         </p>
                     @endif
                 </div>
             </div>
 
             <!-- Payment Action -->
-            @if($submission->status === 'pending_payment' || $submission->status === 'overdue')
+            @if($submission->hasAdminReview() && $submission->status !== 'paid')
                 <div class="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-700">
                     <form method="POST" action="{{ route('client.payment.create', $submission->id) }}">
                         @csrf
@@ -101,7 +101,7 @@
         </flux:card>
 
         @if(!$submission->hasAdminReview())
-            <!-- Pending Admin Review Notice -->
+            <!-- In Process Notice -->
             <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
                 <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
                     <div class="flex gap-3">
@@ -124,8 +124,10 @@
                                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker</th>
                                     <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</th>
-                                    <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Hours</th>
-                                    <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</th>
+                                    <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Normal</th>
+                                    <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Rest</th>
+                                    <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Public</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
@@ -136,57 +138,57 @@
                                             <flux:avatar size="sm" name="{{ $worker->worker_name }}" />
                                             <div>
                                                 <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->worker_name }}</p>
-                                                <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $worker->worker_id }}</p>
+                                                <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $worker->worker_id }} · {{ $worker->worker_passport }}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                         RM {{ number_format($worker->basic_salary, 2) }}
                                     </td>
-                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                        @php
-                                            $totalOTHours = ($worker->ot_normal_hours ?? 0) + ($worker->ot_rest_hours ?? 0) + ($worker->ot_public_hours ?? 0);
-                                        @endphp
-                                        @if($totalOTHours > 0)
-                                            {{ $totalOTHours }} hours
-                                            <div class="text-xs text-zinc-500 dark:text-zinc-400">
-                                                @if($worker->ot_normal_hours > 0)Normal: {{ $worker->ot_normal_hours }}h @endif
-                                                @if($worker->ot_rest_hours > 0)Rest: {{ $worker->ot_rest_hours }}h @endif
-                                                @if($worker->ot_public_hours > 0)Public: {{ $worker->ot_public_hours }}h @endif
-                                            </div>
+                                    <td class="py-3 text-center text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @if(($worker->ot_normal_hours ?? 0) > 0)
+                                            {{ number_format($worker->ot_normal_hours, 1) }}h
                                         @else
                                             <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                         @endif
                                     </td>
-                                    <td class="py-3">
+                                    <td class="py-3 text-center text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @if(($worker->ot_rest_hours ?? 0) > 0)
+                                            {{ number_format($worker->ot_rest_hours, 1) }}h
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 text-center text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @if(($worker->ot_public_hours ?? 0) > 0)
+                                            {{ number_format($worker->ot_public_hours, 1) }}h
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-2">
                                         @php
                                             $workerTransactions = $worker->transactions ?? collect([]);
-                                            $advancePayments = $workerTransactions->where('type', 'advance_payment');
-                                            $deductions = $workerTransactions->where('type', 'deduction');
                                         @endphp
                                         @if($workerTransactions->count() > 0)
-                                            <div class="space-y-1 text-right">
-                                                @if($advancePayments->count() > 0)
-                                                    <div class="text-sm font-medium text-orange-600 dark:text-orange-400">Advance:</div>
-                                                    @foreach($advancePayments as $transaction)
-                                                        <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                            RM {{ number_format($transaction->amount, 2) }}
-                                                            <div class="italic">({{ $transaction->remarks }})</div>
-                                                        </div>
-                                                    @endforeach
-                                                @endif
-                                                @if($deductions->count() > 0)
-                                                    <div class="text-sm font-medium text-red-600 dark:text-red-400">Deduction:</div>
-                                                    @foreach($deductions as $transaction)
-                                                        <div class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                            RM {{ number_format($transaction->amount, 2) }}
-                                                            <div class="italic">({{ $transaction->remarks }})</div>
-                                                        </div>
-                                                    @endforeach
-                                                @endif
+                                            <div class="space-y-1">
+                                                @foreach($workerTransactions as $transaction)
+                                                    <div class="text-xs text-zinc-900 dark:text-zinc-100">
+                                                        @if($transaction->type === 'allowance')
+                                                            +RM {{ number_format($transaction->amount, 2) }} (Allowance)
+                                                        @elseif($transaction->type === 'npl')
+                                                            {{ $transaction->amount }} {{ $transaction->amount == 1 ? 'day' : 'days' }} (NPL)
+                                                        @elseif($transaction->type === 'advance_payment')
+                                                            -RM {{ number_format($transaction->amount, 2) }} (Advance)
+                                                        @else
+                                                            -RM {{ number_format($transaction->amount, 2) }} (Deduction)
+                                                        @endif
+                                                        <div class="text-xs text-zinc-500 dark:text-zinc-400 italic">({{ $transaction->remarks }})</div>
+                                                    </div>
+                                                @endforeach
                                             </div>
                                         @else
-                                            <div class="text-sm text-center text-zinc-400 dark:text-zinc-500">-</div>
+                                            <div class="text-sm text-zinc-400 dark:text-zinc-500">-</div>
                                         @endif
                                     </td>
                                 </tr>
@@ -213,7 +215,7 @@
                                     </p>
                                 </div>
                             </div>
-                            <flux:button variant="filled" size="sm" wire:click="downloadBreakdown({{ $submission->id }})">
+                            <flux:button size="sm" href="{{ route('payroll.breakdown.download', $submission->id) }}">
                                 <flux:icon.arrow-down-tray class="size-4 inline me-1" />
                                 Download Breakdown
                             </flux:button>
@@ -243,18 +245,18 @@
                                 <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_amount, 2) }}</span>
                             </div>
                             <div class="flex justify-between text-sm">
-                                <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->total_workers }} {{ Str::plural('worker', $submission->total_workers) }})</span>
+                                <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }})</span>
                                 <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->service_charge, 2) }}</span>
                             </div>
                             <div class="flex justify-between text-sm">
                                 <span class="text-zinc-600 dark:text-zinc-400">SST (8%)</span>
                                 <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->sst, 2) }}</span>
                             </div>
-                            <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2 flex justify-between">
-                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">Grand Total</span>
-                                <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
-                            </div>
                             @if($submission->has_penalty)
+                                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2 flex justify-between">
+                                    <span class="font-semibold text-zinc-900 dark:text-zinc-100">Grand Total</span>
+                                    <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
+                                </div>
                                 <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2">
                                     <div class="flex justify-between text-sm text-red-600 dark:text-red-400">
                                         <span>Late Payment Penalty (8%)</span>

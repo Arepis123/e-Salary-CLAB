@@ -146,13 +146,14 @@
         }
         .total-label {
             display: inline-block;
-            width: 110px;
+            width: 200px;
             text-align: right;
             padding-right: 10px;
+            white-space: nowrap;
         }
         .total-value {
             display: inline-block;
-            width: 70px;
+            width: 90px;
             text-align: right;
         }
         .grand-total {
@@ -161,7 +162,7 @@
             padding: 5px 10px;
             margin-top: 3px;
             display: inline-block;
-            min-width: 195px;
+            min-width: 220px;
         }
         .grand-total .total-label {
             font-weight: bold;
@@ -341,7 +342,7 @@
                                 <span class="total-value">{{ number_format($invoice->admin_final_amount, 2) }}</span>
                             </div>
                             <div class="total-row">
-                                <span class="total-label">Service Charge (RM 200 × {{ $invoice->total_workers }}):</span>
+                                <span class="total-label">Service Charge (RM 200 × {{ $invoice->billable_workers_count }}):</span>
                                 <span class="total-value">{{ number_format($invoice->calculated_service_charge, 2) }}</span>
                             </div>
                             <div class="total-row">
@@ -354,13 +355,8 @@
                             <span class="total-label">TOTAL AMOUNT (RM):</span>
                             <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
                         </div>
-                        @if($invoice->hasBreakdownFile())
-                        <div style="font-size: 7px; color: #666; margin-top: 5px; text-align: right;">
-                            Detailed breakdown available for download
-                        </div>
-                        @endif
                         @if($invoice->has_penalty)
-                        <div class="total-row" style="color: #dc3545; margin-top: 5px; font-size: 7px;">
+                        <div class="total-row" style="color: #dc3545; margin-top: 10px; font-size: 7px;">
                             <span class="total-label">* Includes 8% late payment penalty</span>
                         </div>
                         @endif

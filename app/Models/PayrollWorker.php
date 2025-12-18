@@ -114,6 +114,29 @@ class PayrollWorker extends Model
     }
 
     /**
+     * Get total NPL (No-Pay Leave) amount from all transactions
+     * NPL is stored as days in 'amount' field and calculated as: (Basic Salary / 26) × Days
+     */
+    public function getTotalNplAttribute(): float
+    {
+        $nplDays = $this->transactions()
+            ->where('type', 'npl')
+            ->sum('amount') ?? 0;
+
+        return round(($this->basic_salary / 26) * $nplDays, 2);
+    }
+
+    /**
+     * Get total allowance from all transactions
+     */
+    public function getTotalAllowanceAttribute(): float
+    {
+        return $this->transactions()
+            ->where('type', 'allowance')
+            ->sum('amount') ?? 0;
+    }
+
+    /**
      * Calculate all salary components using PaymentCalculatorService
      *
      * NEW SYSTEM: Contractor enters PREVIOUS month's OT hours in current month's payroll
@@ -158,14 +181,18 @@ class PayrollWorker extends Model
         // Regular pay is the basic salary
         $this->regular_pay = $this->basic_salary;
 
-        // Get transaction totals (advances and deductions)
+        // Get transaction totals
         $totalAdvancePayment = $this->exists ? $this->total_advance_payment : ($this->advance_payment ?? 0);
         $totalDeduction = $this->exists ? $this->total_deduction : ($this->deduction ?? 0);
-        $totalTransactionDeductions = $totalAdvancePayment + $totalDeduction;
+        $totalNpl = $this->exists ? $this->total_npl : 0;
+        $totalAllowance = $this->exists ? $this->total_allowance : 0;
 
-        // Gross salary = Basic + OT (before any deductions)
+        // Total deductions = Advances + Deductions + NPL
+        $totalTransactionDeductions = $totalAdvancePayment + $totalDeduction + $totalNpl;
+
+        // Gross salary = Basic + OT + Allowance (before any deductions)
         // This is the total earnings before statutory and transaction deductions
-        $this->gross_salary = $this->basic_salary + $this->total_ot_pay + $additionalOtPay;
+        $this->gross_salary = $this->basic_salary + $this->total_ot_pay + $totalAllowance + $additionalOtPay;
 
         // If gross salary is 0 (e.g., worker ended contract), no statutory contributions
         if ($this->gross_salary <= 0) {
@@ -225,5 +252,42 @@ class PayrollWorker extends Model
             $this->advance_payment ?? 0,
             $this->deduction ?? 0
         );
+    }
+
+    /**
+     * Check if the worker's contract has ended for the payroll submission period
+     * Contract is considered ended if con_end date is before the payroll submission month
+     */
+    public function hasContractEnded(): bool
+    {
+        // Get the worker's contract information from worker_db
+        $contract = \DB::connection('worker_db')
+            ->table('contract_worker')
+            ->where('con_wkr_id', $this->worker_id)
+            ->where('con_ctr_clab_no', $this->payrollSubmission->contractor_clab_no)
+            ->orderBy('con_end', 'desc')
+            ->first();
+
+        if (!$contract || !$contract->con_end) {
+            return false;
+        }
+
+        // Get the payroll submission period (month/year)
+        $submission = $this->payrollSubmission;
+        $payrollPeriodStart = \Carbon\Carbon::create($submission->year, $submission->month, 1)->startOfMonth();
+
+        // Contract has ended if con_end is before the start of the payroll period
+        $contractEndDate = \Carbon\Carbon::parse($contract->con_end);
+
+        return $contractEndDate->isBefore($payrollPeriodStart);
+    }
+
+    /**
+     * Check if this worker should be excluded from service charge billing
+     * Excluded if: contract ended AND only has OT hours (no basic salary)
+     */
+    public function isExcludedFromBilling(): bool
+    {
+        return $this->hasContractEnded() && $this->basic_salary == 0;
     }
 }
