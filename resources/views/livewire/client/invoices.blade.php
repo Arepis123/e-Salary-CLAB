@@ -236,7 +236,7 @@
                                 <flux:menu>
                                     @if($invoice->hasAdminReview())
                                         <flux:menu.item icon="eye" href="{{ route('invoices.show', $invoice->id) }}">View Invoice</flux:menu.item>
-                                        <flux:menu.item icon="arrow-down-tray" href="{{ route('invoices.download', $invoice->id) }}">Download PDF</flux:menu.item>
+                                        <flux:menu.item icon="document-arrow-down" href="{{ route('invoices.download', $invoice->id) }}">Download Invoice</flux:menu.item>
                                     @endif
                                     @if($invoice->hasBreakdownFile())
                                         <flux:menu.item icon="document-arrow-down" wire:click="downloadBreakdown({{ $invoice->id }})">Download Breakdown</flux:menu.item>

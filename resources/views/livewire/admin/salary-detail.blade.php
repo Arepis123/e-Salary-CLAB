@@ -84,9 +84,14 @@
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Breakdown File:</p>
                 @if($submission->hasBreakdownFile())
-                    <flux:button size="sm" variant="ghost" wire:click="downloadBreakdown" icon="arrow-down-tray">
-                        {{ $submission->breakdown_file_name }}
-                    </flux:button>
+                    <div class="flex items-center gap-2">
+                        <flux:button size="sm" variant="ghost" wire:click="downloadBreakdown" icon="arrow-down-tray">
+                            {{ $submission->breakdown_file_name }}
+                        </flux:button>
+                        <flux:button size="sm" variant="ghost" wire:click="openReuploadModal" icon="arrow-path" title="Replace file">
+                            Replace
+                        </flux:button>
+                    </div>
                 @else
                     <p class="text-sm text-zinc-500">No file uploaded</p>
                 @endif
@@ -461,6 +466,49 @@
                     @endif
                 </flux:button>
                 <flux:button type="button" wire:click="closeReviewModal" variant="ghost">
+                    Cancel
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <!-- Re-upload Breakdown Modal -->
+    <flux:modal wire:model="showReuploadModal" size="md">
+        <form wire:submit.prevent="reuploadBreakdown">
+            <flux:heading size="lg">Replace Breakdown File</flux:heading>
+            <flux:subheading class="mb-4">
+                Upload a new breakdown file for {{ $submission->month_year }}
+            </flux:subheading>
+
+            <!-- Current File Info -->
+            @if($submission->hasBreakdownFile())
+                <div class="mb-4 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Current file:</p>
+                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $submission->breakdown_file_name }}</p>
+                </div>
+            @endif
+
+            <!-- New File Upload -->
+            <flux:field>
+                <flux:label required>New Breakdown File</flux:label>
+                <flux:description>Upload a replacement file (.xlsx, .xls, or .pdf, max 10MB)</flux:description>
+                <input type="file" wire:model="newBreakdownFile" accept=".xlsx,.xls,.pdf"
+                    class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
+                <flux:error name="newBreakdownFile" />
+                @if($newBreakdownFile)
+                    <p class="text-xs text-green-600 mt-1">Ready to upload: {{ $newBreakdownFile->getClientOriginalName() }}</p>
+                @endif
+            </flux:field>
+
+            <div class="flex gap-2 mt-6">
+                <flux:button type="submit" variant="filled" icon="arrow-up-tray" :disabled="$isReuploading">
+                    @if($isReuploading)
+                        Uploading...
+                    @else
+                        Replace File
+                    @endif
+                </flux:button>
+                <flux:button type="button" wire:click="closeReuploadModal" variant="ghost">
                     Cancel
                 </flux:button>
             </div>

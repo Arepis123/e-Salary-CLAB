@@ -164,6 +164,44 @@
                 </table>
             </div>
 
+            <!-- Worker Breakdown File Upload -->
+            <div class="mt-6 p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/50">
+                <div class="flex items-start gap-3 mb-3">
+                    <flux:icon.document-arrow-up class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div class="flex-1">
+                        <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Worker Breakdown File (Optional)</h3>
+                        <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                            Upload your worker breakdown Excel file (.xlsx, .xls) or PDF. This will be reviewed by admin.
+                        </p>
+                    </div>
+                </div>
+
+                @if($existingBreakdownFileName)
+                    <div class="mb-3 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <flux:icon.document-check class="size-4 text-green-600 dark:text-green-400" />
+                                <span class="text-sm text-green-900 dark:text-green-100">{{ $existingBreakdownFileName }}</span>
+                            </div>
+                            <span class="text-xs text-green-600 dark:text-green-400">Uploaded</span>
+                        </div>
+                    </div>
+                @endif
+
+                <input type="file" wire:model="workerBreakdownFile" accept=".xlsx,.xls,.pdf"
+                    class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 dark:file:bg-blue-900 dark:file:text-blue-200 dark:hover:file:bg-blue-800" />
+
+                @if($workerBreakdownFile)
+                    <p class="text-xs text-green-600 dark:text-green-400 mt-2">
+                        Ready to upload: {{ $workerBreakdownFile->getClientOriginalName() }}
+                    </p>
+                @endif
+
+                @error('workerBreakdownFile')
+                    <p class="text-xs text-red-600 dark:text-red-400 mt-2">{{ $message }}</p>
+                @enderror
+            </div>
+
             <!-- Action Buttons -->
             <div class="mt-6 flex justify-between items-center">
                 <flux:button variant="filled" icon="arrow-left" href="{{ route('client.timesheet') }}">

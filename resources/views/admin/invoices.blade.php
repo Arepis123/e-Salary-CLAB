@@ -118,12 +118,12 @@
                                             href="{{ route('invoices.show', $invoice->id) }}"
                                         />
                                     </flux:tooltip>
-                                    <flux:tooltip content="Download PDF">
+                                    <flux:tooltip content="Download Invoice">
                                         <flux:button
                                             variant="ghost"
                                             size="xs"
                                             icon="arrow-down-tray"
-                                            title="Download PDF"
+                                            title="Download Invoice"
                                             href="{{ route('invoices.download', $invoice->id) }}"
                                         />
                                     </flux:tooltip>

@@ -6,9 +6,12 @@ use App\Models\PayrollSubmission;
 use App\Services\PayrollService;
 use App\Services\ContractWorkerService;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class TimesheetEdit extends Component
 {
+    use WithFileUploads;
+
     protected PayrollService $payrollService;
     protected ContractWorkerService $contractWorkerService;
 
@@ -18,6 +21,10 @@ class TimesheetEdit extends Component
     public $period;
     public $currentSubmission;
     public $errorMessage = '';
+
+    // Worker breakdown file upload
+    public $workerBreakdownFile;
+    public $existingBreakdownFileName;
 
     // Transaction management
     public $showTransactionModal = false;

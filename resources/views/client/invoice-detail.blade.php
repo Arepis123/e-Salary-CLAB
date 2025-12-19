@@ -208,20 +208,8 @@
         @endif
 
         <!-- Payment Method Notice -->
-        @if($invoice->status === 'pending_payment' || $invoice->status === 'overdue')
-            {{-- <flux:card class="p-4 dark:bg-zinc-900 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <div class="flex gap-3">
-                    <flux:icon.information-circle class="size-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-                    <div class="text-sm text-amber-900 dark:text-amber-100">
-                        <p class="font-medium">Payment Method Information</p>
-                        <p class="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                            Payment can only be made using <span class="font-semibold">Online Banking (FPX)</span> through our secure <span class="font-semibold">Billplz payment gateway</span>.
-                            Credit/debit card payments are not accepted. Please ensure your online banking is activated before proceeding.
-                        </p>
-                    </div>
-                </div>
-            </flux:card> --}}
-            <flux:callout icon="check-circle" color="amber">
+        @if($invoice->status === 'pending_payment' || $invoice->status === 'overdue')            
+            <flux:callout icon="check-circle" color="yellow">
                 <flux:callout.heading>Payment Method Information</flux:callout.heading>
                 <flux:callout.text>
                     <p>

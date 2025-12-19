@@ -233,7 +233,7 @@
                                 <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" inset="top bottom" />
                                 <flux:menu>
                                     <flux:menu.item icon="eye" href="{{ route('invoices.show', $invoice->id) }}">View Invoice</flux:menu.item>
-                                    <flux:menu.item icon="arrow-down-tray" href="{{ route('invoices.download', $invoice->id) }}">Download PDF</flux:menu.item>
+                                    <flux:menu.item icon="arrow-down-tray" href="{{ route('invoices.download', $invoice->id) }}">Download Invoice</flux:menu.item>
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
