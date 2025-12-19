@@ -36,20 +36,22 @@
     <div class="flex items-center gap-3">
         @if($submission->status === 'paid')
             <flux:badge color="green" size="sm" icon="check-circle" inset="top bottom">Completed</flux:badge>
-        @elseif($submission->status === 'pending_payment' || $submission->status === 'overdue')
+        @elseif($submission->status === 'pending_payment')
             <flux:badge color="yellow" size="sm" icon="clock" inset="top bottom">Pending Payment</flux:badge>
+        @elseif($submission->status === 'overdue')
+            <flux:badge color="red" size="sm" icon="exclamation-triangle" inset="top bottom">Overdue</flux:badge>
+        @elseif($submission->status === 'approved')
+            <flux:badge color="blue" size="sm" icon="check-circle" inset="top bottom">Approved</flux:badge>
+        @elseif($submission->status === 'submitted')
+            <flux:badge color="orange" size="sm" icon="document-text" inset="top bottom">Under Review</flux:badge>
         @else
             <flux:badge color="zinc" size="sm" inset="top bottom">Draft</flux:badge>
         @endif
 
         @if($submission->payment && $submission->payment->status === 'completed')
             <flux:badge color="green" size="sm" icon="check" inset="top bottom">Payment Received</flux:badge>
-        @else
+        @elseif($submission->status === 'paid' || $submission->status === 'pending_payment' || $submission->status === 'overdue')
             <flux:badge color="orange" size="sm" icon="clock" inset="top bottom">Awaiting Payment</flux:badge>
-        @endif
-
-        @if($submission->isOverdue())
-            <flux:badge color="red" size="sm" icon="exclamation-triangle" inset="top bottom">Overdue</flux:badge>
         @endif
     </div>
 
@@ -284,14 +286,14 @@
                     <flux:table.column align="right">
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span>
                     </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span>
+                    <flux:table.column align="end">
+                        <span class="text-xs text-right font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span>
                     </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span>
+                    <flux:table.column align="end">
+                        <span class="text-xs text-right font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span>
                     </flux:table.column>
-                    <flux:table.column align="right">
-                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span>
+                    <flux:table.column align="end">
+                        <span class="text-xs text-right font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span>
                     </flux:table.column>
                     <flux:table.column align="right">
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span>
@@ -326,7 +328,7 @@
                             <!-- Weekday OT Hours Only -->
                             <flux:table.cell align="end" variant="strong">
                                 @if($worker->ot_normal_hours > 0)
-                                    <span class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}h</span>
+                                    <span class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}</span>
                                 @else
                                     <span class="text-zinc-500">-</span>
                                 @endif
@@ -335,7 +337,7 @@
                             <!-- Rest Day OT Hours Only -->
                             <flux:table.cell align="end" variant="strong">
                                 @if($worker->ot_rest_hours > 0)
-                                    <span class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}h</span>
+                                    <span class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}</span>
                                 @else
                                     <span class="text-zinc-500">-</span>
                                 @endif
@@ -344,7 +346,7 @@
                             <!-- Public Holiday OT Hours Only -->
                             <flux:table.cell align="end" variant="strong">
                                 @if($worker->ot_public_hours > 0)
-                                    <span class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}h</span>
+                                    <span class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}</span>
                                 @else
                                     <span class="text-zinc-500">-</span>
                                 @endif
@@ -445,8 +447,13 @@
                 <input type="file" wire:model="breakdownFile" accept=".xlsx,.xls,.pdf"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="breakdownFile" />
+                <div wire:loading wire:target="breakdownFile" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    <flux:icon.arrow-path class="size-3 inline animate-spin" /> Uploading file...
+                </div>
                 @if($breakdownFile)
-                    <p class="text-xs text-green-600">Ready: {{ $breakdownFile->getClientOriginalName() }}</p>
+                    <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                        <flux:icon.check-circle class="size-3 inline" /> Ready: {{ $breakdownFile->getClientOriginalName() }}
+                    </p>
                 @endif
             </flux:field>
 
@@ -458,12 +465,17 @@
             </flux:field>
 
             <div class="flex gap-2 mt-6">
-                <flux:button type="submit" variant="filled" icon="check-circle" :disabled="$isReviewing">
-                    @if($isReviewing)
-                        Approving...
-                    @else
-                        Approve Submission
-                    @endif
+                <flux:button type="submit" variant="filled" icon="check-circle" :disabled="$isReviewing" wire:loading.attr="disabled" wire:target="breakdownFile">
+                    <span wire:loading.remove wire:target="breakdownFile">
+                        @if($isReviewing)
+                            Approving...
+                        @else
+                            Approve Submission
+                        @endif
+                    </span>
+                    <span wire:loading wire:target="breakdownFile">
+                        Uploading file...
+                    </span>
                 </flux:button>
                 <flux:button type="button" wire:click="closeReviewModal" variant="ghost">
                     Cancel

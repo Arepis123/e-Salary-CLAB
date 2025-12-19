@@ -114,7 +114,7 @@
                 <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'id'" :direction="$sortDirection" wire:click="sortByColumn('id')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Submission ID</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'contractor_clab_no'" :direction="$sortDirection" wire:click="sortByColumn('contractor_clab_no')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor</span></flux:table.column>
-                <flux:table.column sortable :sorted="$sortBy === 'total_workers'" :direction="$sortDirection" wire:click="sortByColumn('total_workers')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Workers</span></flux:table.column>
+                <flux:table.column align="center" sortable :sorted="$sortBy === 'total_workers'" :direction="$sortDirection" wire:click="sortByColumn('total_workers')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Workers</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'month'" :direction="$sortDirection" wire:click="sortByColumn('month')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Period</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'grand_total'" :direction="$sortDirection" wire:click="sortByColumn('grand_total')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Grand Total</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'status'" :direction="$sortDirection" wire:click="sortByColumn('status')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
@@ -136,12 +136,12 @@
                             {{ $submission->user ? $submission->user->name : 'Client ' . $submission->contractor_clab_no }}
                         </flux:table.cell>
 
-                        <flux:table.cell variant="strong">
-                            {{ $submission->total_workers }} {{ Str::plural('worker', $submission->total_workers) }}
+                        <flux:table.cell variant="strong" align="center">
+                            {{ $submission->total_workers }}
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            {{ $submission->month_year }}
+                            {{ \Carbon\Carbon::parse($submission->month_year)->format('M Y') }}
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -150,30 +150,36 @@
                                     RM {{ number_format($submission->client_total, 2) }}
                                 </div>
                             @else
-                                <span class="text-sm text-orange-600 dark:text-orange-400">Pending Review</span>
+                                <span class="text-sm"></span>
                             @endif
                         </flux:table.cell>
 
                         <flux:table.cell>
                             @if($submission->status === 'paid')
-                                <flux:badge color="green" size="sm" inset="top bottom">Completed</flux:badge>
-                            @elseif($submission->status === 'pending_payment' || $submission->status === 'overdue')
-                                <flux:badge color="yellow" size="sm" inset="top bottom">Pending</flux:badge>
+                                <flux:badge color="green" size="sm">Completed</flux:badge>
+                            @elseif($submission->status === 'pending_payment')
+                                <flux:badge color="yellow" size="sm">Pending Payment</flux:badge>
+                            @elseif($submission->status === 'overdue')
+                                <flux:badge color="red" size="sm">Overdue</flux:badge>
+                            @elseif($submission->status === 'approved')
+                                <flux:badge color="blue" size="sm">Approved</flux:badge>
+                            @elseif($submission->status === 'submitted')
+                                <flux:badge color="orange" size="sm">Under Review</flux:badge>
                             @else
-                                <flux:badge color="zinc" size="sm" inset="top bottom">Draft</flux:badge>
+                                <flux:badge color="zinc" size="sm">Draft</flux:badge>
                             @endif
                         </flux:table.cell>
 
                         <flux:table.cell>
                             @if($submission->payment && $submission->payment->status === 'completed')
-                                <flux:badge color="green" size="sm" icon="check" inset="top bottom">Paid</flux:badge>
+                                <flux:badge color="green" size="sm" class="w-12 justify-center">Paid</flux:badge>
                             @else
-                                <flux:badge color="orange" size="sm" icon="clock" inset="top bottom">Awaiting</flux:badge>
+                                <flux:badge color="red" size="sm" class="w-12 justify-center">No</flux:badge>
                             @endif
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            {{ $submission->submitted_at ? $submission->submitted_at->format('d M Y') : '-' }}
+                            {{ $submission->submitted_at ? $submission->submitted_at->format('d M Y') : '' }}
                         </flux:table.cell>
 
                         <flux:table.cell>
@@ -256,7 +262,7 @@
                                 {{ $selectedSubmission->user ? $selectedSubmission->user->name : 'Client ' . $selectedSubmission->contractor_clab_no }}
                             </p>
                             <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                                Period: {{ $selectedSubmission->month_year }} | Workers: {{ $selectedSubmission->total_workers }}
+                                Period: {{ \Carbon\Carbon::parse($selectedSubmission->month_year)->format('M Y') }} | Workers: {{ $selectedSubmission->total_workers }}
                             </p>
                             <div class="mt-2 flex flex-wrap gap-2 items-center hidden">
                                 <flux:badge color="blue" size="sm">
