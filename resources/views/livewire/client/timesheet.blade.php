@@ -97,6 +97,10 @@
             </div>
             @if($currentSubmission->status === 'draft')
                 <flux:badge color="zinc" size="lg">Draft</flux:badge>
+            @elseif($currentSubmission->status === 'submitted')
+                <flux:badge color="blue" size="lg">Awaiting Review</flux:badge>
+            @elseif($currentSubmission->status === 'approved')
+                <flux:badge color="purple" size="lg">Approved</flux:badge>
             @elseif($currentSubmission->status === 'pending_payment')
                 <flux:badge color="orange" size="lg">Pending Payment</flux:badge>
             @elseif($currentSubmission->status === 'paid')
@@ -330,6 +334,10 @@
                         <flux:table.cell>
                             @if($submission->status === 'draft')
                                 <flux:badge color="zinc" size="sm" inset="top bottom">Draft</flux:badge>
+                            @elseif($submission->status === 'submitted')
+                                <flux:badge color="blue" size="sm" inset="top bottom">Awaiting Review</flux:badge>
+                            @elseif($submission->status === 'approved')
+                                <flux:badge color="purple" size="sm" inset="top bottom">Approved</flux:badge>
                             @elseif($submission->status === 'pending_payment')
                                 <flux:badge color="orange" size="sm" inset="top bottom">Pending Payment</flux:badge>
                             @elseif($submission->status === 'paid')
@@ -355,7 +363,7 @@
                                         <flux:menu.item icon="pencil" icon:variant="outline" href="{{ route('timesheet.edit', $submission->id) }}">Edit Draft</flux:menu.item>
                                         <flux:menu.item icon="paper-airplane" icon:variant="outline" wire:click="submitDraftForPayment({{ $submission->id }})">Submit</flux:menu.item>
                                     @endif
-                                    @if($submission->status === 'pending_payment' || $submission->status === 'overdue')
+                                    @if($submission->status === 'approved' || $submission->status === 'pending_payment' || $submission->status === 'overdue')
                                         <flux:menu.separator />
                                         <form method="POST" action="{{ route('client.payment.create', $submission->id) }}" class="contents">
                                             @csrf

@@ -67,6 +67,10 @@
                             <div>
                                 @if($invoice->status === 'draft')
                                     <flux:badge color="zinc" size="sm">Draft</flux:badge>
+                                @elseif($invoice->status === 'submitted')
+                                    <flux:badge color="blue" size="sm">In Process</flux:badge>
+                                @elseif($invoice->status === 'approved')
+                                    <flux:badge color="purple" size="sm">Approved</flux:badge>
                                 @elseif($invoice->status === 'pending_payment')
                                     <flux:badge color="yellow" size="sm">Pending Payment</flux:badge>
                                 @elseif($invoice->status === 'paid')
@@ -157,11 +161,11 @@
         </flux:card>
         
         <!-- Payment Action -->
-        @if($invoice->status === 'pending_payment' || $invoice->status === 'overdue')
+        @if($invoice->status === 'approved' || $invoice->status === 'pending_payment' || $invoice->status === 'overdue')
             <flux:card class="p-6 dark:bg-zinc-900 border border-blue-200 dark:border-blue-800">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Ready to Pay?</h3>                      
+                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Ready to Pay?</h3>
                         <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                             Complete your payment securely via Billplz using Online Banking (FPX)
                         </p>

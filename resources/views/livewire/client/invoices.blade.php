@@ -217,8 +217,12 @@
                         <flux:table.cell>
                             @if($invoice->status === 'draft')
                                 <flux:badge color="zinc" size="sm" inset="top bottom">Draft</flux:badge>
+                            @elseif($invoice->status === 'submitted')
+                                <flux:badge color="blue" size="sm" inset="top bottom">In Process</flux:badge>
+                            @elseif($invoice->status === 'approved')
+                                <flux:badge color="purple" size="sm" inset="top bottom">Approved</flux:badge>
                             @elseif($invoice->status === 'pending_payment')
-                                <flux:badge color="orange" size="sm" inset="top bottom">Pending</flux:badge>
+                                <flux:badge color="orange" size="sm" inset="top bottom">Pending Payment</flux:badge>
                             @elseif($invoice->status === 'paid')
                                 <flux:badge color="green" size="sm" inset="top bottom">Paid</flux:badge>
                             @elseif($invoice->status === 'overdue')
@@ -241,7 +245,7 @@
                                         <flux:menu.separator />
                                         <flux:menu.item icon="paper-airplane" wire:click="finalizeDraft({{ $invoice->id }})">Finalize & Submit</flux:menu.item>
                                     @endif
-                                    @if($invoice->status === 'pending_payment' || $invoice->status === 'overdue')
+                                    @if($invoice->status === 'approved' || $invoice->status === 'pending_payment' || $invoice->status === 'overdue')
                                         <flux:menu.separator />
                                         <form method="POST" action="{{ route('client.payment.create', $invoice->id) }}" class="contents">
                                             @csrf

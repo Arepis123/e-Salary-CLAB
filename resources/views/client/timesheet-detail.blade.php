@@ -37,6 +37,10 @@
                     <div class="mt-1">
                         @if($submission->status === 'draft')
                             <flux:badge color="zinc" >Draft</flux:badge>
+                        @elseif($submission->status === 'submitted')
+                            <flux:badge color="blue" >In Process</flux:badge>
+                        @elseif($submission->status === 'approved')
+                            <flux:badge color="purple" >Approved</flux:badge>
                         @elseif($submission->status === 'pending_payment')
                             <flux:badge color="orange" >Pending Payment</flux:badge>
                         @elseif($submission->status === 'paid')
@@ -61,7 +65,6 @@
                     @if($submission->hasAdminReview())
                         <p class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</p>
                     @else
-                        <p class="text-lg font-semibold text-orange-600 dark:text-orange-400">In Process</p>
                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                             Amount will be available after processing
                         </p>
@@ -109,7 +112,7 @@
                         <div class="text-sm text-blue-900 dark:text-blue-100">
                             <p class="font-medium">Payroll Processing in Progress</p>
                             <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                                Your submission is being processed by our certified external payroll system. The salary breakdown and invoice will be available after admin approval.
+                                Your submission is being processed by our certified payroll system. The salary breakdown and invoice will be available after admin approval.
                             </p>
                         </div>
                     </div>

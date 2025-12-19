@@ -94,6 +94,10 @@
                             <td class="py-3">
                                 @if($invoice->status === 'draft')
                                     <flux:badge color="zinc" size="sm">Draft</flux:badge>
+                                @elseif($invoice->status === 'submitted')
+                                    <flux:badge color="blue" size="sm">In Process</flux:badge>
+                                @elseif($invoice->status === 'approved')
+                                    <flux:badge color="purple" size="sm">Approved</flux:badge>
                                 @elseif($invoice->status === 'pending_payment')
                                     <flux:badge color="orange" size="sm">Pending</flux:badge>
                                 @elseif($invoice->status === 'paid')
