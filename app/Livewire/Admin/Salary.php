@@ -159,8 +159,8 @@ class Salary extends Component
             ->where('status', 'paid')
             ->count();
 
-        // Pending submissions (all time, not just this month)
-        $pending = PayrollSubmission::whereIn('status', ['pending_payment', 'draft', 'overdue'])
+        // Pending submissions (submitted + approved, waiting for action)
+        $pending = PayrollSubmission::whereIn('status', ['submitted', 'approved'])
             ->count();
 
         $this->stats = [
@@ -205,13 +205,7 @@ class Salary extends Component
 
         // Apply status filter
         if ($this->statusFilter) {
-            if ($this->statusFilter === 'completed') {
-                $query->where('status', 'paid');
-            } elseif ($this->statusFilter === 'pending') {
-                $query->whereIn('status', ['pending_payment', 'overdue']);
-            } elseif ($this->statusFilter === 'draft') {
-                $query->where('status', 'draft');
-            }
+            $query->where('status', $this->statusFilter);
         }
 
         // Apply payment status filter

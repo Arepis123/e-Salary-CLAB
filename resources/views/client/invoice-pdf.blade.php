@@ -221,7 +221,6 @@
         <!-- Header with Logo -->
         <div class="header">
             <div class="invoice-title">PRO FORMA INVOICE</div>
-            <div style="font-size: 9px; color: #dc3545; margin-top: 2px; font-weight: normal;">QUOTATION / NOT A TAX INVOICE</div>
             <div class="logo-section">
                 <img src="{{ public_path('images/company-logo.png') }}" alt="Company Logo">
             </div>
@@ -305,15 +304,7 @@
         <table style="width: 100%; margin-top: 8px;">
             <tr>
                 <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-                    <!-- Important Notice about OT -->
-                    <div style="background-color: #f5f5f5; border-left: 4px solid rgb(110, 165, 247); padding: 5px 8px; margin-bottom: 7px; font-size: 7px; border-top-right-radius: 1px; border-bottom-right-radius: 1px;">
-                        <strong>OVERTIME (OT) INFORMATION:</strong><br>
-                        • The OT hours shown are from the PREVIOUS month and are paid in this month's invoice<br>
-                        • Example: November payroll includes October's OT hours<br>
-                        • Gross Salary = Basic Salary + OT<br>
-                        • EPF is calculated on Basic Salary only (2%)<br>
-                        • SOCSO is calculated on Gross Salary using contribution table
-                    </div>
+                    
 
                     <!-- Penalty Notice -->
                     @if($invoice->has_penalty)

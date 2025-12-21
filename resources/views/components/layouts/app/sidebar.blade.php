@@ -22,6 +22,11 @@
                     <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">{{ __('MAIN') }}</h3>
                 </div>
                 <flux:sidebar.item icon="house" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>{{ __('Dashboard') }}</flux:sidebar.item>
+
+                @if(auth()->user()->role === 'client')
+                    <flux:sidebar.item icon="clock" :href="route('ot-entry')" :current="request()->routeIs('ot-entry')" wire:navigate>{{ __('OT Entry') }}</flux:sidebar.item>
+                @endif
+
                 <flux:sidebar.item icon="users" :href="route('workers')" :current="request()->routeIs('workers')" wire:navigate>{{ __('Worker') }}</flux:sidebar.item>
                 <flux:sidebar.item icon="building-office" :href="route('contractors')" :current="request()->routeIs('contractors')" wire:navigate>{{ __('Contractors') }}</flux:sidebar.item>
                 {{-- <flux:sidebar.item icon="wallet" :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>{{ __('Payroll') }}</flux:sidebar.item> --}}

@@ -3,9 +3,16 @@
 namespace App\Livewire\Admin;
 
 use App\Models\PayrollSubmission;
+use App\Mail\PayrollApproved;
 use Flux\Flux;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class SalaryDetail extends Component
 {
@@ -147,8 +154,168 @@ class SalaryDetail extends Component
 
     public function exportWorkerList()
     {
-        // TODO: Implement export worker list functionality
-        Flux::toast(variant: 'info', text: 'Export functionality coming soon!');
+        try {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Set document properties
+            $spreadsheet->getProperties()
+                ->setTitle('Worker Payroll List - ' . $this->submission->month_year)
+                ->setSubject('Worker Payroll Details');
+
+            // Title row
+            $sheet->setCellValue('A1', 'PAYROLL SUBMISSION - ' . strtoupper($this->submission->month_year));
+            $sheet->mergeCells('A1:L1');
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Submission info
+            $sheet->setCellValue('A2', 'Contractor: ' . $this->submission->user->name);
+            $sheet->setCellValue('A3', 'CLAB No: ' . $this->submission->contractor_clab_no);
+            $sheet->setCellValue('A4', 'Status: ' . strtoupper($this->submission->status));
+            $sheet->setCellValue('A5', 'Total Workers: ' . $this->stats['total_workers']);
+
+            // Headers (row 7)
+            $headers = [
+                'A7' => 'No',
+                'B7' => 'Worker ID',
+                'C7' => 'Worker Name',
+                'D7' => 'Passport',
+                'E7' => 'Basic Salary (RM)',
+                'F7' => 'OT Normal (hrs)',
+                'G7' => 'OT Rest (hrs)',
+                'H7' => 'OT Public (hrs)',
+                'I7' => 'Advance Payment (RM)',
+                'J7' => 'Other Deduction (RM)',
+                'K7' => 'NPL (days)',
+                'L7' => 'Allowance (RM)',
+            ];
+
+            foreach ($headers as $cell => $value) {
+                $sheet->setCellValue($cell, $value);
+            }
+
+            // Style headers
+            $sheet->getStyle('A7:L7')->applyFromArray([
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4F46E5']
+                ],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'borders' => [
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                ]
+            ]);
+
+            // Data rows
+            $row = 8;
+            $no = 1;
+            foreach ($this->workers as $worker) {
+                $sheet->setCellValue('A' . $row, $no++);
+                $sheet->setCellValue('B' . $row, $worker->worker_id);
+                $sheet->setCellValue('C' . $row, $worker->worker_name);
+                $sheet->setCellValue('D' . $row, $worker->worker_passport);
+                $sheet->setCellValue('E' . $row, $worker->basic_salary);
+                $sheet->setCellValue('F' . $row, $worker->ot_normal_hours ?? 0);
+                $sheet->setCellValue('G' . $row, $worker->ot_rest_hours ?? 0);
+                $sheet->setCellValue('H' . $row, $worker->ot_public_hours ?? 0);
+                $sheet->setCellValue('I' . $row, $worker->advance_payment ?? 0);
+                $sheet->setCellValue('J' . $row, $worker->other_deduction ?? 0);
+                $sheet->setCellValue('K' . $row, $worker->npl_days ?? 0);
+                $sheet->setCellValue('L' . $row, $worker->allowance ?? 0);
+
+                // Format currency columns
+                foreach (['E', 'I', 'J', 'L'] as $col) {
+                    $sheet->getStyle($col . $row)->getNumberFormat()
+                        ->setFormatCode('#,##0.00');
+                }
+
+                // Format hours columns
+                foreach (['F', 'G', 'H'] as $col) {
+                    $sheet->getStyle($col . $row)->getNumberFormat()
+                        ->setFormatCode('0.00');
+                }
+
+                // Format NPL days column
+                $sheet->getStyle('K' . $row)->getNumberFormat()
+                    ->setFormatCode('0.0');
+
+                $row++;
+            }
+
+            // Total row
+            $totalRow = $row;
+            $sheet->setCellValue('A' . $totalRow, 'TOTAL');
+            $sheet->mergeCells('A' . $totalRow . ':D' . $totalRow);
+            $sheet->setCellValue('E' . $totalRow, '=SUM(E8:E' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('F' . $totalRow, '=SUM(F8:F' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('G' . $totalRow, '=SUM(G8:G' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('H' . $totalRow, '=SUM(H8:H' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('I' . $totalRow, '=SUM(I8:I' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('J' . $totalRow, '=SUM(J8:J' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('K' . $totalRow, '=SUM(K8:K' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('L' . $totalRow, '=SUM(L8:L' . ($totalRow - 1) . ')');
+
+            // Style total row
+            $sheet->getStyle('A' . $totalRow . ':L' . $totalRow)->applyFromArray([
+                'font' => ['bold' => true],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E5E7EB']
+                ],
+                'borders' => [
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                ]
+            ]);
+
+            // Format currency in total row
+            foreach (['E', 'I', 'J', 'L'] as $col) {
+                $sheet->getStyle($col . $totalRow)->getNumberFormat()
+                    ->setFormatCode('#,##0.00');
+            }
+
+            // Format hours in total row
+            foreach (['F', 'G', 'H'] as $col) {
+                $sheet->getStyle($col . $totalRow)->getNumberFormat()
+                    ->setFormatCode('0.00');
+            }
+
+            // Format NPL days in total row
+            $sheet->getStyle('K' . $totalRow)->getNumberFormat()
+                ->setFormatCode('0.0');
+
+            // Auto-size columns
+            foreach (range('A', 'L') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            // Freeze panes at header row
+            $sheet->freezePane('A8');
+
+            // Generate filename
+            $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));
+            $fileName = sprintf(
+                'Worker_List_%s_%s_%s.xlsx',
+                $this->submission->contractor_clab_no,
+                $monthName,
+                $this->submission->year
+            );
+
+            // Create file
+            $writer = new Xlsx($spreadsheet);
+            $tempFile = tempnam(sys_get_temp_dir(), $fileName);
+            $writer->save($tempFile);
+
+            return response()->download($tempFile, $fileName)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Export Failed',
+                text: 'Failed to export worker list: ' . $e->getMessage()
+            );
+        }
     }
 
     public function openReviewModal()
@@ -214,11 +381,40 @@ class SalaryDetail extends Component
                 'breakdown_file_name' => $customFileName,
             ]);
 
-            Flux::toast(
-                variant: 'success',
-                heading: 'Submission Approved',
-                text: 'Submission has been approved with final amount RM ' . number_format($this->reviewFinalAmount, 2)
-            );
+            // Check if submission is overdue and apply penalty immediately
+            $this->submission->refresh();
+            if ($this->submission->isOverdue() && !$this->submission->has_penalty) {
+                $this->submission->updatePenalty();
+                $this->submission->refresh();
+
+                Flux::toast(
+                    variant: 'warning',
+                    heading: 'Late Submission - Penalty Applied',
+                    text: 'This is a late submission. 8% penalty (RM ' . number_format($this->submission->penalty_amount, 2) . ') has been automatically applied.'
+                );
+            } else {
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Submission Approved',
+                    text: 'Submission has been approved with final amount RM ' . number_format($this->reviewFinalAmount, 2)
+                );
+            }
+
+            // Send email notification to client
+            try {
+                Mail::to($this->submission->user->email)
+                    ->send(new PayrollApproved(
+                        $this->submission,
+                        $this->reviewFinalAmount,
+                        $this->reviewNotes
+                    ));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send payroll approval email', [
+                    'submission_id' => $this->submission->id,
+                    'error' => $e->getMessage()
+                ]);
+                // Don't show error to admin - email failure shouldn't block the approval
+            }
 
             $this->closeReviewModal();
             $this->mount($this->submission->id); // Refresh data

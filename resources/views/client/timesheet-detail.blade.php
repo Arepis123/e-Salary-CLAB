@@ -238,129 +238,6 @@
                     </div>
                 @endif
 
-                <!-- Worker Breakdown (Your Submitted Data) -->
-                <div class="mt-6 border-t border-zinc-200 dark:border-zinc-700 pt-6">
-                    <h3 class="mb-4 text-base font-semibold text-zinc-900 dark:text-zinc-100">Your Submitted Worker Data</h3>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                        This shows the data you submitted for {{ $submission->month_year }} payroll
-                    </p>
-
-                    <div class="overflow-x-auto">
-                        <flux:table>
-                            <flux:table.columns>
-                                <flux:table.column align="center">
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span>
-                                </flux:table.column>
-                                <flux:table.column>
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker ID</span>
-                                </flux:table.column>
-                                <flux:table.column>
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</span>
-                                </flux:table.column>
-                                <flux:table.column>
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport</span>
-                                </flux:table.column>
-                                <flux:table.column align="right">
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span>
-                                </flux:table.column>
-                                <flux:table.column align="right">
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span>
-                                </flux:table.column>
-                                <flux:table.column align="right">
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span>
-                                </flux:table.column>
-                                <flux:table.column align="right">
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span>
-                                </flux:table.column>
-                                <flux:table.column align="right">
-                                    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span>
-                                </flux:table.column>
-                            </flux:table.columns>
-
-                            <flux:table.rows>
-                                @foreach($submission->workers as $index => $worker)
-                                    <flux:table.rows :key="$worker->id">
-                                        <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
-
-                                        <flux:table.cell variant="strong">
-                                            {{ $worker->worker_id }}
-                                        </flux:table.cell>
-
-                                        <flux:table.cell variant="strong">
-                                            {{ $worker->worker_name }}
-                                        </flux:table.cell>
-
-                                        <flux:table.cell variant="strong">
-                                            {{ $worker->worker_passport }}
-                                        </flux:table.cell>
-
-                                        <flux:table.cell align="end" variant="strong">
-                                            @if($worker->basic_salary > 0)
-                                                RM {{ number_format($worker->basic_salary, 2) }}
-                                            @else
-                                                <span class="text-zinc-500">-</span>
-                                            @endif
-                                        </flux:table.cell>
-
-                                        <!-- Weekday OT Hours -->
-                                        <flux:table.cell align="end" variant="strong">
-                                            @if($worker->ot_normal_hours > 0)
-                                                <span class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}h</span>
-                                            @else
-                                                <span class="text-zinc-500">-</span>
-                                            @endif
-                                        </flux:table.cell>
-
-                                        <!-- Rest Day OT Hours -->
-                                        <flux:table.cell align="end" variant="strong">
-                                            @if($worker->ot_rest_hours > 0)
-                                                <span class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}h</span>
-                                            @else
-                                                <span class="text-zinc-500">-</span>
-                                            @endif
-                                        </flux:table.cell>
-
-                                        <!-- Public Holiday OT Hours -->
-                                        <flux:table.cell align="end" variant="strong">
-                                            @if($worker->ot_public_hours > 0)
-                                                <span class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}h</span>
-                                            @else
-                                                <span class="text-zinc-500">-</span>
-                                            @endif
-                                        </flux:table.cell>
-
-                                        <!-- Transactions -->
-                                        <flux:table.cell align="end" variant="strong">
-                                            @php
-                                                $workerTransactions = $worker->transactions ?? collect([]);
-                                            @endphp
-                                            @if($workerTransactions->count() > 0)
-                                                <div class="text-xs space-y-1">
-                                                    @foreach($workerTransactions as $txn)
-                                                        <div class="text-zinc-900 dark:text-zinc-100">
-                                                            @if($txn->type === 'allowance')
-                                                                +RM {{ number_format($txn->amount, 2) }} (Allowance)
-                                                            @elseif($txn->type === 'npl')
-                                                                {{ $txn->amount }} {{ $txn->amount == 1 ? 'day' : 'days' }} (NPL)
-                                                            @elseif($txn->type === 'advance_payment')
-                                                                -RM {{ number_format($txn->amount, 2) }} (Advance)
-                                                            @else
-                                                                -RM {{ number_format($txn->amount, 2) }} (Deduction)
-                                                            @endif
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                            @else
-                                                <span class="text-zinc-500">-</span>
-                                            @endif
-                                        </flux:table.cell>
-                                    </flux:table.rows>
-                                @endforeach
-                            </flux:table.rows>
-                        </flux:table>
-                    </div>
-                </div>
-
                 <!-- Invoice Summary -->
                 <div class="mt-6">
                     <h3 class="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">Invoice Summary</h3>
@@ -368,7 +245,7 @@
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm">
                                 <span class="text-zinc-600 dark:text-zinc-400">Total Amount (Payroll)</span>
-                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_amount, 2) }}</span>
+                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->admin_final_amount ?? $submission->total_amount, 2) }}</span>
                             </div>
                             <div class="flex justify-between text-sm">
                                 <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }})</span>
@@ -396,6 +273,129 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </flux:card>
+
+            <!-- Worker Breakdown (Your Submitted Data) - Separate Card -->
+            <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+                <h3 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Your Submitted Worker Data</h3>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                    This shows the data you submitted for {{ $submission->month_year }} payroll
+                </p>
+
+                <div class="overflow-x-auto">
+                    <flux:table>
+                        <flux:table.columns>
+                            <flux:table.column align="center">
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span>
+                            </flux:table.column>
+                            <flux:table.column>
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker ID</span>
+                            </flux:table.column>
+                            <flux:table.column>
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</span>
+                            </flux:table.column>
+                            <flux:table.column>
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport</span>
+                            </flux:table.column>
+                            <flux:table.column align="end">
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span>
+                            </flux:table.column>
+                            <flux:table.column align="end">
+                                <span class="text-xs text-right font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span>
+                            </flux:table.column>
+                            <flux:table.column align="end">
+                                <span class="text-xs text-right font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span>
+                            </flux:table.column>
+                            <flux:table.column align="end">
+                                <span class="text-xs text-right font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span>
+                            </flux:table.column>
+                            <flux:table.column align="end">
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span>
+                            </flux:table.column>
+                        </flux:table.columns>
+
+                        <flux:table.rows>
+                            @foreach($submission->workers as $index => $worker)
+                                <flux:table.rows :key="$worker->id">
+                                    <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
+
+                                    <flux:table.cell variant="strong">
+                                        {{ $worker->worker_id }}
+                                    </flux:table.cell>
+
+                                    <flux:table.cell variant="strong">
+                                        {{ $worker->worker_name }}
+                                    </flux:table.cell>
+
+                                    <flux:table.cell variant="strong">
+                                        {{ $worker->worker_passport }}
+                                    </flux:table.cell>
+
+                                    <flux:table.cell align="end" variant="strong">
+                                        @if($worker->basic_salary > 0)
+                                            RM {{ number_format($worker->basic_salary, 2) }}
+                                        @else
+                                            <span class="text-zinc-500">-</span>
+                                        @endif
+                                    </flux:table.cell>
+
+                                    <!-- Weekday OT Hours -->
+                                    <flux:table.cell align="end" variant="strong">
+                                        @if($worker->ot_normal_hours > 0)
+                                            <span class="font-medium">{{ number_format($worker->ot_normal_hours, 2) }}</span>
+                                        @else
+                                            <span class="text-zinc-500">-</span>
+                                        @endif
+                                    </flux:table.cell>
+
+                                    <!-- Rest Day OT Hours -->
+                                    <flux:table.cell align="end" variant="strong">
+                                        @if($worker->ot_rest_hours > 0)
+                                            <span class="font-medium">{{ number_format($worker->ot_rest_hours, 2) }}</span>
+                                        @else
+                                            <span class="text-zinc-500">-</span>
+                                        @endif
+                                    </flux:table.cell>
+
+                                    <!-- Public Holiday OT Hours -->
+                                    <flux:table.cell align="end" variant="strong">
+                                        @if($worker->ot_public_hours > 0)
+                                            <span class="font-medium">{{ number_format($worker->ot_public_hours, 2) }}</span>
+                                        @else
+                                            <span class="text-zinc-500">-</span>
+                                        @endif
+                                    </flux:table.cell>
+
+                                    <!-- Transactions -->
+                                    <flux:table.cell align="end" variant="strong">
+                                        @php
+                                            $workerTransactions = $worker->transactions ?? collect([]);
+                                        @endphp
+                                        @if($workerTransactions->count() > 0)
+                                            <div class="text-xs space-y-1">
+                                                @foreach($workerTransactions as $txn)
+                                                    <div class="text-zinc-900 dark:text-zinc-100">
+                                                        @if($txn->type === 'allowance')
+                                                            +RM {{ number_format($txn->amount, 2) }} (Allowance)
+                                                        @elseif($txn->type === 'npl')
+                                                            {{ $txn->amount }} {{ $txn->amount == 1 ? 'day' : 'days' }} (NPL)
+                                                        @elseif($txn->type === 'advance_payment')
+                                                            -RM {{ number_format($txn->amount, 2) }} (Advance)
+                                                        @else
+                                                            -RM {{ number_format($txn->amount, 2) }} (Deduction)
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <span class="text-zinc-500">-</span>
+                                        @endif
+                                    </flux:table.cell>
+                                </flux:table.rows>
+                            @endforeach
+                        </flux:table.rows>
+                    </flux:table>
                 </div>
             </flux:card>
         @endif

@@ -4,6 +4,7 @@ namespace App\Livewire\Client;
 
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
+use App\Models\MonthlyOTEntry;
 use App\Services\PayrollService;
 use App\Services\ContractWorkerService;
 use App\Traits\LogsActivity;
@@ -217,8 +218,30 @@ class Timesheet extends Component
             'workers' => collect([]),
         ];
 
+        // Get OT entry period (previous month for this payroll)
+        $otEntryMonth = $currentMonth - 1;
+        $otEntryYear = $currentYear;
+        if ($otEntryMonth < 1) {
+            $otEntryMonth = 12;
+            $otEntryYear--;
+        }
+
+        // Check if we're past the OT entry window (after 15th of current month)
+        // OT entry window is 1st-15th for previous month's OT
+        $today = now();
+        $isAfterOTWindow = $today->day > 15;
+
+        // Check if there are submitted OT entries for this period
+        $monthlyOTEntries = MonthlyOTEntry::with('transactions')
+            ->where('contractor_clab_no', $clabNo)
+            ->where('entry_month', $otEntryMonth)
+            ->where('entry_year', $otEntryYear)
+            ->whereIn('status', ['submitted', 'locked'])
+            ->get()
+            ->keyBy('worker_id');
+
         // Prepare workers data
-        $this->workers = $remainingWorkers->map(function($worker, $index) use ($currentMonth, $currentYear) {
+        $this->workers = $remainingWorkers->map(function($worker, $index) use ($currentMonth, $currentYear, $monthlyOTEntries, $isAfterOTWindow) {
             // Check if worker had an active contract during the payroll period
             // Use the payroll period date, not today's date
             $payrollPeriodDate = \Carbon\Carbon::create($currentYear, $currentMonth, 1);
@@ -229,18 +252,58 @@ class Timesheet extends Component
             // If no active contract during the payroll period, set basic salary to 0 (OT payment only)
             $basicSalary = $hasActiveContract ? ($worker->basic_salary ?? 1700) : 0;
 
+            // Check if this worker has monthly OT entry
+            $monthlyOTEntry = $monthlyOTEntries->get($worker->wkr_id);
+            $hasMonthlyOTEntry = $monthlyOTEntry !== null;
+
+            // Determine if OT/transactions should be locked
+            // Lock if: (1) we're after the OT window (after 15th), OR (2) monthly entry exists
+            $shouldLockOT = $isAfterOTWindow || $hasMonthlyOTEntry;
+
+            // If monthly OT entry exists, use those hours
+            // If after OT window and no monthly entry, use zeros
+            // Otherwise, use zeros (for new submissions, default is zero)
+            if ($hasMonthlyOTEntry) {
+                $otNormalHours = $monthlyOTEntry->ot_normal_hours;
+                $otRestHours = $monthlyOTEntry->ot_rest_hours;
+                $otPublicHours = $monthlyOTEntry->ot_public_hours;
+            } else {
+                // No monthly entry: use zeros (either missed window or before window)
+                $otNormalHours = 0;
+                $otRestHours = 0;
+                $otPublicHours = 0;
+            }
+
+            // Load transactions based on window and monthly entry status
+            $transactions = [];
+            if ($hasMonthlyOTEntry && $monthlyOTEntry->transactions) {
+                // Use transactions from monthly entry (locked)
+                $transactions = $monthlyOTEntry->transactions->map(function($txn) {
+                    return [
+                        'type' => $txn->type,
+                        'amount' => $txn->amount,
+                        'remarks' => $txn->remarks,
+                        'locked' => true, // Flag to make read-only
+                    ];
+                })->toArray();
+            }
+            // After Dec 15 with no monthly entry: no transactions (missed the window)
+            // Before Dec 15 on new submission: no transactions (default empty)
+
             return [
                 'index' => $index,
                 'worker_id' => $worker->wkr_id,
                 'worker_name' => $worker->name,
                 'worker_passport' => $worker->ic_number,
                 'basic_salary' => $basicSalary,
-                'ot_normal_hours' => 0,
-                'ot_rest_hours' => 0,
-                'ot_public_hours' => 0,
+                'ot_normal_hours' => $otNormalHours,
+                'ot_rest_hours' => $otRestHours,
+                'ot_public_hours' => $otPublicHours,
+                'ot_from_monthly_entry' => $shouldLockOT, // Flag to make OT fields read-only
                 'advance_payment' => 0,
                 'deduction' => 0,
-                'transactions' => [], // Store multiple transactions
+                'transactions' => $transactions,
+                'transactions_from_monthly_entry' => $shouldLockOT, // Flag to indicate transactions are locked
                 'included' => true,
                 'ot_payment_only' => !$hasActiveContract, // Flag for OT-only payment
                 'contract_ended' => !$hasActiveContract,
@@ -307,6 +370,16 @@ class Timesheet extends Component
 
     public function openTransactionModal($workerIndex)
     {
+        // Check if transactions are locked (from monthly entry)
+        if ($this->workers[$workerIndex]['transactions_from_monthly_entry'] ?? false) {
+            \Flux::toast(
+                variant: 'warning',
+                heading: 'Transactions Locked',
+                text: 'These transactions were submitted during the OT entry window (1st-15th) and cannot be modified. They will be automatically included in this payroll.'
+            );
+            return;
+        }
+
         $this->currentWorkerIndex = $workerIndex;
         $this->transactions = $this->workers[$workerIndex]['transactions'] ?? [];
         $this->showTransactionModal = true;
@@ -430,6 +503,16 @@ class Timesheet extends Component
 
     public function openOTModal($workerIndex)
     {
+        // Check if OT is locked (from monthly entry)
+        if ($this->workers[$workerIndex]['ot_from_monthly_entry'] ?? false) {
+            \Flux::toast(
+                variant: 'warning',
+                heading: 'OT Hours Locked',
+                text: 'These overtime hours were submitted during the OT entry window (1st-15th) and cannot be modified. They will be automatically included in this payroll.'
+            );
+            return;
+        }
+
         $this->currentWorkerIndex = $workerIndex;
         $this->showOTModal = true;
 

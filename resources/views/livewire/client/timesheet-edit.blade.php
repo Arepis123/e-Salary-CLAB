@@ -96,23 +96,38 @@
 
                             <!-- OT Normal Hours -->
                             <td class="py-3 text-center">
-                                <span class="text-sm {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? number_format($worker['ot_normal_hours'], 1) . ' hrs' : '-' }}
-                                </span>
+                                <div class="flex items-center justify-center gap-1">
+                                    <span class="text-sm {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                        {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? number_format($worker['ot_normal_hours'], 1) . ' hrs' : '-' }}
+                                    </span>
+                                    @if($worker['ot_from_monthly_entry'] ?? false)
+                                        <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry" />
+                                    @endif
+                                </div>
                             </td>
 
                             <!-- OT Rest Day Hours -->
                             <td class="py-3 text-center">
-                                <span class="text-sm {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? number_format($worker['ot_rest_hours'], 1) . ' hrs' : '-' }}
-                                </span>
+                                <div class="flex items-center justify-center gap-1">
+                                    <span class="text-sm {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                        {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? number_format($worker['ot_rest_hours'], 1) . ' hrs' : '-' }}
+                                    </span>
+                                    @if($worker['ot_from_monthly_entry'] ?? false)
+                                        <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry" />
+                                    @endif
+                                </div>
                             </td>
 
                             <!-- OT Public Holiday Hours -->
                             <td class="py-3 text-center">
-                                <span class="text-sm {{ ($worker['ot_public_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                    {{ ($worker['ot_public_hours'] ?? 0) > 0 ? number_format($worker['ot_public_hours'], 1) . ' hrs' : '-' }}
-                                </span>
+                                <div class="flex items-center justify-center gap-1">
+                                    <span class="text-sm {{ ($worker['ot_public_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
+                                        {{ ($worker['ot_public_hours'] ?? 0) > 0 ? number_format($worker['ot_public_hours'], 1) . ' hrs' : '-' }}
+                                    </span>
+                                    @if($worker['ot_from_monthly_entry'] ?? false)
+                                        <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry" />
+                                    @endif
+                                </div>
                             </td>
 
                             <!-- Transactions -->
@@ -123,15 +138,20 @@
                                 @if(count($transactions) > 0)
                                     <div class="space-y-1">
                                         @foreach($transactions as $txn)
-                                            <div class="text-xs text-zinc-900 dark:text-zinc-100">
-                                                @if($txn['type'] === 'allowance')
-                                                    +RM {{ number_format($txn['amount'], 2) }} (Allowance)
-                                                @elseif($txn['type'] === 'npl')
-                                                    {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
-                                                @elseif($txn['type'] === 'advance_payment')
-                                                    -RM {{ number_format($txn['amount'], 2) }} (Advance)
-                                                @else
-                                                    -RM {{ number_format($txn['amount'], 2) }} (Deduction)
+                                            <div class="flex items-center gap-1 text-xs text-zinc-900 dark:text-zinc-100">
+                                                <span>
+                                                    @if($txn['type'] === 'allowance')
+                                                        +RM {{ number_format($txn['amount'], 2) }} (Allowance)
+                                                    @elseif($txn['type'] === 'npl')
+                                                        {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
+                                                    @elseif($txn['type'] === 'advance_payment')
+                                                        -RM {{ number_format($txn['amount'], 2) }} (Advance)
+                                                    @else
+                                                        -RM {{ number_format($txn['amount'], 2) }} (Deduction)
+                                                    @endif
+                                                </span>
+                                                @if(($txn['locked'] ?? false))
+                                                    <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry Window" />
                                                 @endif
                                             </div>
                                         @endforeach
@@ -142,20 +162,45 @@
                             </td>
                             <td class="py-3 px-2">
                                 <div class="flex items-center justify-center gap-2">
-                                    <flux:button
-                                        wire:click="openOTModal({{ $index }})"
-                                        variant="filled"
-                                        size="sm"
-                                    >
-                                        Overtime
-                                    </flux:button>
-                                    <flux:button
-                                        wire:click="openTransactionModal({{ $index }})"
-                                        variant="filled"
-                                        size="sm"
-                                    >
-                                        Manage
-                                    </flux:button>
+                                    @if($worker['ot_from_monthly_entry'] ?? false)
+                                        <flux:button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled
+                                            icon="lock-closed"
+                                            title="OT locked from OT entry window (1st-15th)"
+                                        >
+                                            OT Locked
+                                        </flux:button>
+                                    @else
+                                        <flux:button
+                                            wire:click="openOTModal({{ $index }})"
+                                            variant="filled"
+                                            size="sm"
+                                        >
+                                            Overtime
+                                        </flux:button>
+                                    @endif
+
+                                    @if($worker['transactions_from_monthly_entry'] ?? false)
+                                        <flux:button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled
+                                            icon="lock-closed"
+                                            title="Transactions locked from OT entry window (1st-15th)"
+                                        >
+                                            Txn Locked
+                                        </flux:button>
+                                    @else
+                                        <flux:button
+                                            wire:click="openTransactionModal({{ $index }})"
+                                            variant="filled"
+                                            size="sm"
+                                        >
+                                            Manage
+                                        </flux:button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -165,7 +210,7 @@
             </div>
 
             <!-- Worker Breakdown File Upload -->
-            <div class="mt-6 p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/50">
+            <div class="mt-6 p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 hidden">
                 <div class="flex items-start gap-3 mb-3">
                     <flux:icon.document-arrow-up class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                     <div class="flex-1">
@@ -438,9 +483,22 @@
                     </p>
                 </div>
 
+                @if($workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false)
+                    <!-- Notice: OT from Monthly Entry -->
+                    <flux:callout icon="lock-closed" color="blue">
+                        <flux:callout.heading>OT Hours Locked</flux:callout.heading>
+                        <flux:callout.text>
+                            These overtime hours were submitted during the OT entry window (1st-15th) and are now locked.
+                            They cannot be modified during payroll submission.
+                        </flux:callout.text>
+                    </flux:callout>
+                @endif
+
                 <!-- OT Input Form -->
                 <flux:card class="p-4 bg-zinc-50 dark:bg-zinc-800">
-                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Enter Overtime Hours</h3>
+                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
+                        {{ ($workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false) ? 'Overtime Hours (Read Only)' : 'Enter Overtime Hours' }}
+                    </h3>
                     <div class="grid grid-cols-1 gap-4">
                         <div>
                             <flux:input
@@ -450,6 +508,7 @@
                                 min="0"
                                 label="Normal Day OT (hours)"
                                 placeholder="0.0"
+                                :disabled="$workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false"
                             />
                         </div>
 
@@ -461,6 +520,7 @@
                                 min="0"
                                 label="Rest Day OT (hours)"
                                 placeholder="0.0"
+                                :disabled="$workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false"
                             />
                         </div>
 
@@ -472,6 +532,7 @@
                                 min="0"
                                 label="Public Holiday OT (hours)"
                                 placeholder="0.0"
+                                :disabled="$workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false"
                             />
                         </div>
                     </div>
@@ -515,8 +576,12 @@
 
                 <!-- Modal Actions -->
                 <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                    <flux:button wire:click="closeOTModal" variant="ghost">Cancel</flux:button>
-                    <flux:button wire:click="saveOT" variant="primary">Save</flux:button>
+                    <flux:button wire:click="closeOTModal" variant="ghost">
+                        {{ ($workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false) ? 'Close' : 'Cancel' }}
+                    </flux:button>
+                    @if(!($workers[$currentWorkerIndex]['ot_from_monthly_entry'] ?? false))
+                        <flux:button wire:click="saveOT" variant="primary">Save</flux:button>
+                    @endif
                 </div>
             </div>
         </flux:modal>

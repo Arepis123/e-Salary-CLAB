@@ -15,3 +15,8 @@ Schedule::command('auth:cleanup-failed-attempts')->dailyAt('02:00');
 // Schedule automatic payment reminders
 // Runs daily at 9:00 AM to send reminders 14, 7, and 3 days before due date
 Schedule::command('reminders:payment')->dailyAt('09:00');
+
+// Schedule automatic penalty application for overdue submissions (BACKUP CHECK)
+// Runs daily at 12:01 AM as a safety check for any missed penalties
+// Note: Penalties are now applied immediately when client submits late
+Schedule::command('penalties:apply-overdue')->dailyAt('00:01');

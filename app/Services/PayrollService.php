@@ -246,10 +246,10 @@ class PayrollService
         return [
             'total_submissions' => $submissions->count(),
             'paid_submissions' => $submissions->where('status', 'paid')->count(),
-            'pending_submissions' => $submissions->where('status', 'pending_payment')->count(),
+            'pending_submissions' => $submissions->whereIn('status', ['submitted', 'approved'])->count(),
             'overdue_submissions' => $submissions->where('status', 'overdue')->count(),
             'total_paid_amount' => $submissions->where('status', 'paid')->sum('total_with_penalty'),
-            'total_pending_amount' => $submissions->whereIn('status', ['pending_payment', 'overdue'])->sum('total_with_penalty'),
+            'total_pending_amount' => $submissions->whereIn('status', ['submitted', 'approved', 'overdue'])->sum('total_with_penalty'),
             'unsubmitted_workers' => $unsubmittedWorkersCount ?? 0,
         ];
     }

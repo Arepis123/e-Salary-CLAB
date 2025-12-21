@@ -3,6 +3,7 @@
 namespace App\Livewire\Client;
 
 use App\Models\PayrollSubmission;
+use App\Models\MonthlyOTEntry;
 use App\Services\PayrollService;
 use App\Services\ContractWorkerService;
 use Livewire\Component;
@@ -90,8 +91,30 @@ class TimesheetEdit extends Component
         // Get CLAB number for contract checks
         $clabNo = auth()->user()->contractor_clab_no;
 
+        // Get OT entry period (previous month for this payroll)
+        $otEntryMonth = $submission->month - 1;
+        $otEntryYear = $submission->year;
+        if ($otEntryMonth < 1) {
+            $otEntryMonth = 12;
+            $otEntryYear--;
+        }
+
+        // Check if we're past the OT entry window (after 15th of current month)
+        // OT entry window is 1st-15th for previous month's OT
+        $today = now();
+        $isAfterOTWindow = $today->day > 15;
+
+        // Check if there are submitted OT entries for this period
+        $monthlyOTEntries = MonthlyOTEntry::with('transactions')
+            ->where('contractor_clab_no', $clabNo)
+            ->where('entry_month', $otEntryMonth)
+            ->where('entry_year', $otEntryYear)
+            ->whereIn('status', ['submitted', 'locked'])
+            ->get()
+            ->keyBy('worker_id');
+
         // Prepare workers data with transactions
-        $this->workers = $submission->workers->map(function($draftWorker, $index) use ($clabNo, $submission) {
+        $this->workers = $submission->workers->map(function($draftWorker, $index) use ($clabNo, $submission, $monthlyOTEntries, $isAfterOTWindow) {
             // Get worker model to check contract status
             $worker = \App\Models\Worker::find($draftWorker->worker_id);
             $contract = \App\Models\ContractWorker::where('con_wkr_id', $draftWorker->worker_id)
@@ -123,25 +146,76 @@ class TimesheetEdit extends Component
 
             $previousMonthOT = $previousMonthPayroll ? $previousMonthPayroll->total_ot_pay : 0;
 
+            // Check if this worker has monthly OT entry
+            $monthlyOTEntry = $monthlyOTEntries->get($draftWorker->worker_id);
+            $hasMonthlyOTEntry = $monthlyOTEntry !== null;
+
+            // Determine if OT/transactions should be locked
+            // Lock if: (1) we're after the OT window (after 15th), OR (2) monthly entry exists
+            $shouldLockOT = $isAfterOTWindow || $hasMonthlyOTEntry;
+
+            // If monthly OT entry exists, use those hours
+            // If after OT window and no monthly entry, use zeros
+            // Otherwise, use the draft submission's hours
+            if ($hasMonthlyOTEntry) {
+                $otNormalHours = $monthlyOTEntry->ot_normal_hours;
+                $otRestHours = $monthlyOTEntry->ot_rest_hours;
+                $otPublicHours = $monthlyOTEntry->ot_public_hours;
+            } elseif ($isAfterOTWindow) {
+                // After Dec 15, if no monthly entry exists, use zeros (missed the window)
+                $otNormalHours = 0;
+                $otRestHours = 0;
+                $otPublicHours = 0;
+            } else {
+                // Before Dec 15, use draft values
+                $otNormalHours = $draftWorker->ot_normal_hours;
+                $otRestHours = $draftWorker->ot_rest_hours;
+                $otPublicHours = $draftWorker->ot_public_hours;
+            }
+
+            // Load transactions based on window and monthly entry status
+            $allTransactions = [];
+
+            if ($hasMonthlyOTEntry && $monthlyOTEntry->transactions) {
+                // Use transactions from monthly entry (locked)
+                $allTransactions = $monthlyOTEntry->transactions->map(function($txn) {
+                    return [
+                        'type' => $txn->type,
+                        'amount' => $txn->amount,
+                        'remarks' => $txn->remarks,
+                        'locked' => true, // Flag to make read-only
+                    ];
+                })->toArray();
+            } elseif ($isAfterOTWindow) {
+                // After Dec 15 with no monthly entry: no transactions (missed the window)
+                $allTransactions = [];
+            } else {
+                // Before Dec 15: use draft transactions (editable)
+                $allTransactions = $draftWorker->transactions->map(function($txn) {
+                    return [
+                        'type' => $txn->type,
+                        'amount' => $txn->amount,
+                        'remarks' => $txn->remarks,
+                        'locked' => false,
+                    ];
+                })->toArray();
+            }
+
             return [
                 'index' => $index,
                 'worker_id' => $draftWorker->worker_id,
                 'worker_name' => $draftWorker->worker_name,
                 'worker_passport' => $draftWorker->worker_passport,
                 'basic_salary' => $draftWorker->basic_salary,
-                'ot_normal_hours' => $draftWorker->ot_normal_hours,
-                'ot_rest_hours' => $draftWorker->ot_rest_hours,
-                'ot_public_hours' => $draftWorker->ot_public_hours,
+                'ot_normal_hours' => $otNormalHours,
+                'ot_rest_hours' => $otRestHours,
+                'ot_public_hours' => $otPublicHours,
+                'ot_from_monthly_entry' => $shouldLockOT, // Flag to make OT fields read-only
                 'previous_month_ot' => $previousMonthOT,
                 'contract_ended' => !$hasActiveContract,
                 'ot_payment_only' => !$hasActiveContract,
-                'transactions' => $draftWorker->transactions->map(function($txn) {
-                    return [
-                        'type' => $txn->type,
-                        'amount' => $txn->amount,
-                        'remarks' => $txn->remarks
-                    ];
-                })->toArray(),
+                'transactions' => $allTransactions,
+                'transactions_from_monthly_entry' => $shouldLockOT, // Flag to indicate transactions are locked
                 'included' => true,
             ];
         })->values()->toArray();
@@ -183,6 +257,16 @@ class TimesheetEdit extends Component
 
     public function openTransactionModal($workerIndex)
     {
+        // Check if transactions are locked (from monthly entry)
+        if ($this->workers[$workerIndex]['transactions_from_monthly_entry'] ?? false) {
+            \Flux::toast(
+                variant: 'warning',
+                heading: 'Transactions Locked',
+                text: 'These transactions were submitted during the OT entry window (1st-15th) and cannot be modified. They will be automatically included in this payroll.'
+            );
+            return;
+        }
+
         $this->currentWorkerIndex = $workerIndex;
         $this->transactions = $this->workers[$workerIndex]['transactions'] ?? [];
         $this->showTransactionModal = true;
@@ -325,6 +409,17 @@ class TimesheetEdit extends Component
     public function saveOT()
     {
         if ($this->currentWorkerIndex === null) {
+            return;
+        }
+
+        // Check if OT is locked (from monthly entry)
+        if ($this->workers[$this->currentWorkerIndex]['ot_from_monthly_entry'] ?? false) {
+            \Flux::toast(
+                variant: 'danger',
+                heading: 'OT Hours Locked',
+                text: 'These overtime hours were submitted during the OT entry window and cannot be modified.'
+            );
+            $this->closeOTModal();
             return;
         }
 
@@ -477,7 +572,8 @@ class TimesheetEdit extends Component
                 // Save worker first (without final calculations)
                 $payrollWorker->save();
 
-                // Save transactions BEFORE calculating salary
+                // Save ALL transactions (both locked and editable) BEFORE calculating salary
+                // Locked transactions from monthly entries are copied here for the payroll record
                 if (isset($workerData['transactions']) && is_array($workerData['transactions'])) {
                     foreach ($workerData['transactions'] as $transaction) {
                         $payrollWorker->transactions()->create([
@@ -525,6 +621,21 @@ class TimesheetEdit extends Component
                     'status' => 'submitted',
                     'submitted_at' => now(),
                 ]);
+
+                // Check if submission is late and apply penalty immediately
+                $submission->refresh();
+                if ($submission->isOverdue()) {
+                    $penalty = $submission->calculatePenalty();
+                    $submission->update([
+                        'has_penalty' => true,
+                        'penalty_amount' => $penalty,
+                        'total_with_penalty' => $grandTotal + $penalty,
+                    ]);
+
+                    return redirect()->route('timesheet')
+                        ->with('warning', "Draft submitted for {$submission->month_year}. LATE SUBMISSION: 8% penalty (RM " . number_format($penalty, 2) . ") has been applied. Total due: RM " . number_format($grandTotal + $penalty, 2));
+                }
+
                 return redirect()->route('timesheet')
                     ->with('success', "Draft submitted successfully for {$submission->month_year}. {$selectedWorkerCount} worker(s) included. Awaiting admin review and approval.");
             } else {

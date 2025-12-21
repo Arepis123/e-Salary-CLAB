@@ -128,7 +128,6 @@
             <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
                 <div class="flex items-center justify-between">
                     <div class="flex gap-3">
-                        <flux:icon.document-text class="size-6 flex-shrink-0 text-blue-600 dark:text-blue-400" />
                         <div>
                             <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Detailed Worker Salary Breakdown</h3>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
@@ -146,39 +145,45 @@
 
         <!-- Invoice Summary -->
         <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
-            <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Invoice Summary</h3>
+            <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-6">Invoice Summary</h3>
 
-            <div class="space-y-3">
-                <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }}):</span>
-                    <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->total_amount, 2) }}</span>
+            <div class="space-y-0 divide-y divide-zinc-200 dark:divide-zinc-700">
+                <!-- Payroll Amount -->
+                <div class="flex justify-between py-3">
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }})</span>
+                    <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount ?? $invoice->total_amount, 2) }}</span>
                 </div>
 
-                <div class="flex justify-between py-2">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $invoice->billable_workers_count }} {{ Str::plural('worker', $invoice->billable_workers_count) }}):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->service_charge, 2) }}</span>
+                <!-- Service Charge -->
+                <div class="flex justify-between py-3">
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $invoice->billable_workers_count }} {{ Str::plural('worker', $invoice->billable_workers_count) }})</span>
+                    <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->service_charge, 2) }}</span>
                 </div>
 
-                <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">SST (8%):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->sst, 2) }}</span>
+                <!-- SST -->
+                <div class="flex justify-between py-3">
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">SST (8%)</span>
+                    <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->sst, 2) }}</span>
                 </div>
 
                 @if($invoice->has_penalty)
-                    <div class="flex justify-between py-2 bg-zinc-50 dark:bg-zinc-800 px-4 rounded">
-                        <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Subtotal:</span>
-                        <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->client_total, 2) }}</span>
+                    <!-- Subtotal -->
+                    <div class="flex justify-between py-3">
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Subtotal</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->client_total, 2) }}</span>
                     </div>
 
-                    <div class="flex justify-between py-2">
-                        <span class="text-sm text-red-600 dark:text-red-400">Late Payment Penalty (8%):</span>
-                        <span class="text-sm font-medium text-red-600 dark:text-red-400">RM {{ number_format($invoice->penalty_amount, 2) }}</span>
+                    <!-- Late Penalty -->
+                    <div class="flex justify-between py-3">
+                        <span class="text-sm text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%)</span>
+                        <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->penalty_amount, 2) }}</span>
                     </div>
                 @endif
 
-                <div class="flex justify-between py-4 bg-blue-50 dark:bg-blue-900/20 px-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-                    <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
-                    <span class="text-xl font-bold text-blue-600 dark:text-blue-400">RM {{ number_format($invoice->total_due, 2) }}</span>
+                <!-- Total Amount Due -->
+                <div class="flex justify-between py-4 bg-zinc-50 dark:bg-zinc-800/50">
+                    <span class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Total Amount Due</span>
+                    <span class="text-base font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->total_due, 2) }}</span>
                 </div>
             </div>
         </flux:card>

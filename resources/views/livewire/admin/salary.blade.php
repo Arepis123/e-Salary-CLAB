@@ -87,9 +87,11 @@
                 <div>
                     <flux:select wire:model.live="statusFilter" variant="listbox" placeholder="Filter by Status" size="sm">
                         <flux:select.option value="">All Statuses</flux:select.option>
-                        <flux:select.option value="completed">Completed</flux:select.option>
-                        <flux:select.option value="pending">Pending</flux:select.option>
                         <flux:select.option value="draft">Draft</flux:select.option>
+                        <flux:select.option value="submitted">Submitted</flux:select.option>
+                        <flux:select.option value="approved">Approved</flux:select.option>
+                        <flux:select.option value="paid">Paid</flux:select.option>
+                        <flux:select.option value="overdue">Overdue</flux:select.option>
                     </flux:select>
                 </div>
                 <div>

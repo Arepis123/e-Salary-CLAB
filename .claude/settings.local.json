@@ -39,7 +39,8 @@
       "Bash(powershell -Command \"Test-NetConnection -ComputerName 103.6.196.135 -Port 3306\")",
       "Bash(powershell:*)",
       "Bash(if exist clear_december.php del clear_december.php)",
-      "Bash(if exist check_december_status.php del check_december_status.php)"
+      "Bash(if exist check_december_status.php del check_december_status.php)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

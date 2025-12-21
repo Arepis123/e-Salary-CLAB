@@ -30,6 +30,9 @@
                 <flux:sidebar.item icon="calendar" :href="route('timesheet')" :current="request()->routeIs('timesheet')" wire:navigate badge="{{ $pendingNotifications > 0 ? $pendingNotifications : null }}">
                     {{ __('Timesheet') }}
                 </flux:sidebar.item>
+                <flux:sidebar.item icon="clock" :href="route('ot-entry')" :current="request()->routeIs('ot-entry')" wire:navigate>
+                    {{ __('OT & Transaction Entry') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:sidebar.spacer />

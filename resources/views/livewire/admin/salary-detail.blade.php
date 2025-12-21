@@ -70,9 +70,10 @@
 
     <!-- Approved Info -->
     @if($submission->hasAdminReview())
-    <flux:card class="p-6 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500">
+    <flux:card class="p-6 bg-green-50 dark:bg-green-900/20">
         <h3 class="text-lg font-semibold text-green-900 dark:text-green-100 mb-4">
-            <flux:icon.check-circle class="inline size-5" /> Admin Review Completed
+            Admin Review Completed
+            <flux:icon.check-circle class="inline size-5" />
         </h3>
         <div class="grid gap-4 md:grid-cols-2">
             <div>
@@ -153,9 +154,9 @@
 
         <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="space-y-2">
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Current Month OT Hours</p>
-                <p class="text-2xl font-bold ">{{ number_format($stats['total_ot_hours'], 2) }}</p>
-                <p class="text-xs ">To be paid next month</p>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">Last Month OT Hours</p>
+                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format($stats['total_ot_hours'], 2) }}</p>
+                <p class="text-xs text-zinc-600 dark:text-zinc-400">Paid in current month</p>
             </div>
         </flux:card>
 
@@ -166,7 +167,7 @@
                     {{ $submission->payment_deadline->format('d M Y') }}
                 </p>
                 @if(!$submission->isOverdue() && $submission->status !== 'paid')
-                    <p class="text-xs text-zinc-500 dark:text-zinc-500">
+                    <p class="text-xs text-zinc-600 dark:text-zinc-400">
                         {{ abs($submission->daysUntilDeadline()) }} days remaining
                     </p>
                 @elseif($submission->isOverdue())

@@ -221,7 +221,6 @@
         <!-- Header with Logo -->
         <div class="header">
             <div class="invoice-title">PRO FORMA INVOICE</div>
-            <div style="font-size: 9px; color: #dc3545; margin-top: 2px; font-weight: normal;">QUOTATION / NOT A TAX INVOICE</div>
             <div class="logo-section">
                 <img src="{{ public_path('images/company-logo.png') }}" alt="Company Logo">
             </div>

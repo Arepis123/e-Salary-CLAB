@@ -117,6 +117,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ========================================================================
 
     Route::middleware('role:client')->group(function () {
+        Route::get('ot-entry', \App\Livewire\Client\OTEntry::class)->name('ot-entry');
         Route::get('timesheet', \App\Livewire\Client\Timesheet::class)->name('timesheet');
         Route::get('timesheet/{id}', [\App\Http\Controllers\Client\TimesheetController::class, 'show'])->name('timesheet.show');
         Route::get('timesheet/{id}/edit', \App\Livewire\Client\TimesheetEdit::class)->name('timesheet.edit');
