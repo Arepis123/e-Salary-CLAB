@@ -38,6 +38,9 @@
             <flux:sidebar.spacer />
 
             <flux:sidebar.nav>
+                <flux:sidebar.item icon="book-open" :href="route('user-manual')" wire:navigate>
+                    {{ __('User Manual') }}
+                </flux:sidebar.item>
                 <flux:sidebar.item icon="settings" :href="route('settings.profile')" wire:navigate>
                     {{ __('Settings') }}
                 </flux:sidebar.item>

@@ -10,6 +10,12 @@ Route::get('/', function () {
 })->name('home');
 
 // ============================================================================
+// PUBLIC ROUTES (No authentication required)
+// ============================================================================
+
+Route::get('user-manual', \App\Livewire\UserManual::class)->name('user-manual');
+
+// ============================================================================
 // UNIFIED ROUTES - Role-agnostic URLs (Security Enhancement)
 // ============================================================================
 // Routes without /admin or /client prefixes to prevent role enumeration

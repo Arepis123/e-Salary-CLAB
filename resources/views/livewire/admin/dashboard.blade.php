@@ -4,7 +4,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Dashboard</h1>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Overview of your e-payroll system</p>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">Overview of e-salary system</p>
             </div>
             <div class="text-sm text-zinc-600 dark:text-zinc-400">
                 {{ now()->format('l, F j, Y') }}
