@@ -96,7 +96,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Download Tax Invoice as PDF (after payment)
+     * Download Receipt as PDF (after payment)
      * Only available for paid invoices
      */
     public function downloadTaxInvoice($id)

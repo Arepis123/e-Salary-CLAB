@@ -120,7 +120,7 @@
                                 <div><strong>Rest Day:</strong> RM 16.34/hr (2.0x)</div>
                                 <div><strong>Public Holiday:</strong> RM 24.51/hr (3.0x)</div>
                             </div>
-                            <p class="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">Note: This month's OT is calculated now but paid NEXT month. EPF/SOCSO applies to total (Basic + Previous Month OT)</p>
+                            <p class="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">Note: This month's OT is calculated now and processed from the 1st to 15th of NEXT month. EPF/SOCSO applies to total (Basic + Previous Month OT)</p>
                         </div>
                     </div>
                 </div>

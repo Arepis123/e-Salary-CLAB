@@ -9,6 +9,8 @@ class PayrollPayment extends Model
     protected $fillable = [
         'payroll_submission_id',
         'payment_method',
+        'payment_type',
+        'bank_name',
         'billplz_bill_id',
         'billplz_url',
         'transaction_id',

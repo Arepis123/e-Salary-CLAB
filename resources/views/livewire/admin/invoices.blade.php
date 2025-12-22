@@ -177,12 +177,17 @@
                             INV-{{ str_pad($invoice->id, 4, '0', STR_PAD_LEFT) }}
                         </flux:table.cell>
 
-                        <flux:table.cell variant="strong">
+                        <flux:table.cell variant="strong" class="max-w-xs">
                             <div class="flex flex-col">
-                                <span>{{ $invoice->user ? $invoice->user->name : 'N/A' }}</span>
-                                <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $invoice->contractor_clab_no }}</span>
+                                <span class="truncate block max-w-xs">
+                                    {{ $invoice->user ? $invoice->user->name : 'N/A' }}
+                                </span>
+                                <span class="text-xs text-zinc-500 dark:text-zinc-400">
+                                    {{ $invoice->contractor_clab_no }}
+                                </span>
                             </div>
                         </flux:table.cell>
+
 
                         <flux:table.cell variant="strong">{{ $invoice->month_year }}</flux:table.cell>
 
@@ -191,16 +196,8 @@
                         <flux:table.cell variant="strong">
                             @if($invoice->hasAdminReview())
                                 <div class="font-semibold text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($invoice->client_total, 2) }}
+                                    RM {{ number_format($invoice->total_due, 2) }}
                                 </div>
-                                @if($invoice->has_penalty)
-                                    <div class="text-xs text-red-600 dark:text-red-400">
-                                        +RM {{ number_format($invoice->penalty_amount, 2) }} penalty
-                                    </div>
-                                    <div class="text-xs font-semibold text-red-600 dark:text-red-400">
-                                        Total: RM {{ number_format($invoice->total_due, 2) }}
-                                    </div>
-                                @endif
                             @else
                                 <span class="text-sm text-orange-600 dark:text-orange-400">Pending Review</span>
                             @endif

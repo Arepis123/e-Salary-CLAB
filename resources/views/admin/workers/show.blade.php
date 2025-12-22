@@ -275,9 +275,10 @@
                                     <tr class="border-b border-zinc-200 dark:border-zinc-700">
                                         <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Period</th>
                                         <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                                            <div>Prev Month OT</div>
-                                        </th>
+                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Normal</th>
+                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Rest</th>
+                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Public</th>
+                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Earning</th>
                                         <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</th>
                                         <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Net Salary</th>
                                         <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
@@ -285,28 +286,6 @@
                                 </thead>
                                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                                     @foreach($payrollHistory as $payroll)
-                                        @php
-                                            // Get previous month's OT (the OT being paid in this payroll)
-                                            $currentMonth = $payroll->payrollSubmission->month;
-                                            $currentYear = $payroll->payrollSubmission->year;
-                                            $previousMonth = $currentMonth - 1;
-                                            $previousYear = $currentYear;
-                                            if ($previousMonth < 1) {
-                                                $previousMonth = 12;
-                                                $previousYear--;
-                                            }
-
-                                            // Find previous month's payroll to get the OT earned then
-                                            $previousPayroll = \App\Models\PayrollWorker::where('worker_id', $worker->wkr_id)
-                                                ->whereHas('payrollSubmission', function($query) use ($previousMonth, $previousYear) {
-                                                    $query->where('month', $previousMonth)
-                                                          ->where('year', $previousYear)
-                                                          ->where('status', '!=', 'draft');
-                                                })
-                                                ->first();
-
-                                            $previousMonthOT = $previousPayroll ? $previousPayroll->total_ot_pay : 0;
-                                        @endphp
                                         <tr>
                                             <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">
                                                 {{ $payroll->payrollSubmission->month_year }}
@@ -315,16 +294,49 @@
                                                 RM {{ number_format($payroll->basic_salary, 2) }}
                                             </td>
                                             <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                                @if($previousMonthOT > 0)
-                                                    RM {{ number_format($previousMonthOT, 2) }}
+                                                @if($payroll->ot_normal_hours > 0)
+                                                    {{ number_format($payroll->ot_normal_hours, 2) }} hrs
+                                                @else
+                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                                @if($payroll->ot_rest_hours > 0)
+                                                    {{ number_format($payroll->ot_rest_hours, 2) }} hrs
+                                                @else
+                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                                @if($payroll->ot_public_hours > 0)
+                                                    {{ number_format($payroll->ot_public_hours, 2) }} hrs
+                                                @else
+                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
+                                                @php
+                                                    // Earning = Allowances from transactions
+                                                    $totalEarning = $payroll->total_allowance;
+                                                @endphp
+                                                @if($totalEarning > 0)
+                                                    RM {{ number_format($totalEarning, 2) }}
                                                 @else
                                                     <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                                 @endif
                                             </td>
                                             <td class="py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">
-                                                -RM {{ number_format($payroll->total_deductions, 2) }}
+                                                @php
+                                                    // Deduction = Advance Payment + Deductions + NPL from transactions
+                                                    $totalTransactionDeductions = $payroll->total_advance_payment + $payroll->total_deduction + $payroll->total_npl;
+                                                @endphp
+                                                @if($totalTransactionDeductions > 0)
+                                                    -RM {{ number_format($totalTransactionDeductions, 2) }}
+                                                @else
+                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                                @endif
                                             </td>
-                                            <td class="py-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">
+                                            <td class="py-3 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                                 RM {{ number_format($payroll->net_salary, 2) }}
                                             </td>
                                             <td class="py-3 text-center">
@@ -346,7 +358,7 @@
                         <div class="mt-4 space-y-2">
                             <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
                                 <p class="text-xs text-zinc-600 dark:text-zinc-300">
-                                    <strong>Note:</strong> Overtime is paid one month in arrears. For example, October payroll shows September's OT being paid.
+                                    <strong>Note:</strong> Overtime and deductions are processed from the 1st to 15th of the following month. For example, October overtime is collected from November 1st to November 15th.
                                 </p>
                             </div>
                             <p class="text-xs text-zinc-500 dark:text-zinc-500">

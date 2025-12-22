@@ -162,7 +162,7 @@
             padding: 5px 10px;
             margin-top: 3px;
             display: inline-block;
-            min-width: 305px;
+            min-width: 220px;
         }
         .grand-total .total-label {
             font-weight: bold;
@@ -226,11 +226,6 @@
             </div>
         </div>
 
-        <!-- Company Info -->
-        <div class="company-info">
-            e-Salary Management System
-        </div>
-
         <!-- Invoice Purpose -->
         <div style="background-color: #f5f5f5; padding: 8px 10px; margin-bottom: 10px; border-left: 4px solid #000; font-size: 10px; font-weight: bold;">
             PAYROLL PAYMENT FOR: {{ strtoupper($invoice->month_year) }}
@@ -276,92 +271,40 @@
             </tr>
         </table>
 
-        <!-- Items Table -->
-        <table class="items-table">
-            <thead>
+        <!-- Simplified Payroll Summary -->
+        <div style="background-color: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 4px;">
+            <h3 style="margin: 0 0 10px 0; font-size: 12px;">Payroll Summary:</h3>
+            <table style="width: 100%; font-size: 10px;">
                 <tr>
-                    <th class="worker-name">WORKER</th>
-                    <th class="basic-salary">BASIC<br>SALARY</th>
-                    <th class="ot-col">OVERTIME<br>(OT)</th>
-                    <th class="gross-salary">GROSS<br>SALARY</th>
-                    <th class="worker-epf">WORKER<br>EPF</th>
-                    <th class="worker-socso">WORKER<br>SOCSO</th>
-                    <th class="deduction-col">DEDUCTION</th>
-                    <th class="net-salary">NET<br>SALARY</th>
-                    <th class="employer-epf">EMPLOYER<br>EPF</th>
-                    <th class="employer-socso">EMPLOYER<br>SOCSO</th>
-                    <th class="total-cost">TOTAL<br>PAYMENT</th>
+                    <td style="width: 50%;"><strong>Total Workers:</strong></td>
+                    <td>{{ $invoice->total_workers }}</td>
                 </tr>
-            </thead>
-            <tbody>
-                @foreach($invoice->workers as $worker)
                 <tr>
-                    <td class="worker-name">
-                        <div class="description-main">{{ $worker->worker_name }}</div>
-                        <div class="description-sub">ID: {{ $worker->worker_id }}</div>
-                    </td>
-                    <td class="basic-salary">{{ number_format($worker->basic_salary, 2) }}</td>
-                    <td class="ot-col">
-                        @if($worker->total_ot_pay > 0)
-                            {{ number_format($worker->total_ot_pay, 2) }}
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="gross-salary">{{ number_format($worker->gross_salary, 2) }}</td>
-                    <td class="worker-epf">{{ number_format($worker->epf_employee, 2) }}</td>
-                    <td class="worker-socso">{{ number_format($worker->socso_employee, 2) }}</td>
-                    <td class="deduction-col">
-                        @php
-                            $workerTransactions = $worker->transactions ?? collect([]);
-                            $advancePayments = $workerTransactions->where('type', 'advance_payment');
-                            $deductions = $workerTransactions->where('type', 'deduction');
-                        @endphp
-                        @if($workerTransactions->count() > 0)
-                            @if($advancePayments->count() > 0)
-                                <div class="advance-payment transaction-item">
-                                    <strong>Advance:</strong>
-                                    @foreach($advancePayments as $transaction)
-                                        <div>-RM {{ number_format($transaction->amount, 2) }}</div>
-                                        <div style="font-style: italic;">({{ $transaction->remarks }})</div>
-                                    @endforeach
-                                </div>
-                            @endif
-                            @if($deductions->count() > 0)
-                                <div class="deduction transaction-item">
-                                    <strong>Deduction:</strong>
-                                    @foreach($deductions as $transaction)
-                                        <div>-RM {{ number_format($transaction->amount, 2) }}</div>
-                                        <div style="font-style: italic;">({{ $transaction->remarks }})</div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td class="net-salary" style="font-weight: bold;">{{ number_format($worker->net_salary, 2) }}</td>
-                    <td class="employer-epf">{{ number_format($worker->epf_employer, 2) }}</td>
-                    <td class="employer-socso">{{ number_format($worker->socso_employer, 2) }}</td>
-                    <td class="total-cost" style="font-weight: bold;">{{ number_format($worker->total_payment, 2) }}</td>
+                    <td><strong>Payroll Period:</strong></td>
+                    <td>{{ $invoice->month_year }}</td>
                 </tr>
-                @endforeach
-            </tbody>
-        </table>
+                @if($invoice->hasBreakdownFile())
+                <tr>
+                    <td><strong>Detailed Breakdown:</strong></td>
+                    <td style="color: #0066cc;">
+                        Available for download ({{ $invoice->breakdown_file_name }})
+                    </td>
+                </tr>
+                @endif
+            </table>
+            <p style="margin-top: 10px; font-size: 9px; color: #666; font-style: italic;">
+                Detailed payroll breakdown is available as a separate file from our certified payroll system.
+                @if($invoice->hasBreakdownFile())
+                    Download at: {{ $invoice->getBreakdownFileUrl() }}
+                @endif
+            </p>
+        </div>
 
         <!-- Notices and Totals Side by Side -->
         <table style="width: 100%; margin-top: 8px;">
             <tr>
                 <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-                    <!-- Important Notice about OT -->
-                    <div style="background-color: #f5f5f5; border-left: 4px solid rgb(110, 165, 247); padding: 5px 8px; margin-bottom: 7px; font-size: 7px; border-top-right-radius: 1px; border-bottom-right-radius: 1px;">
-                        <strong>OVERTIME (OT) INFORMATION:</strong><br>
-                        • The OT hours shown are from the PREVIOUS month and are paid in this month's invoice<br>
-                        • Example: November payroll includes October's OT hours<br>
-                        • Gross Salary = Basic Salary + OT<br>
-                        • EPF is calculated on Basic Salary only (2%)<br>
-                        • SOCSO is calculated on Gross Salary using contribution table
-                    </div>
+
 
                     <!-- Penalty Notice -->
                     @if($invoice->has_penalty)
@@ -381,34 +324,33 @@
                     @endif
                 </td>
                 <td style="width: 50%; vertical-align: top;">
-                    <!-- Totals -->
+                    <!-- Totals with Breakdown -->
                     <div class="totals-section">
-                        <div class="total-row">
-                            <span class="total-label">TOTAL (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->total_amount, 2) }}</span>
-                        </div>
-                        <div class="total-row">
-                            <span class="total-label">SERVICE CHARGE (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->service_charge, 2) }}</span>
-                        </div>
-                        <div class="total-row">
-                            <span class="total-label">SST 8% (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->sst, 2) }}</span>
-                        </div>
-                        <div class="total-row" style="font-weight: bold; font-size: 8px;">
-                            <span class="total-label">GRAND TOTAL (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
-                        </div>
-                        @if($invoice->has_penalty)
-                        <div class="total-row" style="color: #dc3545;">
-                            <span class="total-label">PENALTY 8% (RM):</span>
-                            <span class="total-value">+{{ number_format($invoice->penalty_amount, 2) }}</span>
+                        @if($invoice->hasAdminReview())
+                        <div style="text-align: right; margin-bottom: 5px;">
+                            <div class="total-row">
+                                <span class="total-label">Payroll Amount:</span>
+                                <span class="total-value">{{ number_format($invoice->admin_final_amount, 2) }}</span>
+                            </div>
+                            <div class="total-row">
+                                <span class="total-label">Service Charge (RM 200 × {{ $invoice->billable_workers_count }}):</span>
+                                <span class="total-value">{{ number_format($invoice->calculated_service_charge, 2) }}</span>
+                            </div>
+                            <div class="total-row">
+                                <span class="total-label">SST (8%):</span>
+                                <span class="total-value">{{ number_format($invoice->calculated_sst, 2) }}</span>
+                            </div>
                         </div>
                         @endif
                         <div class="grand-total">
-                            <span class="total-label">TOTAL DUE (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->total_due, 2) }}</span>
+                            <span class="total-label">TOTAL AMOUNT (RM):</span>
+                            <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
                         </div>
+                        @if($invoice->has_penalty)
+                        <div class="total-row" style="color: #dc3545; margin-top: 10px; font-size: 7px;">
+                            <span class="total-label">* Includes 8% late payment penalty</span>
+                        </div>
+                        @endif
                     </div>
                 </td>
             </tr>
@@ -423,7 +365,7 @@
 
         <!-- Footer -->
         <div class="footer">
-            <strong>{{ config('app.name') }}</strong> | e-Salary Management System | Generated: {{ now()->format('d/m/Y H:i') }}
+            <strong>{{ config('app.name') }}</strong> | Generated: {{ now()->format('d/m/Y H:i') }}
         </div>
     </div>
 </body>

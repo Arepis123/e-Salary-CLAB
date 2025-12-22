@@ -299,6 +299,7 @@
                                 'processing' => 'blue',
                                 'failed' => 'red',
                                 'cancelled' => 'yellow',
+                                'redirected' => 'cyan',
                             ];
                         @endphp
                         <div class="flex items-center gap-2">
@@ -314,7 +315,7 @@
                                 <flux:icon.information-circle class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                                 <div class="text-xs text-blue-800 dark:text-blue-200">
                                     <p class="font-medium mb-1">Payment Attempt Tracking</p>
-                                    <p>Each payment attempt is logged separately. Pending payments older than 2 hours are automatically marked as cancelled when a new payment is initiated.</p>
+                                    <p>Every payment attempt is logged, including when clients are redirected to existing pending payments within the 2-hour window. This helps you track all client payment interactions and assist them if they encounter errors.</p>
                                 </div>
                             </div>
                         </div>
@@ -324,12 +325,13 @@
                             @foreach($selectedSubmission->payments as $index => $payment)
                                 @php
                                     $borderColor = match($payment->status) {
-                                        'completed' => 'border-l-4 border-green-500',
-                                        'failed' => 'border-l-4 border-red-500',
-                                        'cancelled' => 'border-l-4 border-yellow-500',
-                                        'pending' => 'border-l-4 border-orange-500',
-                                        'processing' => 'border-l-4 border-blue-500',
-                                        default => 'border-l-4 border-zinc-300 dark:border-zinc-700',
+                                        'completed' => 'border-green-500',
+                                        'failed' => 'border-red-500',
+                                        'cancelled' => 'border-yellow-500',
+                                        'pending' => 'border-orange-500',
+                                        'processing' => 'border-blue-500',
+                                        'redirected' => 'border-cyan-500',
+                                        default => 'border-zinc-300 dark:border-zinc-700',
                                     };
                                 @endphp
                                 <flux:card class="p-4 {{ $borderColor }}">
@@ -362,6 +364,27 @@
                                                 <span class="text-zinc-500 dark:text-zinc-400">Amount:</span>
                                                 <span class="font-medium text-zinc-900 dark:text-zinc-100 ml-1">RM {{ number_format($payment->amount, 2) }}</span>
                                             </div>
+
+                                            @if($payment->payment_type)
+                                                <div>
+                                                    <span class="text-zinc-500 dark:text-zinc-400">Payment Type:</span>
+                                                    <flux:badge
+                                                        color="{{ $payment->payment_type === 'B2B' ? 'purple' : 'blue' }}"
+                                                        size="sm"
+                                                        inset="top bottom"
+                                                        class="ml-1"
+                                                    >
+                                                        {{ $payment->payment_type }}
+                                                    </flux:badge>
+                                                </div>
+                                            @endif
+
+                                            @if($payment->bank_name)
+                                                <div>
+                                                    <span class="text-zinc-500 dark:text-zinc-400">Bank:</span>
+                                                    <span class="font-medium text-zinc-900 dark:text-zinc-100 ml-1">{{ $payment->bank_name }}</span>
+                                                </div>
+                                            @endif
 
                                             @if($payment->transaction_id)
                                                 <div class="sm:col-span-2">

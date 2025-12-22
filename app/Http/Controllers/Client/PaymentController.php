@@ -65,6 +65,43 @@ class PaymentController extends Controller
                 'submission_id' => $submission->id,
             ]);
 
+            // Log this attempt even though we're redirecting
+            // This helps admin track how many times client attempted payment
+            $attemptLog = PayrollPayment::create([
+                'payroll_submission_id' => $submission->id,
+                'payment_method' => 'billplz',
+                'billplz_bill_id' => $recentPendingPayment->billplz_bill_id,
+                'billplz_url' => $recentPendingPayment->billplz_url,
+                'amount' => $recentPendingPayment->amount,
+                'status' => 'redirected',
+                'payment_response' => json_encode([
+                    'redirected_to_payment_id' => $recentPendingPayment->id,
+                    'reason' => 'Redirected to existing pending payment within 2-hour window',
+                    'payment_age_minutes' => $paymentAge,
+                    'redirected_at' => now()->toDateTimeString(),
+                ]),
+            ]);
+
+            Log::info('Payment attempt logged as redirected', [
+                'attempt_id' => $attemptLog->id,
+                'original_payment_id' => $recentPendingPayment->id,
+                'submission_id' => $submission->id,
+            ]);
+
+            // Log activity
+            $this->logPaymentActivity(
+                action: 'redirected',
+                description: "Client attempted payment but was redirected to existing pending payment for payroll {$submission->month_year}",
+                payment: $attemptLog,
+                properties: [
+                    'submission_id' => $submission->id,
+                    'amount' => $recentPendingPayment->amount,
+                    'period' => $submission->month_year,
+                    'original_payment_id' => $recentPendingPayment->id,
+                    'payment_age_minutes' => $paymentAge,
+                ]
+            );
+
             $url = $this->billplzService->getDirectPaymentUrl($recentPendingPayment->billplz_url);
             return redirect($url);
         }
@@ -251,14 +288,38 @@ class PaymentController extends Controller
         $billplzBillId = $request->input('id'); // Billplz Bill ID is the transaction identifier
         $transactionStatus = $request->input('transaction_status');
 
-        // Store callback response and transaction ID (use Billplz Bill ID as transaction ID)
-        $payment->payment_response = json_encode($request->all());
-        $payment->transaction_id = $billplzBillId; // Billplz Bill ID is the transaction reference
-        $payment->save(); // Save transaction_id before marking as completed
+        // Capture payment type and bank information from Billplz callback
+        // Billplz sends bank_code and other bank details in the callback
+        $bankCode = $request->input('bank_code');
+        $bankName = $request->input('bank_name') ?? $bankCode;
+
+        // Determine payment type: B2B or B2C
+        // B2B banks typically have specific codes (e.g., corporate/business FPX)
+        // NOTE: This list should be updated based on actual Billplz responses
+        // Common B2B bank codes in Malaysia FPX system:
+        $b2bBankCodes = ['ABB0234', 'ABMB0213', 'AGRO01', 'BIMB0340', 'BKRM0602', 'BMMB0342',
+                         'BSN0601', 'CIT0219', 'HLB0224', 'HSBC0223', 'KFH0346', 'MB2U0227',
+                         'MBB0228', 'OCBC0229', 'PBB0233', 'RHB0218', 'SCB0216', 'UOB0226'];
+
+        // If no bank_code provided or empty, default to B2C (most common for individuals)
+        $paymentType = $bankCode && in_array($bankCode, $b2bBankCodes) ? 'B2B' : 'B2C';
 
         if ($paid && $state === 'active' && $transactionStatus === 'completed') {
-            // Payment successful
-            $payment->markAsCompleted($request->all());
+            // Payment successful - update all fields at once to ensure transaction_id is saved
+            $payment->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'payment_response' => json_encode($request->all()),
+                'transaction_id' => $billplzBillId,
+                'payment_type' => $paymentType,
+                'bank_name' => $bankName,
+            ]);
+
+            // Update payroll submission status
+            $payment->payrollSubmission->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+            ]);
 
             Log::info('Billplz payment completed', [
                 'payment_id' => $payment->id,
@@ -266,6 +327,8 @@ class PaymentController extends Controller
                 'bill_id' => $billplzId,
                 'transaction_id' => $billplzBillId,
                 'amount' => $amount,
+                'payment_type' => $paymentType,
+                'bank_name' => $bankName,
             ]);
 
             // Log activity (without user context as this is a webhook)
@@ -277,7 +340,7 @@ class PaymentController extends Controller
                 'user_email' => $submission->user?->email,
                 'module' => 'payment',
                 'action' => 'completed',
-                'description' => "Payment of RM " . number_format($amount, 2) . " completed for payroll {$submission->month_year}",
+                'description' => "Payment of RM " . number_format($amount, 2) . " completed for payroll {$submission->month_year} via {$paymentType} ({$bankName})",
                 'subject_type' => get_class($payment),
                 'subject_id' => $payment->id,
                 'properties' => [
@@ -285,6 +348,8 @@ class PaymentController extends Controller
                     'amount' => $amount,
                     'transaction_id' => $billplzBillId,
                     'period' => $submission->month_year,
+                    'payment_type' => $paymentType,
+                    'bank_name' => $bankName,
                 ],
                 'ip_address' => $request->ip(),
                 'user_agent' => 'Billplz Webhook',
@@ -292,8 +357,14 @@ class PaymentController extends Controller
                 'method' => $request->method(),
             ]);
         } else {
-            // Payment failed - this will be logged as a separate attempt
-            $payment->markAsFailed($request->all());
+            // Payment failed - save all payment details including transaction info
+            $payment->update([
+                'status' => 'failed',
+                'payment_response' => json_encode($request->all()),
+                'transaction_id' => $billplzBillId,
+                'payment_type' => $paymentType,
+                'bank_name' => $bankName,
+            ]);
 
             Log::warning('Billplz payment failed - attempt logged', [
                 'payment_id' => $payment->id,
@@ -379,7 +450,27 @@ class PaymentController extends Controller
         } elseif ($submission->payment && $submission->payment->status === 'failed') {
             return view('client.payment-failed', compact('submission'));
         } elseif ($submission->payment && $submission->payment->status === 'pending' && !$billPaid) {
-            // User returned without completing payment (cancelled)
+            // User returned without completing payment (cancelled/abandoned)
+            // Log this abandonment for admin visibility
+            Log::info('Client abandoned payment without completing', [
+                'payment_id' => $submission->payment->id,
+                'submission_id' => $submission->id,
+                'user_id' => auth()->id(),
+            ]);
+
+            // Log activity for abandoned payment
+            $this->logPaymentActivity(
+                action: 'abandoned',
+                description: "Client returned from payment page without completing payment for payroll {$submission->month_year}",
+                payment: $submission->payment,
+                properties: [
+                    'submission_id' => $submission->id,
+                    'amount' => $submission->payment->amount,
+                    'period' => $submission->month_year,
+                    'billplz_bill_id' => $submission->payment->billplz_bill_id,
+                ]
+            );
+
             return view('client.payment-cancelled', compact('submission'));
         } else {
             // Payment is actually being processed (rare case)

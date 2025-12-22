@@ -11,7 +11,7 @@
                     <!-- Tax Invoice (for paid invoices) -->
                     <flux:button variant="primary" href="{{ route('invoices.download-tax', $invoice->id) }}">
                         <flux:icon.arrow-down-tray class="size-4" />
-                        Download Tax Invoice
+                        Download Receipt
                     </flux:button>
                     <!-- Pro Forma Invoice (still available) -->
                     <flux:button variant="outline" href="{{ route('invoices.download', $invoice->id) }}">
