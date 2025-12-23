@@ -58,6 +58,7 @@ class ContractWorker extends Model
      * Custom timestamps column names
      */
     const CREATED_AT = 'con_created_at';
+
     const UPDATED_AT = null; // No updated_at column
 
     /**
@@ -114,9 +115,10 @@ class ContractWorker extends Model
      */
     public function isActive(): bool
     {
-        if (!$this->con_end) {
+        if (! $this->con_end) {
             return false;
         }
+
         return $this->con_end->isFuture() || $this->con_end->isToday();
     }
 
@@ -125,7 +127,7 @@ class ContractWorker extends Model
      */
     public function isExpired(): bool
     {
-        return $this->con_end && $this->con_end->isPast() && !$this->con_end->isToday();
+        return $this->con_end && $this->con_end->isPast() && ! $this->con_end->isToday();
     }
 
     /**

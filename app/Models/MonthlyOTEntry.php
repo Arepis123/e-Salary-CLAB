@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 
 class MonthlyOTEntry extends Model
 {
@@ -63,7 +63,7 @@ class MonthlyOTEntry extends Model
      */
     public function isLocked(): bool
     {
-        return $this->status === 'locked' || !is_null($this->locked_at);
+        return $this->status === 'locked' || ! is_null($this->locked_at);
     }
 
     /**
@@ -96,8 +96,8 @@ class MonthlyOTEntry extends Model
     public function scopeForContractorPeriod($query, string $clabNo, int $month, int $year)
     {
         return $query->where('contractor_clab_no', $clabNo)
-                     ->where('entry_month', $month)
-                     ->where('entry_year', $year);
+            ->where('entry_month', $month)
+            ->where('entry_year', $year);
     }
 
     /**

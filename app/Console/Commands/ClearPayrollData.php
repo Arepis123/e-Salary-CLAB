@@ -26,9 +26,10 @@ class ClearPayrollData extends Command
      */
     public function handle()
     {
-        if (!$this->option('force')) {
-            if (!$this->confirm('This will delete ALL payroll submission data. Are you sure?')) {
+        if (! $this->option('force')) {
+            if (! $this->confirm('This will delete ALL payroll submission data. Are you sure?')) {
                 $this->info('Operation cancelled.');
+
                 return Command::SUCCESS;
             }
         }
@@ -64,7 +65,8 @@ class ClearPayrollData extends Command
             // Make sure to re-enable foreign key checks even if there's an error
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
-            $this->error('Error clearing payroll data: ' . $e->getMessage());
+            $this->error('Error clearing payroll data: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }

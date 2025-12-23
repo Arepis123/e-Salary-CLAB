@@ -43,8 +43,8 @@ class NotificationTemplate extends Model
         $body = $this->body;
 
         foreach ($data as $key => $value) {
-            $subject = str_replace('{{' . $key . '}}', $value, $subject);
-            $body = str_replace('{{' . $key . '}}', $value, $body);
+            $subject = str_replace('{{'.$key.'}}', $value, $subject);
+            $body = str_replace('{{'.$key.'}}', $value, $body);
         }
 
         return [
@@ -58,7 +58,7 @@ class NotificationTemplate extends Model
      */
     public static function getAvailableVariables(string $triggerType): array
     {
-        return match($triggerType) {
+        return match ($triggerType) {
             'auto_payment_deadline', 'auto_overdue' => [
                 'client_name' => 'Client Name',
                 'invoice_number' => 'Invoice Number',

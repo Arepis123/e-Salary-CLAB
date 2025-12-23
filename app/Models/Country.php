@@ -13,10 +13,15 @@ use Illuminate\Database\Eloquent\Model;
 class Country extends Model
 {
     protected $connection = 'worker_db';
+
     protected $table = 'mst_countries';
+
     protected $primaryKey = 'cty_id';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     public $timestamps = false;
 
     protected $fillable = [

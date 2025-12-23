@@ -32,8 +32,9 @@ class TestPenalty extends Command
             // Test specific submission
             $submission = PayrollSubmission::find($submissionId);
 
-            if (!$submission) {
+            if (! $submission) {
                 $this->error("Submission #{$submissionId} not found!");
+
                 return 1;
             }
 
@@ -46,6 +47,7 @@ class TestPenalty extends Command
 
             if ($submissions->isEmpty()) {
                 $this->error('No pending submissions found!');
+
                 return 1;
             }
 
@@ -53,7 +55,7 @@ class TestPenalty extends Command
             $this->newLine();
 
             foreach ($submissions as $submission) {
-                $this->line("ID: {$submission->id} | {$submission->month_year} | Status: {$submission->status} | Amount: RM " . number_format($submission->total_amount, 2));
+                $this->line("ID: {$submission->id} | {$submission->month_year} | Status: {$submission->status} | Amount: RM ".number_format($submission->total_amount, 2));
             }
 
             $this->newLine();
@@ -61,8 +63,9 @@ class TestPenalty extends Command
 
             $selected = PayrollSubmission::find($selectedId);
 
-            if (!$selected) {
+            if (! $selected) {
                 $this->error("Submission #{$selectedId} not found!");
+
                 return 1;
             }
 
@@ -77,13 +80,14 @@ class TestPenalty extends Command
         $this->info("Testing penalty for Submission #{$submission->id}");
         $this->line("Period: {$submission->month_year}");
         $this->line("Status: {$submission->status}");
-        $this->line("Total Amount: RM " . number_format($submission->total_amount, 2));
+        $this->line('Total Amount: RM '.number_format($submission->total_amount, 2));
         $this->line("Current Deadline: {$submission->payment_deadline->format('Y-m-d')}");
 
         $this->newLine();
 
         if ($submission->status === 'paid') {
             $this->error('This submission is already paid! Cannot apply penalty.');
+
             return;
         }
 
@@ -103,8 +107,8 @@ class TestPenalty extends Command
 
         $this->newLine();
         $this->info('✓ Penalty Applied!');
-        $this->line("Penalty Amount (8%): RM " . number_format($submission->penalty_amount, 2));
-        $this->line("Total with Penalty: RM " . number_format($submission->total_with_penalty, 2));
+        $this->line('Penalty Amount (8%): RM '.number_format($submission->penalty_amount, 2));
+        $this->line('Total with Penalty: RM '.number_format($submission->total_with_penalty, 2));
         $this->line("Status: {$submission->status}");
 
         $this->newLine();

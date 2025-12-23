@@ -2,8 +2,9 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\Worker;
 use App\Models\SalaryAdjustment;
+use App\Models\Worker;
+use App\Services\ContractorWindowService;
 use App\Services\WorkerService;
 use Flux\Flux;
 use Illuminate\Support\Facades\DB;
@@ -31,30 +32,61 @@ class Configuration extends Component
     public $sortDirection = 'asc';
 
     public $showEditModal = false;
+
     public $editingWorkerId = null;
+
     public $editingWorkerName = '';
+
     public $editingWorkerPassport = '';
+
     public $editingBasicSalary = '';
+
     public $remarks = '';
+
     public $perPage = 15;
+
     public $stats = [];
+
     public $showHistory = false;
+
+    // Window management properties
+    public $activeTab = 'salary';
+
+    public $showWindowModal = false;
+
+    public $showHistoryModal = false;
+
+    public $selectedContractorClab = '';
+
+    public $selectedContractorName = '';
+
+    public $windowAction = '';
+
+    public $windowRemarks = '';
+
+    public $contractorHistory = [];
+
+    public $windowStats = [];
 
     protected WorkerService $workerService;
 
-    public function boot(WorkerService $workerService)
+    protected ContractorWindowService $windowService;
+
+    public function boot(WorkerService $workerService, ContractorWindowService $windowService)
     {
         $this->workerService = $workerService;
+        $this->windowService = $windowService;
     }
 
     public function mount()
     {
         // Check if user is super admin
-        if (!auth()->user()->isSuperAdmin()) {
+        if (! auth()->user()->isSuperAdmin()) {
             abort(403, 'Unauthorized access. Only Super Admin can access this page.');
         }
 
         $this->loadStats();
+        $this->loadWindowStats();
     }
 
     public function loadStats()
@@ -108,8 +140,9 @@ class Configuration extends Component
     {
         $worker = Worker::find($workerId);
 
-        if (!$worker) {
+        if (! $worker) {
             Flux::toast(variant: 'danger', text: 'Worker not found.');
+
             return;
         }
 
@@ -133,7 +166,7 @@ class Configuration extends Component
 
     public function toggleHistory()
     {
-        $this->showHistory = !$this->showHistory;
+        $this->showHistory = ! $this->showHistory;
     }
 
     public function updateBasicSalary()
@@ -147,8 +180,9 @@ class Configuration extends Component
             // Update in second database (worker_db)
             $worker = Worker::find($this->editingWorkerId);
 
-            if (!$worker) {
+            if (! $worker) {
                 Flux::toast(variant: 'danger', text: 'Worker not found.');
+
                 return;
             }
 
@@ -158,6 +192,7 @@ class Configuration extends Component
             // Only update if salary changed
             if ($oldSalary == $newSalary) {
                 Flux::toast(variant: 'warning', text: 'Salary has not changed.');
+
                 return;
             }
 
@@ -187,7 +222,7 @@ class Configuration extends Component
             Flux::toast(
                 variant: 'success',
                 heading: 'Salary Updated!',
-                text: "Basic salary for {$this->editingWorkerName} updated from RM " . number_format($oldSalary, 2) . " to RM " . number_format($newSalary, 2)
+                text: "Basic salary for {$this->editingWorkerName} updated from RM ".number_format($oldSalary, 2).' to RM '.number_format($newSalary, 2)
             );
 
             $this->closeEditModal();
@@ -196,9 +231,98 @@ class Configuration extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Update Failed',
-                text: 'Failed to update basic salary: ' . $e->getMessage()
+                text: 'Failed to update basic salary: '.$e->getMessage()
             );
         }
+    }
+
+    // Window management methods
+    public function loadWindowStats()
+    {
+        $this->windowStats = $this->windowService->getWindowStatistics();
+    }
+
+    public function switchTab(string $tab)
+    {
+        $this->activeTab = $tab;
+    }
+
+    public function openWindowModal(string $clabNo, string $contractorName, string $action)
+    {
+        $this->selectedContractorClab = $clabNo;
+        $this->selectedContractorName = $contractorName;
+        $this->windowAction = $action;
+        $this->windowRemarks = '';
+        $this->showWindowModal = true;
+    }
+
+    public function closeWindowModal()
+    {
+        $this->showWindowModal = false;
+        $this->selectedContractorClab = '';
+        $this->selectedContractorName = '';
+        $this->windowAction = '';
+        $this->windowRemarks = '';
+    }
+
+    public function confirmWindowAction()
+    {
+        $this->validate([
+            'windowRemarks' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            if ($this->windowAction === 'open') {
+                $setting = $this->windowService->openWindow(
+                    $this->selectedContractorClab,
+                    auth()->id(),
+                    $this->windowRemarks
+                );
+
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Window Opened',
+                    text: "OT entry and transaction window opened for {$this->selectedContractorName}. Locked entries have been unlocked."
+                );
+            } else {
+                $setting = $this->windowService->closeWindow(
+                    $this->selectedContractorClab,
+                    auth()->id(),
+                    $this->windowRemarks
+                );
+
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Window Closed',
+                    text: "OT entry and transaction window closed for {$this->selectedContractorName}."
+                );
+            }
+
+            $this->closeWindowModal();
+            $this->loadWindowStats();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to update window: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function viewContractorHistory(string $clabNo, string $contractorName)
+    {
+        $this->selectedContractorClab = $clabNo;
+        $this->selectedContractorName = $contractorName;
+        $this->contractorHistory = $this->windowService->getContractorHistory($clabNo);
+        $this->showHistoryModal = true;
+    }
+
+    public function closeHistoryModal()
+    {
+        $this->showHistoryModal = false;
+        $this->selectedContractorClab = '';
+        $this->selectedContractorName = '';
+        $this->contractorHistory = [];
     }
 
     public function render()
@@ -214,9 +338,9 @@ class Configuration extends Component
         // Apply search filter
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('wkr_name', 'like', '%' . $this->search . '%')
-                    ->orWhere('wkr_passno', 'like', '%' . $this->search . '%')
-                    ->orWhere('wkr_id', 'like', '%' . $this->search . '%');
+                $q->where('wkr_name', 'like', '%'.$this->search.'%')
+                    ->orWhere('wkr_passno', 'like', '%'.$this->search.'%')
+                    ->orWhere('wkr_id', 'like', '%'.$this->search.'%');
             });
         }
 
@@ -281,12 +405,20 @@ class Configuration extends Component
             ->limit(50)
             ->get();
 
+        // Get contractors for window management tab
+        $contractors = [];
+        if ($this->activeTab === 'windows') {
+            $contractors = $this->windowService->getAllContractorSettings();
+        }
+
         return view('livewire.admin.configuration', [
             'workers' => $workers,
             'countries' => $countries,
             'positions' => $positions,
             'stats' => $this->stats,
             'salaryHistory' => $salaryHistory,
-        ])->layout('components.layouts.app', ['title' => __('Configuration - Basic Salary Management')]);
+            'contractors' => $contractors,
+            'windowStats' => $this->windowStats,
+        ])->layout('components.layouts.app', ['title' => __('Configuration')]);
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class ViewContractWorkerStructure extends Command
 {
     protected $signature = 'db:view-contract-worker';
+
     protected $description = 'View contract_worker table structure and sample data';
 
     public function handle()
@@ -24,12 +25,12 @@ class ViewContractWorkerStructure extends Command
 
             $this->table(
                 ['Field', 'Type', 'Null', 'Key', 'Default'],
-                collect($columns)->map(fn($col) => [
+                collect($columns)->map(fn ($col) => [
                     $col->Field,
                     $col->Type,
                     $col->Null,
                     $col->Key ?? '',
-                    $col->Default ?? 'NULL'
+                    $col->Default ?? 'NULL',
                 ])
             );
 
@@ -52,14 +53,14 @@ class ViewContractWorkerStructure extends Command
 
                 $this->table(
                     $headers,
-                    $samples->map(fn($row) => (array) $row)
+                    $samples->map(fn ($row) => (array) $row)
                 );
             } else {
                 $this->warn('No records found in contract_worker table.');
             }
 
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
         }
 
         $this->newLine();

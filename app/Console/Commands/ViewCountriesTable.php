@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class ViewCountriesTable extends Command
 {
     protected $signature = 'db:view-countries';
+
     protected $description = 'View mst_countries table structure and sample data';
 
     public function handle()
@@ -21,12 +22,12 @@ class ViewCountriesTable extends Command
 
             $this->table(
                 ['Field', 'Type', 'Null', 'Key', 'Default'],
-                collect($columns)->map(fn($col) => [
+                collect($columns)->map(fn ($col) => [
                     $col->Field,
                     $col->Type,
                     $col->Null,
                     $col->Key ?? '',
-                    $col->Default ?? 'NULL'
+                    $col->Default ?? 'NULL',
                 ])
             );
 
@@ -34,7 +35,7 @@ class ViewCountriesTable extends Command
 
             // Sample data
             $countries = DB::connection('worker_db')->table('mst_countries')->limit(10)->get();
-            $this->info("Sample Countries (first 10):");
+            $this->info('Sample Countries (first 10):');
 
             if ($countries->count() > 0) {
                 $firstRow = (array) $countries->first();
@@ -42,12 +43,12 @@ class ViewCountriesTable extends Command
 
                 $this->table(
                     $headers,
-                    $countries->map(fn($row) => (array) $row)
+                    $countries->map(fn ($row) => (array) $row)
                 );
             }
 
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
         }
 
         $this->newLine();

@@ -35,7 +35,7 @@ class TestWorkerDbConnection extends Command
             $this->line("   ✓ Connected to: {$firstDb}");
 
             $firstTables = \DB::connection('mariadb')->select('SHOW TABLES');
-            $this->line('   ✓ Tables found: ' . count($firstTables));
+            $this->line('   ✓ Tables found: '.count($firstTables));
             $this->newLine();
 
             // Test Second Database (worker_db)
@@ -46,7 +46,7 @@ class TestWorkerDbConnection extends Command
             // Try to get tables from second database
             try {
                 $secondTables = \DB::connection('worker_db')->select('SHOW TABLES');
-                $this->line('   ✓ Tables found: ' . count($secondTables));
+                $this->line('   ✓ Tables found: '.count($secondTables));
 
                 if (count($secondTables) > 0) {
                     $this->line('   ✓ Tables:');
@@ -66,12 +66,12 @@ class TestWorkerDbConnection extends Command
             return Command::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ Connection failed: ' . $e->getMessage());
+            $this->error('❌ Connection failed: '.$e->getMessage());
             $this->newLine();
             $this->line('Please check your .env configuration:');
-            $this->line('  WORKER_DB_HOST=' . env('WORKER_DB_HOST'));
-            $this->line('  WORKER_DB_PORT=' . env('WORKER_DB_PORT'));
-            $this->line('  WORKER_DB_DATABASE=' . env('WORKER_DB_DATABASE'));
+            $this->line('  WORKER_DB_HOST='.env('WORKER_DB_HOST'));
+            $this->line('  WORKER_DB_PORT='.env('WORKER_DB_PORT'));
+            $this->line('  WORKER_DB_DATABASE='.env('WORKER_DB_DATABASE'));
 
             return Command::FAILURE;
         }

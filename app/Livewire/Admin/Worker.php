@@ -4,8 +4,6 @@ namespace App\Livewire\Admin;
 
 use App\Exports\WorkersExport;
 use App\Models\ContractWorker;
-use App\Models\PayrollWorker;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -37,10 +35,15 @@ class Worker extends Component
     public $sortDirection = 'asc';
 
     public $stats = [];
+
     public $workers = [];
+
     public $showFilters = true;
+
     public $clients = [];
+
     public $positions = [];
+
     public $perPage = 10;
 
     public function mount()
@@ -52,7 +55,7 @@ class Worker extends Component
 
     public function toggleFilters()
     {
-        $this->showFilters = !$this->showFilters;
+        $this->showFilters = ! $this->showFilters;
     }
 
     public function clearFilters()
@@ -91,7 +94,7 @@ class Worker extends Component
             ->whereIn('wkr_id', $workerIds)
             ->get();
 
-        $fileName = 'workers_' . now()->format('Y-m-d_His') . '.xlsx';
+        $fileName = 'workers_'.now()->format('Y-m-d_His').'.xlsx';
 
         return Excel::download(new WorkersExport($allWorkers), $fileName);
     }
@@ -205,11 +208,11 @@ class Worker extends Component
         // Apply search filter
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('con_wkr_id', 'like', '%' . $this->search . '%')
-                  ->orWhere('con_wkr_passno', 'like', '%' . $this->search . '%')
-                  ->orWhereHas('worker', function ($workerQuery) {
-                      $workerQuery->where('wkr_name', 'like', '%' . $this->search . '%');
-                  });
+                $q->where('con_wkr_id', 'like', '%'.$this->search.'%')
+                    ->orWhere('con_wkr_passno', 'like', '%'.$this->search.'%')
+                    ->orWhereHas('worker', function ($workerQuery) {
+                        $workerQuery->where('wkr_name', 'like', '%'.$this->search.'%');
+                    });
             });
         }
 
@@ -275,10 +278,11 @@ class Worker extends Component
                 }
                 // Convert d/m/Y to timestamp
                 $date = \DateTime::createFromFormat('d/m/Y', $dateString);
+
                 return $date ? $date->getTimestamp() : PHP_INT_MAX;
             };
 
-            $primaryA = match($this->sortBy) {
+            $primaryA = match ($this->sortBy) {
                 'name' => strtolower($a['name']),
                 'passport' => strtolower($a['passport']),
                 'position' => strtolower($a['position']),
@@ -290,7 +294,7 @@ class Worker extends Component
                 default => strtolower($a['name']),
             };
 
-            $primaryB = match($this->sortBy) {
+            $primaryB = match ($this->sortBy) {
                 'name' => strtolower($b['name']),
                 'passport' => strtolower($b['passport']),
                 'position' => strtolower($b['position']),

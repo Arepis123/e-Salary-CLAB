@@ -40,6 +40,7 @@ class CleanupFailedLoginAttempts extends Command
 
         if ($count === 0) {
             $this->info('No old records found to delete.');
+
             return Command::SUCCESS;
         }
 

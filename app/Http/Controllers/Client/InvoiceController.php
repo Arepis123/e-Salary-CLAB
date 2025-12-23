@@ -15,7 +15,7 @@ class InvoiceController extends Controller
     {
         $clabNo = $request->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('client.invoices', [
                 'error' => 'No contractor CLAB number assigned to your account.',
             ]);
@@ -39,7 +39,7 @@ class InvoiceController extends Controller
 
         // Use total_due accessor to include dynamic penalty calculation
         $allSubmissions = PayrollSubmission::where('contractor_clab_no', $clabNo)->get();
-        $totalInvoiced = $allSubmissions->sum(function($submission) {
+        $totalInvoiced = $allSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -90,7 +90,7 @@ class InvoiceController extends Controller
         $pdf = \PDF::loadView('client.invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'ProForma-Invoice-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT) . '-' . $invoice->month_year . '.pdf';
+        $filename = 'ProForma-Invoice-'.str_pad($invoice->id, 4, '0', STR_PAD_LEFT).'-'.$invoice->month_year.'.pdf';
 
         return $pdf->download($filename);
     }
@@ -118,7 +118,7 @@ class InvoiceController extends Controller
         }
 
         // Generate tax invoice number if not already generated
-        if (!$invoice->hasTaxInvoice()) {
+        if (! $invoice->hasTaxInvoice()) {
             $invoice->generateTaxInvoiceNumber();
             $invoice->refresh();
         }
@@ -126,7 +126,7 @@ class InvoiceController extends Controller
         $pdf = \PDF::loadView('client.tax-invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'Tax-Invoice-' . $invoice->tax_invoice_number . '-' . $invoice->month_year . '.pdf';
+        $filename = 'Tax-Invoice-'.$invoice->tax_invoice_number.'-'.$invoice->month_year.'.pdf';
 
         return $pdf->download($filename);
     }

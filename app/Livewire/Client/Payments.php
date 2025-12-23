@@ -4,9 +4,8 @@ namespace App\Livewire\Client;
 
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
-use Livewire\Component;
 use Livewire\Attributes\Url;
-use Carbon\Carbon;
+use Livewire\Component;
 
 class Payments extends Component
 {
@@ -30,7 +29,7 @@ class Payments extends Component
 
     public function mount()
     {
-        if (!$this->year) {
+        if (! $this->year) {
             $this->year = now()->year;
         }
     }
@@ -77,7 +76,7 @@ class Payments extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('livewire.client.payments', [
                 'error' => 'No contractor CLAB number assigned to your account.',
                 'payments' => collect([]),
@@ -104,15 +103,16 @@ class Payments extends Component
         // Get all payments for this contractor with submission details
         $allPayments = PayrollPayment::whereHas('submission', function ($query) use ($clabNo) {
             $query->where('contractor_clab_no', $clabNo)
-                  ->whereYear('created_at', $this->year);
+                ->whereYear('created_at', $this->year);
         })
-        ->with(['submission'])
-        ->get();
+            ->with(['submission'])
+            ->get();
 
         // Apply search filter
         if ($this->search) {
-            $allPayments = $allPayments->filter(function($payment) {
+            $allPayments = $allPayments->filter(function ($payment) {
                 $searchLower = strtolower($this->search);
+
                 return str_contains(strtolower($payment->transaction_id ?? ''), $searchLower) ||
                        str_contains(strtolower($payment->billplz_bill_id ?? ''), $searchLower) ||
                        str_contains(strtolower($payment->submission->month_year ?? ''), $searchLower) ||
@@ -122,21 +122,21 @@ class Payments extends Component
 
         // Apply status filter
         if ($this->statusFilter && $this->statusFilter !== 'all') {
-            $allPayments = $allPayments->filter(function($payment) {
+            $allPayments = $allPayments->filter(function ($payment) {
                 return $payment->status === $this->statusFilter;
             });
         }
 
         // Apply sorting
-        $allPayments = $allPayments->sort(function($a, $b) {
-            $primaryA = match($this->sortBy) {
+        $allPayments = $allPayments->sort(function ($a, $b) {
+            $primaryA = match ($this->sortBy) {
                 'transaction_id' => $a->transaction_id ?? $a->billplz_bill_id ?? '',
                 'period' => $a->submission->month_year ?? '',
                 'amount' => $a->amount ?? 0,
                 'workers' => $a->submission->total_workers ?? 0,
                 'payment_date' => $a->completed_at ? $a->completed_at->timestamp : 0,
                 'method' => strtolower($a->payment_method ?? ''),
-                'status' => match($a->status) {
+                'status' => match ($a->status) {
                     'completed' => 0,
                     'pending' => 1,
                     'failed' => 2,
@@ -145,14 +145,14 @@ class Payments extends Component
                 default => $a->completed_at ? $a->completed_at->timestamp : 0,
             };
 
-            $primaryB = match($this->sortBy) {
+            $primaryB = match ($this->sortBy) {
                 'transaction_id' => $b->transaction_id ?? $b->billplz_bill_id ?? '',
                 'period' => $b->submission->month_year ?? '',
                 'amount' => $b->amount ?? 0,
                 'workers' => $b->submission->total_workers ?? 0,
                 'payment_date' => $b->completed_at ? $b->completed_at->timestamp : 0,
                 'method' => strtolower($b->payment_method ?? ''),
-                'status' => match($b->status) {
+                'status' => match ($b->status) {
                     'completed' => 0,
                     'pending' => 1,
                     'failed' => 2,
@@ -186,7 +186,7 @@ class Payments extends Component
             ->where('year', $currentYear)
             ->get();
 
-        $thisMonthAmount = $thisMonthSubmissions->sum(function($submission) {
+        $thisMonthAmount = $thisMonthSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -200,7 +200,7 @@ class Payments extends Component
             ->where('status', 'paid')
             ->get();
 
-        $lastMonthAmount = $lastMonthSubmissions->sum(function($submission) {
+        $lastMonthAmount = $lastMonthSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -210,7 +210,7 @@ class Payments extends Component
             ->where('status', 'paid')
             ->get();
 
-        $thisYearAmount = $thisYearSubmissions->sum(function($submission) {
+        $thisYearAmount = $thisYearSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 

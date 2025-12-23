@@ -43,7 +43,7 @@ class InvoiceController extends Controller
         $pdf = \PDF::loadView('admin.invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'ProForma-Invoice-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT) . '-' . $invoice->month_year . '.pdf';
+        $filename = 'ProForma-Invoice-'.str_pad($invoice->id, 4, '0', STR_PAD_LEFT).'-'.$invoice->month_year.'.pdf';
 
         return $pdf->download($filename);
     }
@@ -63,7 +63,7 @@ class InvoiceController extends Controller
         }
 
         // Generate tax invoice number if not already generated
-        if (!$invoice->hasTaxInvoice()) {
+        if (! $invoice->hasTaxInvoice()) {
             $invoice->generateTaxInvoiceNumber();
             $invoice->refresh();
         }
@@ -73,7 +73,7 @@ class InvoiceController extends Controller
         $pdf = \PDF::loadView('admin.tax-invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'Tax-Invoice-' . $invoice->tax_invoice_number . '-' . $invoice->month_year . '.pdf';
+        $filename = 'Tax-Invoice-'.$invoice->tax_invoice_number.'-'.$invoice->month_year.'.pdf';
 
         return $pdf->download($filename);
     }

@@ -2,10 +2,9 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\PayrollSubmission;
 use App\Models\PayrollPayment;
+use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
-use App\Models\User;
 use Flux\Flux;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -13,14 +12,23 @@ use Livewire\Component;
 class Report extends Component
 {
     public $reportType = '';
+
     public $period = '';
+
     public $clientFilter = '';
+
     public $selectedMonth;
+
     public $selectedYear;
+
     public $stats = [];
+
     public $clientPayments = [];
+
     public $topWorkers = [];
+
     public $chartData = [];
+
     public $availableMonths = [];
 
     public function mount()
@@ -67,9 +75,9 @@ class Report extends Component
 
     public function filterByMonthYear($monthYear)
     {
-        list($year, $month) = explode('-', $monthYear);
-        $this->selectedYear = (int)$year;
-        $this->selectedMonth = (int)$month;
+        [$year, $month] = explode('-', $monthYear);
+        $this->selectedYear = (int) $year;
+        $this->selectedMonth = (int) $month;
 
         $this->loadClientPayments();
         $this->loadTopWorkers();
@@ -93,26 +101,26 @@ class Report extends Component
         // Average salary (from all paid submissions)
         $totalWorkers = PayrollWorker::whereHas('submission', function ($query) use ($currentYear, $currentMonth) {
             $query->where('year', $currentYear)
-                  ->where('month', $currentMonth);
+                ->where('month', $currentMonth);
         })->count();
 
         $averageSalary = $totalWorkers > 0
             ? PayrollWorker::whereHas('submission', function ($query) use ($currentYear, $currentMonth) {
                 $query->where('year', $currentYear)
-                      ->where('month', $currentMonth);
+                    ->where('month', $currentMonth);
             })->avg('net_salary')
             : 0;
 
         // Total hours worked
         $totalHours = PayrollWorker::whereHas('submission', function ($query) use ($currentYear, $currentMonth) {
             $query->where('year', $currentYear)
-                  ->where('month', $currentMonth);
+                ->where('month', $currentMonth);
         })->sum(DB::raw('regular_hours + ot_normal_hours + ot_rest_hours + ot_public_hours'));
 
         // Overtime hours
         $overtimeHours = PayrollWorker::whereHas('submission', function ($query) use ($currentYear, $currentMonth) {
             $query->where('year', $currentYear)
-                  ->where('month', $currentMonth);
+                ->where('month', $currentMonth);
         })->sum(DB::raw('ot_normal_hours + ot_rest_hours + ot_public_hours'));
 
         // Completed and pending payments
@@ -154,7 +162,7 @@ class Report extends Component
             $firstSubmission = $contractorSubmissions->first();
             $clientName = $firstSubmission->user
                 ? ($firstSubmission->user->company_name ?? $firstSubmission->user->name)
-                : 'Contractor ' . $clabNo;
+                : 'Contractor '.$clabNo;
 
             // Aggregate data across all submissions for this contractor
             $totalWorkers = $contractorSubmissions->sum(function ($submission) {
@@ -197,7 +205,7 @@ class Report extends Component
                 return in_array($submission->status, ['pending_payment', 'overdue']);
             });
 
-            $status = $hasAnyPaid && !$hasAnyPending ? 'Paid' : 'Pending';
+            $status = $hasAnyPaid && ! $hasAnyPending ? 'Paid' : 'Pending';
 
             $clientPayments[] = [
                 'client' => $clientName,
@@ -228,9 +236,9 @@ class Report extends Component
 
         // Get top 5 workers by total salary (including overtime) for selected month
         $topWorkers = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($currentMonth, $currentYear) {
-                $query->where('month', $currentMonth)
-                      ->where('year', $currentYear);
-            })
+            $query->where('month', $currentMonth)
+                ->where('year', $currentYear);
+        })
             ->with(['payrollSubmission.user', 'worker'])
             ->get()
             ->map(function ($worker) {
@@ -239,7 +247,7 @@ class Report extends Component
 
                 return [
                     'worker_id' => $worker->worker_id,
-                    'name' => $worker->worker_name ?? ($worker->worker ? $worker->worker->wkr_name : 'Worker ' . $worker->worker_id),
+                    'name' => $worker->worker_name ?? ($worker->worker ? $worker->worker->wkr_name : 'Worker '.$worker->worker_id),
                     'position' => 'General Worker',
                     'client' => $worker->payrollSubmission && $worker->payrollSubmission->user
                         ? ($worker->payrollSubmission->user->company_name ?? $worker->payrollSubmission->user->name)
@@ -255,6 +263,7 @@ class Report extends Component
         // Add rank
         $this->topWorkers = $topWorkers->map(function ($worker, $index) {
             $worker['rank'] = $index + 1;
+
             return $worker;
         })->toArray();
     }

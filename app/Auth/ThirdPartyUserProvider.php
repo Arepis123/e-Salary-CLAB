@@ -47,14 +47,14 @@ class ThirdPartyUserProvider implements UserProvider
 
         $username = $credentials['username'] ?? $credentials['email'] ?? null;
 
-        if (!$username) {
+        if (! $username) {
             return null;
         }
 
         // First, check if user exists locally as admin/super_admin
         $localUser = User::where(function ($query) use ($username) {
             $query->where('username', $username)
-                  ->orWhere('email', $username);
+                ->orWhere('email', $username);
         })->first();
 
         // If local user is admin or super_admin, return immediately
@@ -67,11 +67,11 @@ class ThirdPartyUserProvider implements UserProvider
             ->table('tbl_user')
             ->where(function ($query) use ($username) {
                 $query->where('u_username', $username)
-                      ->orWhere('u_email1', $username);
+                    ->orWhere('u_email1', $username);
             })
             ->first();
 
-        if (!$thirdPartyUser) {
+        if (! $thirdPartyUser) {
             return null;
         }
 
@@ -101,7 +101,7 @@ class ThirdPartyUserProvider implements UserProvider
         // Get password from credentials
         $password = $credentials['password'] ?? null;
 
-        if (!$password || !$user->username) {
+        if (! $password || ! $user->username) {
             return false;
         }
 
@@ -116,7 +116,7 @@ class ThirdPartyUserProvider implements UserProvider
             ->where('u_username', $user->username)
             ->first();
 
-        if (!$thirdPartyUser) {
+        if (! $thirdPartyUser) {
             return false;
         }
 
@@ -124,7 +124,7 @@ class ThirdPartyUserProvider implements UserProvider
         $isValid = md5($password) === $thirdPartyUser->u_password;
 
         // Log failed login attempts
-        if (!$isValid) {
+        if (! $isValid) {
             DB::table('failed_login_attempts')->insert([
                 'username' => $user->username,
                 'ip_address' => request()->ip(),

@@ -4,8 +4,8 @@ namespace App\Livewire\Admin;
 
 use App\Models\PayrollSubmission;
 use App\Models\User;
-use Livewire\Component;
 use Livewire\Attributes\Url;
+use Livewire\Component;
 
 class Invoices extends Component
 {
@@ -32,7 +32,7 @@ class Invoices extends Component
 
     public function mount()
     {
-        if (!$this->year) {
+        if (! $this->year) {
             $this->year = now()->year;
         }
     }
@@ -97,10 +97,11 @@ class Invoices extends Component
 
         // Apply search filter
         if ($this->search) {
-            $allInvoices = $allInvoices->filter(function($invoice) {
+            $allInvoices = $allInvoices->filter(function ($invoice) {
                 $searchLower = strtolower($this->search);
-                $invoiceNumber = 'INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT);
+                $invoiceNumber = 'INV-'.str_pad($invoice->id, 4, '0', STR_PAD_LEFT);
                 $contractorName = $invoice->user ? strtolower($invoice->user->name) : '';
+
                 return str_contains(strtolower($invoiceNumber), $searchLower) ||
                        str_contains(strtolower($invoice->month_year ?? ''), $searchLower) ||
                        str_contains($contractorName, $searchLower) ||
@@ -110,14 +111,14 @@ class Invoices extends Component
 
         // Apply status filter
         if ($this->statusFilter && $this->statusFilter !== 'all') {
-            $allInvoices = $allInvoices->filter(function($invoice) {
+            $allInvoices = $allInvoices->filter(function ($invoice) {
                 return $invoice->status === $this->statusFilter;
             });
         }
 
         // Apply sorting
-        $allInvoices = $allInvoices->sort(function($a, $b) {
-            $primaryA = match($this->sortBy) {
+        $allInvoices = $allInvoices->sort(function ($a, $b) {
+            $primaryA = match ($this->sortBy) {
                 'invoice_number' => str_pad($a->id, 4, '0', STR_PAD_LEFT),
                 'contractor' => $a->user ? $a->user->name : $a->contractor_clab_no,
                 'period' => $a->month_year ?? '',
@@ -125,7 +126,7 @@ class Invoices extends Component
                 'amount' => $a->total_with_penalty ?? 0,
                 'issue_date' => $a->submitted_at ? $a->submitted_at->timestamp : 0,
                 'due_date' => $a->payment_deadline ? $a->payment_deadline->timestamp : 0,
-                'status' => match($a->status) {
+                'status' => match ($a->status) {
                     'overdue' => 0,
                     'pending_payment' => 1,
                     'paid' => 2,
@@ -135,7 +136,7 @@ class Invoices extends Component
                 default => $a->submitted_at ? $a->submitted_at->timestamp : 0,
             };
 
-            $primaryB = match($this->sortBy) {
+            $primaryB = match ($this->sortBy) {
                 'invoice_number' => str_pad($b->id, 4, '0', STR_PAD_LEFT),
                 'contractor' => $b->user ? $b->user->name : $b->contractor_clab_no,
                 'period' => $b->month_year ?? '',
@@ -143,7 +144,7 @@ class Invoices extends Component
                 'amount' => $b->total_with_penalty ?? 0,
                 'issue_date' => $b->submitted_at ? $b->submitted_at->timestamp : 0,
                 'due_date' => $b->payment_deadline ? $b->payment_deadline->timestamp : 0,
-                'status' => match($b->status) {
+                'status' => match ($b->status) {
                     'overdue' => 0,
                     'pending_payment' => 1,
                     'paid' => 2,
@@ -173,7 +174,7 @@ class Invoices extends Component
         $pendingInvoices = $allSubmissions->whereIn('status', ['pending_payment', 'overdue'])->count();
         $paidInvoices = $allSubmissions->where('status', 'paid')->count();
         // Use total_due accessor to include dynamic penalty calculation
-        $totalInvoiced = $allSubmissions->sum(function($submission) {
+        $totalInvoiced = $allSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -182,7 +183,7 @@ class Invoices extends Component
             ->whereNotNull('contractor_clab_no')
             ->orderBy('name')
             ->get()
-            ->map(function($user) {
+            ->map(function ($user) {
                 return [
                     'clab_no' => $user->contractor_clab_no,
                     'name' => $user->name,

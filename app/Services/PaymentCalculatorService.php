@@ -14,14 +14,20 @@ class PaymentCalculatorService
 {
     // Constants based on Malaysian regulations
     public const MINIMUM_SALARY = 1700.00; // RM 1,700 minimum for foreign workers
+
     public const EPF_WORKER_RATE = 0.02;   // 2% EPF deduction from worker
+
     public const EPF_EMPLOYER_RATE = 0.02; // 2% EPF contribution by employer
 
     // Overtime calculation constants
     public const WORKING_DAYS_PER_MONTH = 26;
+
     public const WORKING_HOURS_PER_DAY = 8;
+
     public const OT_WEEKDAY_MULTIPLIER = 1.5;
+
     public const OT_REST_DAY_MULTIPLIER = 2.0;
+
     public const OT_PUBLIC_HOLIDAY_MULTIPLIER = 3.0;
 
     /**
@@ -101,7 +107,7 @@ class PaymentCalculatorService
     /**
      * Find SOCSO contribution bracket for a given salary
      *
-     * @param float $salary Monthly salary
+     * @param  float  $salary  Monthly salary
      * @return array|null Returns [employee_contribution, employer_contribution] or null if not found
      */
     private function getSOCSObracket(float $salary): ?array
@@ -147,6 +153,7 @@ class PaymentCalculatorService
     public function calculateWorkerSOCSO(float $basicSalary): float
     {
         $bracket = $this->getSOCSObracket($basicSalary);
+
         return round($bracket['employee'], 2);
     }
 
@@ -157,6 +164,7 @@ class PaymentCalculatorService
     public function calculateEmployerSOCSO(float $basicSalary): float
     {
         $bracket = $this->getSOCSObracket($basicSalary);
+
         return round($bracket['employer'], 2);
     }
 
@@ -210,6 +218,7 @@ class PaymentCalculatorService
     public function calculateHourlyRate(float $basicSalary): float
     {
         $dailyRate = $this->calculateDailyRate($basicSalary);
+
         return round($dailyRate / self::WORKING_HOURS_PER_DAY, 2);
     }
 
@@ -220,6 +229,7 @@ class PaymentCalculatorService
     public function calculateWeekdayOTRate(float $basicSalary): float
     {
         $hourlyRate = $this->calculateHourlyRate($basicSalary);
+
         return round($hourlyRate * self::OT_WEEKDAY_MULTIPLIER, 2);
     }
 
@@ -230,6 +240,7 @@ class PaymentCalculatorService
     public function calculateRestDayOTRate(float $basicSalary): float
     {
         $hourlyRate = $this->calculateHourlyRate($basicSalary);
+
         return round($hourlyRate * self::OT_REST_DAY_MULTIPLIER, 2);
     }
 
@@ -240,16 +251,16 @@ class PaymentCalculatorService
     public function calculatePublicHolidayOTRate(float $basicSalary): float
     {
         $hourlyRate = $this->calculateHourlyRate($basicSalary);
+
         return round($hourlyRate * self::OT_PUBLIC_HOLIDAY_MULTIPLIER, 2);
     }
 
     /**
      * Calculate total overtime pay
      *
-     * @param float $basicSalary
-     * @param float $weekdayOTHours Number of overtime hours on weekdays
-     * @param float $restDayOTHours Number of overtime hours on rest days
-     * @param float $publicHolidayOTHours Number of overtime hours on public holidays
+     * @param  float  $weekdayOTHours  Number of overtime hours on weekdays
+     * @param  float  $restDayOTHours  Number of overtime hours on rest days
+     * @param  float  $publicHolidayOTHours  Number of overtime hours on public holidays
      * @return float Total overtime amount
      */
     public function calculateTotalOvertimePay(
@@ -268,12 +279,12 @@ class PaymentCalculatorService
     /**
      * Calculate complete worker payment breakdown
      *
-     * @param float $basicSalary Worker's basic salary
-     * @param float $weekdayOTHours Weekday overtime hours
-     * @param float $restDayOTHours Rest day overtime hours
-     * @param float $publicHolidayOTHours Public holiday overtime hours
-     * @param float $advancePayment Advance payment to worker (loan)
-     * @param float $deduction Deduction from worker's salary
+     * @param  float  $basicSalary  Worker's basic salary
+     * @param  float  $weekdayOTHours  Weekday overtime hours
+     * @param  float  $restDayOTHours  Rest day overtime hours
+     * @param  float  $publicHolidayOTHours  Public holiday overtime hours
+     * @param  float  $advancePayment  Advance payment to worker (loan)
+     * @param  float  $deduction  Deduction from worker's salary
      * @return array Complete payment breakdown
      */
     public function calculateWorkerPayment(
@@ -350,15 +361,15 @@ class PaymentCalculatorService
     public function getPaymentSummary(array $paymentBreakdown): array
     {
         return [
-            'Basic Salary' => 'RM ' . number_format($paymentBreakdown['basic_salary'], 2),
-            'Worker Deductions (EPF + SOCSO)' => 'RM ' . number_format($paymentBreakdown['total_worker_deductions'], 2),
-            'Net Basic Salary' => 'RM ' . number_format($paymentBreakdown['net_basic_salary'], 2),
-            'Overtime Pay' => 'RM ' . number_format($paymentBreakdown['total_overtime_pay'], 2),
-            'Advance Payment' => 'RM ' . number_format($paymentBreakdown['advance_payment'], 2),
-            'Deduction' => 'RM ' . number_format($paymentBreakdown['deduction'], 2),
-            'Total Net Pay (Worker Receives)' => 'RM ' . number_format($paymentBreakdown['total_net_pay'], 2),
-            'Employer Contributions' => 'RM ' . number_format($paymentBreakdown['total_employer_contributions'], 2),
-            'Total Payment to CLAB' => 'RM ' . number_format($paymentBreakdown['total_payment_to_clab'], 2),
+            'Basic Salary' => 'RM '.number_format($paymentBreakdown['basic_salary'], 2),
+            'Worker Deductions (EPF + SOCSO)' => 'RM '.number_format($paymentBreakdown['total_worker_deductions'], 2),
+            'Net Basic Salary' => 'RM '.number_format($paymentBreakdown['net_basic_salary'], 2),
+            'Overtime Pay' => 'RM '.number_format($paymentBreakdown['total_overtime_pay'], 2),
+            'Advance Payment' => 'RM '.number_format($paymentBreakdown['advance_payment'], 2),
+            'Deduction' => 'RM '.number_format($paymentBreakdown['deduction'], 2),
+            'Total Net Pay (Worker Receives)' => 'RM '.number_format($paymentBreakdown['total_net_pay'], 2),
+            'Employer Contributions' => 'RM '.number_format($paymentBreakdown['total_employer_contributions'], 2),
+            'Total Payment to CLAB' => 'RM '.number_format($paymentBreakdown['total_payment_to_clab'], 2),
         ];
     }
 }

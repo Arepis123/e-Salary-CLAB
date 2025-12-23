@@ -160,12 +160,12 @@ class PayrollWorker extends Model
      * - EPF (both worker & employer): Calculated on BASIC SALARY only
      * - SOCSO (both worker & employer): Calculated on GROSS SALARY (Basic + OT - Advance - Deduction)
      *
-     * @param float $additionalOtPay Additional OT amount (legacy parameter, kept for compatibility)
+     * @param  float  $additionalOtPay  Additional OT amount (legacy parameter, kept for compatibility)
      */
     public function calculateSalary(float $additionalOtPay = 0): void
     {
         // Skip if auto-calculation disabled (admin review workflow)
-        if (!config('payroll.use_auto_calculations', false)) {
+        if (! config('payroll.use_auto_calculations', false)) {
             return;
         }
 
@@ -268,7 +268,7 @@ class PayrollWorker extends Model
             ->orderBy('con_end', 'desc')
             ->first();
 
-        if (!$contract || !$contract->con_end) {
+        if (! $contract || ! $contract->con_end) {
             return false;
         }
 

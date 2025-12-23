@@ -2,42 +2,55 @@
 
 namespace App\Livewire\Client;
 
-use Livewire\Component;
-use Livewire\Attributes\Title;
-use Livewire\WithFileUploads;
-use Flux;
 use App\Services\OTEntryService;
-use App\Models\MonthlyOTEntry;
 use App\Traits\LogsActivity;
+use Flux;
+use Livewire\Attributes\Title;
+use Livewire\Component;
+use Livewire\WithFileUploads;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 #[Title('OT & Transaction Entry')]
 class OTEntry extends Component
 {
-    use WithFileUploads, LogsActivity;
+    use LogsActivity, WithFileUploads;
 
     public $period;
+
     public $entries = [];
+
     public $isWithinWindow = false;
+
     public $hasSubmitted = false;
+
     public $submissionStatus = [];
 
     // Transaction management
     public $showTransactionModal = false;
+
     public $currentWorkerIndex = null;
+
     public $transactions = [];
+
     public $newTransactionCategory = 'deduction';
+
     public $newTransactionType = 'advance_payment';
+
     public $newTransactionAmount = '';
+
     public $newTransactionRemarks = '';
 
     // Import management
     public $showImportModal = false;
+
     public $importFile;
+
     public $importData = [];
+
     public $importErrors = [];
+
     public $showImportPreview = false;
 
     protected $otEntryService;
@@ -51,18 +64,21 @@ class OTEntry extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             Flux::toast(
                 variant: 'danger',
                 heading: 'Error',
                 text: 'No contractor CLAB number assigned to your account.'
             );
+
             return redirect()->route('dashboard');
         }
 
         // Get entry period information
         $this->period = $this->otEntryService->getEntryPeriod();
-        $this->isWithinWindow = $this->period['is_within_window'];
+
+        // Use contractor-specific window check instead of default
+        $this->isWithinWindow = $this->otEntryService->isContractorWindowOpen($clabNo);
 
         // Get or create entries for this contractor
         $this->loadEntries();
@@ -89,12 +105,12 @@ class OTEntry extends Component
                 'ot_public_hours' => $entry->ot_public_hours,
                 'status' => $entry->status,
                 'is_locked' => $entry->isLocked(),
-                'transactions' => $entry->transactions->map(function($txn) {
+                'transactions' => $entry->transactions->map(function ($txn) {
                     return [
                         'id' => $txn->id,
                         'type' => $txn->type,
                         'amount' => $txn->amount,
-                        'remarks' => $txn->remarks
+                        'remarks' => $txn->remarks,
                     ];
                 })->toArray(),
             ];
@@ -103,12 +119,16 @@ class OTEntry extends Component
 
     public function saveDraft()
     {
-        if (!$this->isWithinWindow) {
+        $clabNo = auth()->user()->contractor_clab_no;
+
+        // Re-check window status
+        if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
             Flux::toast(
                 variant: 'danger',
                 heading: 'Window Closed',
-                text: 'OT entry window is closed. Entries can only be made between 1st and 15th.'
+                text: 'OT entry window is closed for your contractor. Please contact administrator if you need to make changes.'
             );
+
             return;
         }
 
@@ -123,9 +143,9 @@ class OTEntry extends Component
 
                 // Validate OT hours
                 $this->validate([
-                    "entries.*.ot_normal_hours" => 'nullable|numeric|min:0|max:744',
-                    "entries.*.ot_rest_hours" => 'nullable|numeric|min:0|max:744',
-                    "entries.*.ot_public_hours" => 'nullable|numeric|min:0|max:744',
+                    'entries.*.ot_normal_hours' => 'nullable|numeric|min:0|max:744',
+                    'entries.*.ot_rest_hours' => 'nullable|numeric|min:0|max:744',
+                    'entries.*.ot_public_hours' => 'nullable|numeric|min:0|max:744',
                 ]);
 
                 // Save entry
@@ -164,7 +184,7 @@ class OTEntry extends Component
             // Log activity
             $this->logOTActivity(
                 action: 'saved_draft',
-                description: 'Saved OT entries as draft for ' . $this->period['entry_month_name'],
+                description: 'Saved OT entries as draft for '.$this->period['entry_month_name'],
                 properties: [
                     'entry_period' => $this->period['entry_month_name'],
                     'workers_count' => count($this->entries),
@@ -178,19 +198,23 @@ class OTEntry extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Error',
-                text: 'Failed to save OT entries: ' . $e->getMessage()
+                text: 'Failed to save OT entries: '.$e->getMessage()
             );
         }
     }
 
     public function submitEntries()
     {
-        if (!$this->isWithinWindow) {
+        $clabNo = auth()->user()->contractor_clab_no;
+
+        // Re-check window status
+        if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
             Flux::toast(
                 variant: 'danger',
                 heading: 'Window Closed',
-                text: 'OT entry window is closed. Entries can only be submitted between 1st and 15th.'
+                text: 'OT entry window is closed for your contractor. Please contact administrator if you need to make changes.'
             );
+
             return;
         }
 
@@ -211,7 +235,7 @@ class OTEntry extends Component
             // Log activity
             $this->logOTActivity(
                 action: 'submitted',
-                description: 'Submitted OT entries for ' . $this->period['entry_month_name'],
+                description: 'Submitted OT entries for '.$this->period['entry_month_name'],
                 properties: [
                     'entry_period' => $this->period['entry_month_name'],
                     'workers_count' => count($this->entries),
@@ -225,7 +249,7 @@ class OTEntry extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Error',
-                text: 'Failed to submit OT entries: ' . $e->getMessage()
+                text: 'Failed to submit OT entries: '.$e->getMessage()
             );
         }
     }
@@ -254,7 +278,7 @@ class OTEntry extends Component
         \Log::info('Modal state', [
             'showTransactionModal' => $this->showTransactionModal,
             'currentWorkerIndex' => $this->currentWorkerIndex,
-            'transactions_count' => count($this->transactions)
+            'transactions_count' => count($this->transactions),
         ]);
     }
 
@@ -382,7 +406,7 @@ class OTEntry extends Component
     // Import methods
     public function downloadTemplate()
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         // Set headers
@@ -394,7 +418,7 @@ class OTEntry extends Component
             'E1' => 'OT Public Hours',
             'F1' => 'Transaction Type',
             'G1' => 'Transaction Amount',
-            'H1' => 'Transaction Remarks'
+            'H1' => 'Transaction Remarks',
         ];
 
         foreach ($headers as $cell => $value) {
@@ -436,7 +460,7 @@ class OTEntry extends Component
 
         // Create file
         $writer = new Xlsx($spreadsheet);
-        $fileName = 'OT_Import_Template_' . date('Y-m-d') . '.xlsx';
+        $fileName = 'OT_Import_Template_'.date('Y-m-d').'.xlsx';
         $tempFile = tempnam(sys_get_temp_dir(), $fileName);
         $writer->save($tempFile);
 
@@ -464,7 +488,7 @@ class OTEntry extends Component
     public function processImport()
     {
         $this->validate([
-            'importFile' => 'required|mimes:xlsx,xls,csv|max:2048'
+            'importFile' => 'required|mimes:xlsx,xls,csv|max:2048',
         ]);
 
         try {
@@ -499,11 +523,13 @@ class OTEntry extends Component
                 // Validate required fields
                 if (empty($passport)) {
                     $this->importErrors[] = "Row {$rowNumber}: Passport is required";
+
                     continue;
                 }
 
                 if (empty($name)) {
                     $this->importErrors[] = "Row {$rowNumber}: Worker name is required";
+
                     continue;
                 }
 
@@ -516,25 +542,29 @@ class OTEntry extends Component
                     }
                 }
 
-                if (!$workerExists) {
+                if (! $workerExists) {
                     $this->importErrors[] = "Row {$rowNumber}: Worker with passport {$passport} not found in your worker list";
+
                     continue;
                 }
 
                 // Validate transaction type if provided
-                if (!empty($txnType)) {
-                    if (!in_array($txnType, ['advance_payment', 'deduction', 'npl', 'allowance'])) {
+                if (! empty($txnType)) {
+                    if (! in_array($txnType, ['advance_payment', 'deduction', 'npl', 'allowance'])) {
                         $this->importErrors[] = "Row {$rowNumber}: Invalid transaction type '{$txnType}'. Must be: advance_payment, deduction, npl, or allowance";
+
                         continue;
                     }
 
                     if (empty($txnAmount)) {
                         $this->importErrors[] = "Row {$rowNumber}: Transaction amount is required when transaction type is provided";
+
                         continue;
                     }
 
                     if (empty($txnRemarks)) {
                         $this->importErrors[] = "Row {$rowNumber}: Transaction remarks is required when transaction type is provided";
+
                         continue;
                     }
                 }
@@ -549,7 +579,7 @@ class OTEntry extends Component
                     'transaction_type' => $txnType ?: null,
                     'transaction_amount' => is_numeric($txnAmount) ? floatval($txnAmount) : null,
                     'transaction_remarks' => $txnRemarks ?: null,
-                    'row_number' => $rowNumber
+                    'row_number' => $rowNumber,
                 ];
             }
 
@@ -559,18 +589,19 @@ class OTEntry extends Component
                     heading: 'No Data',
                     text: 'No valid data found in the uploaded file.'
                 );
+
                 return;
             }
 
-            if (!empty($this->importData)) {
+            if (! empty($this->importData)) {
                 $this->showImportPreview = true;
             }
 
-            if (!empty($this->importErrors)) {
+            if (! empty($this->importErrors)) {
                 Flux::toast(
                     variant: 'warning',
                     heading: 'Import Warnings',
-                    text: count($this->importErrors) . ' errors found. Please review before proceeding.'
+                    text: count($this->importErrors).' errors found. Please review before proceeding.'
                 );
             }
 
@@ -578,7 +609,7 @@ class OTEntry extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Import Failed',
-                text: 'Failed to process file: ' . $e->getMessage()
+                text: 'Failed to process file: '.$e->getMessage()
             );
         }
     }
@@ -591,6 +622,7 @@ class OTEntry extends Component
                 heading: 'No Data',
                 text: 'No data to import.'
             );
+
             return;
         }
 
@@ -602,13 +634,13 @@ class OTEntry extends Component
             $groupedData = [];
             foreach ($this->importData as $item) {
                 $passport = $item['passport'];
-                if (!isset($groupedData[$passport])) {
+                if (! isset($groupedData[$passport])) {
                     $groupedData[$passport] = [
                         'name' => $item['name'],
                         'ot_normal' => $item['ot_normal'],
                         'ot_rest' => $item['ot_rest'],
                         'ot_public' => $item['ot_public'],
-                        'transactions' => []
+                        'transactions' => [],
                     ];
                 }
 
@@ -628,7 +660,7 @@ class OTEntry extends Component
                     $groupedData[$passport]['transactions'][] = [
                         'type' => $item['transaction_type'],
                         'amount' => $item['transaction_amount'],
-                        'remarks' => $item['transaction_remarks']
+                        'remarks' => $item['transaction_remarks'],
                     ];
                 }
             }
@@ -650,7 +682,7 @@ class OTEntry extends Component
                     }
 
                     // Add transactions
-                    if (!empty($data['transactions'])) {
+                    if (! empty($data['transactions'])) {
                         $entry['transactions'] = array_merge($entry['transactions'] ?? [], $data['transactions']);
                         $importedTransactions += count($data['transactions']);
                     }
@@ -667,7 +699,7 @@ class OTEntry extends Component
             // Log activity
             $this->logOTActivity(
                 action: 'bulk_import',
-                description: "Imported OT and transactions via file upload",
+                description: 'Imported OT and transactions via file upload',
                 properties: [
                     'entry_period' => $this->period['entry_month_name'],
                     'workers_count' => $importedWorkers,
@@ -685,7 +717,7 @@ class OTEntry extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Import Failed',
-                text: 'Failed to import data: ' . $e->getMessage()
+                text: 'Failed to import data: '.$e->getMessage()
             );
         }
     }

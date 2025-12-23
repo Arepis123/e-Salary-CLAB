@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 class TestContractWorker extends Command
 {
     protected $signature = 'test:contract-worker';
+
     protected $description = 'Test ContractWorker model and service';
 
     public function handle()
@@ -61,7 +62,7 @@ class TestContractWorker extends Command
             $this->info('Test 4: Service - Get Contract Statistics');
             $this->line(str_repeat('=', 80));
 
-            $service = new ContractWorkerService();
+            $service = new ContractWorkerService;
             $stats = $service->getContractStatistics();
 
             $this->table(
@@ -87,7 +88,7 @@ class TestContractWorker extends Command
             if ($contractors->count() > 0) {
                 $this->table(
                     ['CLAB Number', 'Company Name', 'Contact Person'],
-                    $contractors->map(fn($c) => [
+                    $contractors->map(fn ($c) => [
                         $c->ctr_clab_no,
                         $c->company_name,
                         $c->contact_person ?? 'N/A',
@@ -109,7 +110,7 @@ class TestContractWorker extends Command
                 if ($workers->count() > 0) {
                     $this->table(
                         ['Worker ID', 'Name', 'Passport', 'Contract Start', 'Contract End', 'Days Left'],
-                        $workers->map(fn($w) => [
+                        $workers->map(fn ($w) => [
                             $w->wkr_id,
                             $w->name,
                             $w->ic_number,
@@ -150,7 +151,7 @@ class TestContractWorker extends Command
             $this->info('✅ All tests completed successfully!');
 
         } catch (\Exception $e) {
-            $this->error('❌ Test failed: ' . $e->getMessage());
+            $this->error('❌ Test failed: '.$e->getMessage());
             $this->error($e->getTraceAsString());
         }
     }

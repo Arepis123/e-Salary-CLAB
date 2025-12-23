@@ -2,18 +2,18 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\User;
+use App\Models\ContractWorker;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
+use App\Models\User;
 use App\Models\Worker;
-use App\Models\ContractWorker;
-use Livewire\Component;
 use Livewire\Attributes\Url;
-use Illuminate\Support\Facades\DB;
+use Livewire\Component;
 
 class ContractorDetail extends Component
 {
     public $contractorClabNo;
+
     public $contractor;
 
     // Tabs
@@ -27,6 +27,7 @@ class ContractorDetail extends Component
     public $payrollPage = 1;
 
     public $workersPerPage = 10;
+
     public $payrollPerPage = 10;
 
     public function mount($clabNo)
@@ -43,9 +44,9 @@ class ContractorDetail extends Component
     public function getWorkersProperty()
     {
         // Get unique workers by grouping by passport number
-        $payrollWorkers = PayrollWorker::whereHas('payrollSubmission', function($query) {
-                $query->where('contractor_clab_no', $this->contractorClabNo);
-            })
+        $payrollWorkers = PayrollWorker::whereHas('payrollSubmission', function ($query) {
+            $query->where('contractor_clab_no', $this->contractorClabNo);
+        })
             ->with(['worker.country', 'worker.workTrade', 'payrollSubmission'])
             ->selectRaw('worker_id, worker_passport, worker_name, MAX(id) as latest_id, MAX(payroll_submission_id) as latest_submission_id')
             ->groupBy('worker_id', 'worker_passport', 'worker_name')
@@ -53,7 +54,7 @@ class ContractorDetail extends Component
             ->get();
 
         // Enrich with worker details from worker_db
-        $enrichedWorkers = $payrollWorkers->map(function($payrollWorker) {
+        $enrichedWorkers = $payrollWorkers->map(function ($payrollWorker) {
             $worker = $payrollWorker->worker;
 
             // Get the latest contract for this worker with this contractor
@@ -74,12 +75,12 @@ class ContractorDetail extends Component
 
             // Count total submissions for this worker
             $totalSubmissions = PayrollWorker::where('worker_passport', $payrollWorker->worker_passport)
-                ->whereHas('payrollSubmission', function($query) {
+                ->whereHas('payrollSubmission', function ($query) {
                     $query->where('contractor_clab_no', $this->contractorClabNo);
                 })
                 ->count();
 
-            return (object)[
+            return (object) [
                 'worker_passport' => $payrollWorker->worker_passport,
                 'worker_name' => $payrollWorker->worker_name,
                 'country' => $country,
@@ -125,7 +126,7 @@ class ContractorDetail extends Component
 
         return [
             'total_submissions' => $submissions->count(),
-            'total_workers' => PayrollWorker::whereHas('payrollSubmission', function($query) {
+            'total_workers' => PayrollWorker::whereHas('payrollSubmission', function ($query) {
                 $query->where('contractor_clab_no', $this->contractorClabNo);
             })->distinct('worker_passport')->count('worker_passport'),
             'total_paid' => $submissions->where('status', 'paid')->sum('grand_total'),

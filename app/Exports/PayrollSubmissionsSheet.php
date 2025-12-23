@@ -3,19 +3,19 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PayrollSubmissionsSheet implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
+class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected $submissions;
+
     protected $filters;
 
     public function __construct($submissions, $filters = [])
@@ -75,7 +75,7 @@ class PayrollSubmissionsSheet implements FromCollection, WithHeadings, WithMappi
         $rowNumber++;
 
         // Status mapping
-        $status = match($submission->status) {
+        $status = match ($submission->status) {
             'paid' => 'Completed',
             'pending_payment' => 'Pending Payment',
             'overdue' => 'Overdue',
@@ -90,9 +90,9 @@ class PayrollSubmissionsSheet implements FromCollection, WithHeadings, WithMappi
 
         return [
             $rowNumber,
-            'PAY' . str_pad($submission->id, 6, '0', STR_PAD_LEFT),
+            'PAY'.str_pad($submission->id, 6, '0', STR_PAD_LEFT),
             $submission->contractor_clab_no,
-            $submission->user ? $submission->user->name : 'Client ' . $submission->contractor_clab_no,
+            $submission->user ? $submission->user->name : 'Client '.$submission->contractor_clab_no,
             $submission->month_year,
             $submission->total_workers,
             $submission->total_amount,
@@ -136,7 +136,7 @@ class PayrollSubmissionsSheet implements FromCollection, WithHeadings, WithMappi
 
         // Format currency columns (G, H, I, J, K, L)
         $lastRow = $this->submissions->count() + 1;
-        $sheet->getStyle('G2:L' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('G2:L'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
 
         return [];
     }

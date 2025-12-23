@@ -3,17 +3,18 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidths, WithTitle
+class PayrollSummarySheet implements FromCollection, WithColumnWidths, WithStyles, WithTitle
 {
     protected $submissions;
+
     protected $filters;
 
     public function __construct($submissions, $filters = [])
@@ -44,20 +45,20 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
 
         // Applied Filters
         $filterInfo = [];
-        if (!empty($this->filters['search'])) {
-            $filterInfo[] = 'Search: ' . $this->filters['search'];
+        if (! empty($this->filters['search'])) {
+            $filterInfo[] = 'Search: '.$this->filters['search'];
         }
-        if (!empty($this->filters['contractor'])) {
-            $filterInfo[] = 'Contractor: ' . $this->filters['contractor'];
+        if (! empty($this->filters['contractor'])) {
+            $filterInfo[] = 'Contractor: '.$this->filters['contractor'];
         }
-        if (!empty($this->filters['status'])) {
-            $filterInfo[] = 'Status: ' . ucfirst($this->filters['status']);
+        if (! empty($this->filters['status'])) {
+            $filterInfo[] = 'Status: '.ucfirst($this->filters['status']);
         }
-        if (!empty($this->filters['payment_status'])) {
-            $filterInfo[] = 'Payment: ' . ucfirst($this->filters['payment_status']);
+        if (! empty($this->filters['payment_status'])) {
+            $filterInfo[] = 'Payment: '.ucfirst($this->filters['payment_status']);
         }
 
-        if (!empty($filterInfo)) {
+        if (! empty($filterInfo)) {
             $data->push(['Filters Applied:', implode(', ', $filterInfo)]);
             $data->push([]);
         }
@@ -68,11 +69,11 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
         $data->push(['Metric', 'Value']);
         $data->push(['Total Submissions', $this->submissions->count()]);
         $data->push(['Total Workers', $this->submissions->sum('total_workers')]);
-        $data->push(['Total Amount (before service & SST)', 'RM ' . number_format($this->submissions->sum('total_amount'), 2)]);
-        $data->push(['Total Service Charges', 'RM ' . number_format($this->submissions->sum('service_charge'), 2)]);
-        $data->push(['Total SST', 'RM ' . number_format($this->submissions->sum('sst'), 2)]);
-        $data->push(['Grand Total', 'RM ' . number_format($this->submissions->sum('grand_total'), 2)]);
-        $data->push(['Total Penalties', 'RM ' . number_format($this->submissions->sum('penalty_amount'), 2)]);
+        $data->push(['Total Amount (before service & SST)', 'RM '.number_format($this->submissions->sum('total_amount'), 2)]);
+        $data->push(['Total Service Charges', 'RM '.number_format($this->submissions->sum('service_charge'), 2)]);
+        $data->push(['Total SST', 'RM '.number_format($this->submissions->sum('sst'), 2)]);
+        $data->push(['Grand Total', 'RM '.number_format($this->submissions->sum('grand_total'), 2)]);
+        $data->push(['Total Penalties', 'RM '.number_format($this->submissions->sum('penalty_amount'), 2)]);
         $data->push([]);
 
         // Status Breakdown
@@ -85,9 +86,9 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
         $pending = $this->submissions->whereIn('status', ['pending_payment', 'overdue'])->count();
         $draft = $this->submissions->where('status', 'draft')->count();
 
-        $data->push(['Completed', $completed, $total > 0 ? round(($completed / $total) * 100, 1) . '%' : '0%']);
-        $data->push(['Pending Payment', $pending, $total > 0 ? round(($pending / $total) * 100, 1) . '%' : '0%']);
-        $data->push(['Draft', $draft, $total > 0 ? round(($draft / $total) * 100, 1) . '%' : '0%']);
+        $data->push(['Completed', $completed, $total > 0 ? round(($completed / $total) * 100, 1).'%' : '0%']);
+        $data->push(['Pending Payment', $pending, $total > 0 ? round(($pending / $total) * 100, 1).'%' : '0%']);
+        $data->push(['Draft', $draft, $total > 0 ? round(($draft / $total) * 100, 1).'%' : '0%']);
         $data->push([]);
 
         // Payment Status Breakdown
@@ -95,13 +96,13 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
         $data->push([]);
         $data->push(['Payment Status', 'Count', 'Percentage']);
 
-        $paidCount = $this->submissions->filter(function($s) {
+        $paidCount = $this->submissions->filter(function ($s) {
             return $s->payment && $s->payment->status === 'completed';
         })->count();
         $awaitingCount = $total - $paidCount;
 
-        $data->push(['Paid', $paidCount, $total > 0 ? round(($paidCount / $total) * 100, 1) . '%' : '0%']);
-        $data->push(['Awaiting Payment', $awaitingCount, $total > 0 ? round(($awaitingCount / $total) * 100, 1) . '%' : '0%']);
+        $data->push(['Paid', $paidCount, $total > 0 ? round(($paidCount / $total) * 100, 1).'%' : '0%']);
+        $data->push(['Awaiting Payment', $awaitingCount, $total > 0 ? round(($awaitingCount / $total) * 100, 1).'%' : '0%']);
 
         return $data;
     }
@@ -123,14 +124,14 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
         // Section headers styling
         $sectionRows = [];
         foreach ($sheet->getRowIterator() as $row) {
-            $cellValue = $sheet->getCell('A' . $row->getRowIndex())->getValue();
+            $cellValue = $sheet->getCell('A'.$row->getRowIndex())->getValue();
             if (in_array($cellValue, ['OVERALL SUMMARY', 'STATUS BREAKDOWN', 'PAYMENT STATUS BREAKDOWN'])) {
                 $sectionRows[] = $row->getRowIndex();
             }
         }
 
         foreach ($sectionRows as $rowIndex) {
-            $sheet->getStyle('A' . $rowIndex)->applyFromArray([
+            $sheet->getStyle('A'.$rowIndex)->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'size' => 14,
@@ -144,15 +145,15 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
                     'horizontal' => Alignment::HORIZONTAL_LEFT,
                 ],
             ]);
-            $sheet->mergeCells('A' . $rowIndex . ':C' . $rowIndex);
+            $sheet->mergeCells('A'.$rowIndex.':C'.$rowIndex);
             $sheet->getRowDimension($rowIndex)->setRowHeight(25);
         }
 
         // Table headers styling (rows with "Metric", "Status", "Payment Status")
         foreach ($sheet->getRowIterator() as $row) {
-            $cellValue = $sheet->getCell('A' . $row->getRowIndex())->getValue();
+            $cellValue = $sheet->getCell('A'.$row->getRowIndex())->getValue();
             if (in_array($cellValue, ['Metric', 'Status', 'Payment Status'])) {
-                $sheet->getStyle('A' . $row->getRowIndex() . ':C' . $row->getRowIndex())->applyFromArray([
+                $sheet->getStyle('A'.$row->getRowIndex().':C'.$row->getRowIndex())->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'size' => 11,
@@ -173,7 +174,7 @@ class PayrollSummarySheet implements FromCollection, WithStyles, WithColumnWidth
 
         // Apply borders to data tables
         $maxRow = $sheet->getHighestRow();
-        $sheet->getStyle('A1:C' . $maxRow)->applyFromArray([
+        $sheet->getStyle('A1:C'.$maxRow)->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,

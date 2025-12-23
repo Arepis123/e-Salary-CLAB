@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
-use App\Models\PayrollSubmission;
 use App\Models\PayrollPayment;
+use App\Models\PayrollSubmission;
 use App\Services\BillplzService;
 use App\Traits\LogsActivity;
 use Illuminate\Http\Request;
@@ -42,7 +42,7 @@ class PaymentController extends Controller
         }
 
         // Block payment if not approved by admin
-        if (!$submission->canCreatePayment()) {
+        if (! $submission->canCreatePayment()) {
             return redirect()->route('timesheet')
                 ->with('error', 'This submission must be approved by admin before payment can be created.');
         }
@@ -103,6 +103,7 @@ class PaymentController extends Controller
             );
 
             $url = $this->billplzService->getDirectPaymentUrl($recentPendingPayment->billplz_url);
+
             return redirect($url);
         }
 
@@ -157,7 +158,7 @@ class PaymentController extends Controller
             $totalAmount += $penalty;
 
             // Update the submission with penalty info if not already set
-            if (!$submission->has_penalty) {
+            if (! $submission->has_penalty) {
                 $submission->update([
                     'has_penalty' => true,
                     'penalty_amount' => $penalty,
@@ -181,7 +182,7 @@ class PaymentController extends Controller
         // Attempt to create Billplz bill
         $bill = $this->billplzService->createBill($billData);
 
-        if (!$bill) {
+        if (! $bill) {
             // Log the failure
             Log::error('Failed to create Billplz bill', [
                 'submission_id' => $submission->id,
@@ -228,7 +229,7 @@ class PaymentController extends Controller
         // Log activity
         $this->logPaymentActivity(
             action: 'initiated',
-            description: "Initiated payment of RM " . number_format($totalAmount, 2) . " for payroll {$submission->month_year}",
+            description: 'Initiated payment of RM '.number_format($totalAmount, 2)." for payroll {$submission->month_year}",
             payment: $payment,
             properties: [
                 'submission_id' => $submission->id,
@@ -256,7 +257,7 @@ class PaymentController extends Controller
         $billplzId = $request->input('id');
         $xSignature = $request->header('X-Signature');
 
-        if (!$this->billplzService->validateSignature($billplzId, $xSignature)) {
+        if (! $this->billplzService->validateSignature($billplzId, $xSignature)) {
             Log::warning('Billplz callback signature validation failed', [
                 'bill_id' => $billplzId,
                 'x_signature' => $xSignature,
@@ -268,7 +269,7 @@ class PaymentController extends Controller
         // Find payment by billplz_bill_id
         $payment = PayrollPayment::where('billplz_bill_id', $billplzId)->first();
 
-        if (!$payment) {
+        if (! $payment) {
             Log::error('Payment not found for Billplz callback', [
                 'bill_id' => $billplzId,
             ]);
@@ -298,8 +299,8 @@ class PaymentController extends Controller
         // NOTE: This list should be updated based on actual Billplz responses
         // Common B2B bank codes in Malaysia FPX system:
         $b2bBankCodes = ['ABB0234', 'ABMB0213', 'AGRO01', 'BIMB0340', 'BKRM0602', 'BMMB0342',
-                         'BSN0601', 'CIT0219', 'HLB0224', 'HSBC0223', 'KFH0346', 'MB2U0227',
-                         'MBB0228', 'OCBC0229', 'PBB0233', 'RHB0218', 'SCB0216', 'UOB0226'];
+            'BSN0601', 'CIT0219', 'HLB0224', 'HSBC0223', 'KFH0346', 'MB2U0227',
+            'MBB0228', 'OCBC0229', 'PBB0233', 'RHB0218', 'SCB0216', 'UOB0226'];
 
         // If no bank_code provided or empty, default to B2C (most common for individuals)
         $paymentType = $bankCode && in_array($bankCode, $b2bBankCodes) ? 'B2B' : 'B2C';
@@ -336,11 +337,11 @@ class PaymentController extends Controller
             ActivityLog::create([
                 'user_id' => $submission->user_id ?? null,
                 'contractor_clab_no' => $submission->contractor_clab_no,
-                'user_name' => $submission->user ? ($submission->user->name ?? $submission->user->company_name) : 'Client ' . $submission->contractor_clab_no,
+                'user_name' => $submission->user ? ($submission->user->name ?? $submission->user->company_name) : 'Client '.$submission->contractor_clab_no,
                 'user_email' => $submission->user?->email,
                 'module' => 'payment',
                 'action' => 'completed',
-                'description' => "Payment of RM " . number_format($amount, 2) . " completed for payroll {$submission->month_year} via {$paymentType} ({$bankName})",
+                'description' => 'Payment of RM '.number_format($amount, 2)." completed for payroll {$submission->month_year} via {$paymentType} ({$bankName})",
                 'subject_type' => get_class($payment),
                 'subject_id' => $payment->id,
                 'properties' => [
@@ -381,7 +382,7 @@ class PaymentController extends Controller
             ActivityLog::create([
                 'user_id' => $submission->user_id ?? null,
                 'contractor_clab_no' => $submission->contractor_clab_no,
-                'user_name' => $submission->user ? ($submission->user->name ?? $submission->user->company_name) : 'Client ' . $submission->contractor_clab_no,
+                'user_name' => $submission->user ? ($submission->user->name ?? $submission->user->company_name) : 'Client '.$submission->contractor_clab_no,
                 'user_email' => $submission->user?->email,
                 'module' => 'payment',
                 'action' => 'failed',
@@ -427,14 +428,14 @@ class PaymentController extends Controller
         }
 
         // Check if user is authenticated
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             // User session expired, show guest views without requiring login
             if ($submission->payment && $submission->payment->status === 'completed') {
                 return view('client.payment-success-guest', compact('submission'));
             } elseif ($submission->payment && $submission->payment->status === 'failed') {
                 return redirect()->route('login')
                     ->with('error', 'Payment failed. Please login to try again.');
-            } elseif ($submission->payment && $submission->payment->status === 'pending' && !$billPaid) {
+            } elseif ($submission->payment && $submission->payment->status === 'pending' && ! $billPaid) {
                 // User returned without paying (cancelled)
                 return redirect()->route('login')
                     ->with('warning', 'Payment was not completed. Please login to try again.');
@@ -449,7 +450,7 @@ class PaymentController extends Controller
             return view('client.payment-success', compact('submission'));
         } elseif ($submission->payment && $submission->payment->status === 'failed') {
             return view('client.payment-failed', compact('submission'));
-        } elseif ($submission->payment && $submission->payment->status === 'pending' && !$billPaid) {
+        } elseif ($submission->payment && $submission->payment->status === 'pending' && ! $billPaid) {
             // User returned without completing payment (cancelled/abandoned)
             // Log this abandonment for admin visibility
             Log::info('Client abandoned payment without completing', [

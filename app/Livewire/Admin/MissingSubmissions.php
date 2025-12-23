@@ -2,13 +2,13 @@
 
 namespace App\Livewire\Admin;
 
+use App\Mail\PayrollReminderMail;
+use App\Models\Contractor;
+use App\Models\ContractWorker;
+use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
-use App\Models\PayrollReminder;
 use App\Models\User;
-use App\Models\ContractWorker;
-use App\Models\Contractor;
-use App\Mail\PayrollReminderMail;
 use Flux\Flux;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Response;
@@ -17,19 +17,27 @@ use Livewire\Component;
 class MissingSubmissions extends Component
 {
     public $missingContractors = [];
+
     public $showRemindModal = false;
+
     public $selectedContractor = null;
+
     public $reminderMessage = '';
+
     public $pastReminders;
 
     // Filter properties
     public $selectedMonth;
+
     public $selectedYear;
+
     public $availableMonths = [];
+
     public $availableYears = [];
 
     // Historical tracking
     public $historicalSummary = [];
+
     public $showHistoricalSummary = true;
 
     public function mount()
@@ -49,7 +57,7 @@ class MissingSubmissions extends Component
 
     public function toggleHistoricalSummary()
     {
-        $this->showHistoricalSummary = !$this->showHistoricalSummary;
+        $this->showHistoricalSummary = ! $this->showHistoricalSummary;
     }
 
     public function refresh()
@@ -71,20 +79,20 @@ class MissingSubmissions extends Component
             Flux::toast(
                 variant: 'success',
                 heading: 'Data refreshed',
-                text: "{$difference} " . \Illuminate\Support\Str::plural('contractor', $difference) . " submitted since last refresh!"
+                text: "{$difference} ".\Illuminate\Support\Str::plural('contractor', $difference).' submitted since last refresh!'
             );
         } elseif ($newCount > $previousCount) {
             $difference = $newCount - $previousCount;
             Flux::toast(
                 variant: 'warning',
                 heading: 'Data refreshed',
-                text: "{$difference} new " . \Illuminate\Support\Str::plural('contractor', $difference) . " with missing submissions."
+                text: "{$difference} new ".\Illuminate\Support\Str::plural('contractor', $difference).' with missing submissions.'
             );
         } else {
             Flux::toast(
                 variant: 'info',
                 heading: 'Data refreshed',
-                text: 'No changes. Still ' . $newCount . ' ' . \Illuminate\Support\Str::plural('contractor', $newCount) . ' with missing submissions.'
+                text: 'No changes. Still '.$newCount.' '.\Illuminate\Support\Str::plural('contractor', $newCount).' with missing submissions.'
             );
         }
     }
@@ -143,6 +151,7 @@ class MissingSubmissions extends Component
                 heading: 'No data to export',
                 text: 'There are no missing submissions for the current period.'
             );
+
             return;
         }
 
@@ -162,7 +171,7 @@ class MissingSubmissions extends Component
             echo $csvContent;
         }, $filename, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -175,6 +184,7 @@ class MissingSubmissions extends Component
                 heading: 'No data to export',
                 text: 'There are no contractors with multiple missing periods to export.'
             );
+
             return;
         }
 
@@ -192,7 +202,7 @@ class MissingSubmissions extends Component
             echo $csvContent;
         }, $filename, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -205,6 +215,7 @@ class MissingSubmissions extends Component
                 heading: 'No data to export',
                 text: 'There are no missing submissions for the current period.'
             );
+
             return;
         }
 
@@ -224,7 +235,7 @@ class MissingSubmissions extends Component
             echo $csvContent;
         }, $filename, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -235,37 +246,37 @@ class MissingSubmissions extends Component
         // CSV Header
         $csv = "Missing Payroll Submissions & Payments Report\n";
         $csv .= "Period: {$periodLabel}\n";
-        $csv .= "Generated: " . now()->format('d M Y, h:i A') . "\n\n";
+        $csv .= 'Generated: '.now()->format('d M Y, h:i A')."\n\n";
 
         // Column headers
         $csv .= "No,CLAB No,Contractor Name,Email,Phone,Workers With Issues,Not Submitted,Not Paid,Total Workers,Workers Completed,Reminders Sent,Status\n";
 
         // Data rows
         foreach ($this->missingContractors as $index => $contractor) {
-            $csv .= ($index + 1) . ',';
-            $csv .= '"' . $contractor['clab_no'] . '",';
-            $csv .= '"' . str_replace('"', '""', $contractor['name']) . '",';
-            $csv .= '"' . ($contractor['email'] ?? 'N/A') . '",';
-            $csv .= '"' . ($contractor['phone'] ?? 'N/A') . '",';
-            $csv .= $contractor['active_workers'] . ',';
-            $csv .= $contractor['not_submitted'] . ',';
-            $csv .= $contractor['submitted_not_paid'] . ',';
-            $csv .= $contractor['total_workers'] . ',';
-            $csv .= ($contractor['total_workers'] - $contractor['active_workers']) . ',';
-            $csv .= $contractor['reminders_sent'] . ',';
+            $csv .= ($index + 1).',';
+            $csv .= '"'.$contractor['clab_no'].'",';
+            $csv .= '"'.str_replace('"', '""', $contractor['name']).'",';
+            $csv .= '"'.($contractor['email'] ?? 'N/A').'",';
+            $csv .= '"'.($contractor['phone'] ?? 'N/A').'",';
+            $csv .= $contractor['active_workers'].',';
+            $csv .= $contractor['not_submitted'].',';
+            $csv .= $contractor['submitted_not_paid'].',';
+            $csv .= $contractor['total_workers'].',';
+            $csv .= ($contractor['total_workers'] - $contractor['active_workers']).',';
+            $csv .= $contractor['reminders_sent'].',';
             $csv .= $contractor['reminders_sent'] > 0 ? 'Reminded' : 'Not Reminded';
             $csv .= "\n";
         }
 
         // Summary
         $csv .= "\nSummary\n";
-        $csv .= "Total Contractors With Issues," . $this->missingContractors->count() . "\n";
-        $csv .= "Total Workers With Issues," . $this->missingContractors->sum('active_workers') . "\n";
-        $csv .= "Total Workers Not Submitted," . $this->missingContractors->sum('not_submitted') . "\n";
-        $csv .= "Total Workers Not Paid," . $this->missingContractors->sum('submitted_not_paid') . "\n";
-        $csv .= "Total Workers Completed," . $this->missingContractors->sum(function ($c) {
+        $csv .= 'Total Contractors With Issues,'.$this->missingContractors->count()."\n";
+        $csv .= 'Total Workers With Issues,'.$this->missingContractors->sum('active_workers')."\n";
+        $csv .= 'Total Workers Not Submitted,'.$this->missingContractors->sum('not_submitted')."\n";
+        $csv .= 'Total Workers Not Paid,'.$this->missingContractors->sum('submitted_not_paid')."\n";
+        $csv .= 'Total Workers Completed,'.$this->missingContractors->sum(function ($c) {
             return $c['total_workers'] - $c['active_workers'];
-        }) . "\n";
+        })."\n";
 
         return $csv;
     }
@@ -277,7 +288,7 @@ class MissingSubmissions extends Component
         // CSV Header
         $csv = "Detailed Submissions & Payments Report\n";
         $csv .= "Period: {$periodLabel}\n";
-        $csv .= "Generated: " . now()->format('d M Y, h:i A') . "\n\n";
+        $csv .= 'Generated: '.now()->format('d M Y, h:i A')."\n\n";
 
         // Single table header
         $csv .= "No,CLAB No,Contractor Name,Contractor Email,Contractor Phone,Worker ID,Worker Name,Passport No,Status,Issue Type\n";
@@ -295,16 +306,16 @@ class MissingSubmissions extends Component
 
             if ($workerDetails->isNotEmpty()) {
                 foreach ($workerDetails as $worker) {
-                    $csv .= $rowNumber . ',';
-                    $csv .= '"' . $contractor['clab_no'] . '",';
-                    $csv .= '"' . str_replace('"', '""', $contractor['name']) . '",';
-                    $csv .= '"' . ($contractor['email'] ?? 'N/A') . '",';
-                    $csv .= '"' . ($contractor['phone'] ?? 'N/A') . '",';
-                    $csv .= '"' . $worker['worker_id'] . '",';
-                    $csv .= '"' . str_replace('"', '""', $worker['name']) . '",';
-                    $csv .= '"' . ($worker['passport'] ?? 'N/A') . '",';
-                    $csv .= '"' . $worker['status'] . '",';
-                    $csv .= '"' . $worker['issue_type'] . '"';
+                    $csv .= $rowNumber.',';
+                    $csv .= '"'.$contractor['clab_no'].'",';
+                    $csv .= '"'.str_replace('"', '""', $contractor['name']).'",';
+                    $csv .= '"'.($contractor['email'] ?? 'N/A').'",';
+                    $csv .= '"'.($contractor['phone'] ?? 'N/A').'",';
+                    $csv .= '"'.$worker['worker_id'].'",';
+                    $csv .= '"'.str_replace('"', '""', $worker['name']).'",';
+                    $csv .= '"'.($worker['passport'] ?? 'N/A').'",';
+                    $csv .= '"'.$worker['status'].'",';
+                    $csv .= '"'.$worker['issue_type'].'"';
                     $csv .= "\n";
                     $rowNumber++;
                 }
@@ -315,10 +326,10 @@ class MissingSubmissions extends Component
         $csv .= "\n";
         $csv .= "SUMMARY\n";
         $csv .= "Period,{$periodLabel}\n";
-        $csv .= "Total Contractors With Issues," . $this->missingContractors->count() . "\n";
-        $csv .= "Total Workers With Issues," . $this->missingContractors->sum('active_workers') . "\n";
-        $csv .= "Total Workers Not Submitted," . $this->missingContractors->sum('not_submitted') . "\n";
-        $csv .= "Total Workers Not Paid," . $this->missingContractors->sum('submitted_not_paid') . "\n";
+        $csv .= 'Total Contractors With Issues,'.$this->missingContractors->count()."\n";
+        $csv .= 'Total Workers With Issues,'.$this->missingContractors->sum('active_workers')."\n";
+        $csv .= 'Total Workers Not Submitted,'.$this->missingContractors->sum('not_submitted')."\n";
+        $csv .= 'Total Workers Not Paid,'.$this->missingContractors->sum('submitted_not_paid')."\n";
 
         return $csv;
     }
@@ -331,7 +342,7 @@ class MissingSubmissions extends Component
         // CSV Header
         $csv = "Detailed Missing Submissions & Payments Report (Historical)\n";
         $csv .= "Period Range: {$startDate->format('F Y')} - {$endDate->format('F Y')}\n";
-        $csv .= "Generated: " . now()->format('d M Y, h:i A') . "\n\n";
+        $csv .= 'Generated: '.now()->format('d M Y, h:i A')."\n\n";
 
         // Single table header
         $csv .= "No,Period,CLAB No,Contractor Name,Contractor Email,Missing Months Count,Worker ID,Worker Name,Passport No,Status,Issue Type\n";
@@ -351,17 +362,17 @@ class MissingSubmissions extends Component
 
                 if ($workerDetails->isNotEmpty()) {
                     foreach ($workerDetails as $worker) {
-                        $csv .= $rowNumber . ',';
-                        $csv .= '"' . $period['label'] . '",';
-                        $csv .= '"' . $contractor['clab_no'] . '",';
-                        $csv .= '"' . str_replace('"', '""', $contractor['name']) . '",';
-                        $csv .= '"' . ($contractor['email'] ?? 'N/A') . '",';
-                        $csv .= $contractor['missing_count'] . ',';
-                        $csv .= '"' . $worker['worker_id'] . '",';
-                        $csv .= '"' . str_replace('"', '""', $worker['name']) . '",';
-                        $csv .= '"' . ($worker['passport'] ?? 'N/A') . '",';
-                        $csv .= '"' . $worker['status'] . '",';
-                        $csv .= '"' . $worker['issue_type'] . '"';
+                        $csv .= $rowNumber.',';
+                        $csv .= '"'.$period['label'].'",';
+                        $csv .= '"'.$contractor['clab_no'].'",';
+                        $csv .= '"'.str_replace('"', '""', $contractor['name']).'",';
+                        $csv .= '"'.($contractor['email'] ?? 'N/A').'",';
+                        $csv .= $contractor['missing_count'].',';
+                        $csv .= '"'.$worker['worker_id'].'",';
+                        $csv .= '"'.str_replace('"', '""', $worker['name']).'",';
+                        $csv .= '"'.($worker['passport'] ?? 'N/A').'",';
+                        $csv .= '"'.$worker['status'].'",';
+                        $csv .= '"'.$worker['issue_type'].'"';
                         $csv .= "\n";
                         $rowNumber++;
                     }
@@ -373,8 +384,8 @@ class MissingSubmissions extends Component
         $csv .= "\n";
         $csv .= "SUMMARY\n";
         $csv .= "Period Range,{$startDate->format('F Y')} - {$endDate->format('F Y')}\n";
-        $csv .= "Total Contractors with Repeat Issues," . count($this->historicalSummary) . "\n";
-        $csv .= "Total Records," . ($rowNumber - 1) . "\n";
+        $csv .= 'Total Contractors with Repeat Issues,'.count($this->historicalSummary)."\n";
+        $csv .= 'Total Records,'.($rowNumber - 1)."\n";
 
         return $csv;
     }
@@ -392,9 +403,9 @@ class MissingSubmissions extends Component
         foreach ($activeWorkers as $contractWorker) {
             // Check if worker was submitted and paid for this period
             $payrollWorker = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($month, $year) {
-                    $query->where('month', $month)
-                          ->where('year', $year);
-                })
+                $query->where('month', $month)
+                    ->where('year', $year);
+            })
                 ->where('worker_id', $contractWorker->con_wkr_id)
                 ->with('payrollSubmission')
                 ->first();
@@ -403,7 +414,7 @@ class MissingSubmissions extends Component
             $workerName = $contractWorker->worker ? $contractWorker->worker->wkr_name : 'Unknown';
             $workerPassport = $contractWorker->worker ? $contractWorker->worker->wkr_passno : ($contractWorker->con_wkr_passno ?? 'N/A');
 
-            if (!$payrollWorker) {
+            if (! $payrollWorker) {
                 // Not submitted at all
                 $result->push([
                     'worker_id' => $contractWorker->con_wkr_id,
@@ -430,14 +441,16 @@ class MissingSubmissions extends Component
     public function sendReminder()
     {
         // Validate
-        if (!$this->selectedContractor || empty($this->reminderMessage)) {
+        if (! $this->selectedContractor || empty($this->reminderMessage)) {
             Flux::toast(variant: 'danger', text: 'Cannot send reminder without a message.');
+
             return;
         }
 
         // Validate email exists
         if (empty($this->selectedContractor['email'])) {
             Flux::toast(variant: 'danger', text: 'Cannot send reminder: No email address found for this contractor.');
+
             return;
         }
 
@@ -540,19 +553,19 @@ class MissingSubmissions extends Component
 
         // Get submitted AND paid worker IDs for current month
         $submittedAndPaidWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($currentMonth, $currentYear) {
-                $query->where('month', $currentMonth)
-                      ->where('year', $currentYear)
-                      ->where('status', 'paid'); // Only count as complete if paid
-            })
+            $query->where('month', $currentMonth)
+                ->where('year', $currentYear)
+                ->where('status', 'paid'); // Only count as complete if paid
+        })
             ->pluck('worker_id')
             ->unique();
 
         // Get submitted but NOT paid worker IDs for current month
         $submittedButUnpaidWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($currentMonth, $currentYear) {
-                $query->where('month', $currentMonth)
-                      ->where('year', $currentYear)
-                      ->where('status', '!=', 'paid'); // Submitted but not paid
-            })
+            $query->where('month', $currentMonth)
+                ->where('year', $currentYear)
+                ->where('status', '!=', 'paid'); // Submitted but not paid
+        })
             ->pluck('worker_id')
             ->unique();
 
@@ -578,8 +591,8 @@ class MissingSubmissions extends Component
 
             // Count workers not submitted at all
             $notSubmitted = $activeWorkerIds->diff($submittedAndPaidWorkerIds)
-                                           ->diff($submittedButUnpaidWorkerIds)
-                                           ->count();
+                ->diff($submittedButUnpaidWorkerIds)
+                ->count();
 
             // Count workers submitted but not paid
             $submittedNotPaid = $activeWorkerIds->intersect($submittedButUnpaidWorkerIds)->count();
@@ -598,6 +611,7 @@ class MissingSubmissions extends Component
 
         if ($contractorIssues->isEmpty()) {
             $this->missingContractors = collect();
+
             return;
         }
 
@@ -632,7 +646,7 @@ class MissingSubmissions extends Component
                 'clab_no' => $clabNo,
                 'name' => $user
                     ? ($user->company_name ?? $user->name)
-                    : ($contractor ? $contractor->ctr_comp_name : 'Contractor ' . $clabNo),
+                    : ($contractor ? $contractor->ctr_comp_name : 'Contractor '.$clabNo),
                 'email' => $user
                     ? $user->email
                     : ($contractor ? $contractor->ctr_email : null),
@@ -668,6 +682,7 @@ class MissingSubmissions extends Component
 
         if ($allContractors->isEmpty()) {
             $this->historicalSummary = [];
+
             return;
         }
 
@@ -695,6 +710,7 @@ class MissingSubmissions extends Component
                 // Skip the current month (ongoing period)
                 if ($month === $currentMonth && $year === $currentYear) {
                     $currentPeriod->addMonth();
+
                     continue;
                 }
 
@@ -706,10 +722,10 @@ class MissingSubmissions extends Component
                 if ($activeWorkerIds->isNotEmpty()) {
                     // Check workers that were submitted AND paid
                     $submittedAndPaidWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($month, $year) {
-                            $query->where('month', $month)
-                                  ->where('year', $year)
-                                  ->where('status', 'paid'); // Only count if paid
-                        })
+                        $query->where('month', $month)
+                            ->where('year', $year)
+                            ->where('status', 'paid'); // Only count if paid
+                    })
                         ->whereIn('worker_id', $activeWorkerIds)
                         ->pluck('worker_id')
                         ->unique();
@@ -718,17 +734,17 @@ class MissingSubmissions extends Component
                     if ($submittedAndPaidWorkerIds->count() < $activeWorkerIds->count()) {
                         // Count workers submitted but not paid
                         $submittedButUnpaidWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($month, $year) {
-                                $query->where('month', $month)
-                                      ->where('year', $year)
-                                      ->where('status', '!=', 'paid');
-                            })
+                            $query->where('month', $month)
+                                ->where('year', $year)
+                                ->where('status', '!=', 'paid');
+                        })
                             ->whereIn('worker_id', $activeWorkerIds)
                             ->pluck('worker_id')
                             ->unique();
 
                         $notSubmittedCount = $activeWorkerIds->diff($submittedAndPaidWorkerIds)
-                                                             ->diff($submittedButUnpaidWorkerIds)
-                                                             ->count();
+                            ->diff($submittedButUnpaidWorkerIds)
+                            ->count();
                         $notPaidCount = $submittedButUnpaidWorkerIds->count();
 
                         $missingMonths[] = [
@@ -755,7 +771,7 @@ class MissingSubmissions extends Component
                     'clab_no' => $clabNo,
                     'name' => $user
                         ? ($user->company_name ?? $user->name)
-                        : ($contractor ? $contractor->ctr_comp_name : 'Contractor ' . $clabNo),
+                        : ($contractor ? $contractor->ctr_comp_name : 'Contractor '.$clabNo),
                     'email' => $user
                         ? $user->email
                         : ($contractor ? $contractor->ctr_email : null),

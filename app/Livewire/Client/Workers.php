@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Client;
 
-use App\Services\ContractWorkerService;
 use App\Exports\WorkersExport;
-use Maatwebsite\Excel\Facades\Excel;
-use Livewire\Component;
+use App\Services\ContractWorkerService;
 use Livewire\Attributes\Url;
+use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class Workers extends Component
 {
@@ -96,7 +96,7 @@ class Workers extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no ?? auth()->user()->username;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             return;
         }
 
@@ -105,7 +105,7 @@ class Workers extends Component
 
         // Apply the same filters as in render()
         if ($this->search) {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 return str_contains(strtolower($worker->name), strtolower($this->search)) ||
                        str_contains(strtolower($worker->ic_number), strtolower($this->search)) ||
                        str_contains(strtolower($worker->wkr_id), strtolower($this->search));
@@ -113,45 +113,46 @@ class Workers extends Component
         }
 
         if ($this->status && $this->status !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 if ($this->status === 'active') {
                     return $worker->contract_info && $worker->contract_info->isActive();
                 } elseif ($this->status === 'inactive') {
-                    return !$worker->contract_info || !$worker->contract_info->isActive();
+                    return ! $worker->contract_info || ! $worker->contract_info->isActive();
                 }
+
                 return true;
             });
         }
 
         if ($this->country && $this->country !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 return $worker->country && $worker->country->cty_code === $this->country;
             });
         }
 
         if ($this->position && $this->position !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 return $worker->workTrade && $worker->workTrade->trade_code === $this->position;
             });
         }
 
         if ($this->expiryStatus && $this->expiryStatus !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 $passportExpired = $worker->wkr_passexp && $worker->wkr_passexp->isPast();
                 $passportExpiringSoon = $worker->wkr_passexp && $worker->wkr_passexp->isFuture() && now()->diffInDays($worker->wkr_passexp, false) <= 60;
                 $permitExpired = $worker->wkr_permitexp && $worker->wkr_permitexp->isPast();
                 $permitExpiringSoon = $worker->wkr_permitexp && $worker->wkr_permitexp->isFuture() && now()->diffInDays($worker->wkr_permitexp, false) <= 30;
 
-                return match($this->expiryStatus) {
+                return match ($this->expiryStatus) {
                     'expired' => $passportExpired || $permitExpired,
-                    'expiring_soon' => ($passportExpiringSoon || $permitExpiringSoon) && !$passportExpired && !$permitExpired,
-                    'valid' => !$passportExpired && !$permitExpired && !$passportExpiringSoon && !$permitExpiringSoon,
+                    'expiring_soon' => ($passportExpiringSoon || $permitExpiringSoon) && ! $passportExpired && ! $permitExpired,
+                    'valid' => ! $passportExpired && ! $permitExpired && ! $passportExpiringSoon && ! $permitExpiringSoon,
                     default => true,
                 };
             });
         }
 
-        $fileName = 'workers_' . now()->format('Y-m-d_His') . '.xlsx';
+        $fileName = 'workers_'.now()->format('Y-m-d_His').'.xlsx';
 
         return Excel::download(new WorkersExport($allWorkers), $fileName);
     }
@@ -160,7 +161,7 @@ class Workers extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no ?? auth()->user()->username;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('livewire.client.workers', [
                 'workers' => collect([]),
                 'stats' => [
@@ -191,7 +192,7 @@ class Workers extends Component
 
         // Apply search filter
         if ($this->search) {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 return str_contains(strtolower($worker->name), strtolower($this->search)) ||
                        str_contains(strtolower($worker->ic_number), strtolower($this->search)) ||
                        str_contains(strtolower($worker->wkr_id), strtolower($this->search));
@@ -200,50 +201,51 @@ class Workers extends Component
 
         // Apply status filter
         if ($this->status && $this->status !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 if ($this->status === 'active') {
                     return $worker->contract_info && $worker->contract_info->isActive();
                 } elseif ($this->status === 'inactive') {
-                    return !$worker->contract_info || !$worker->contract_info->isActive();
+                    return ! $worker->contract_info || ! $worker->contract_info->isActive();
                 }
+
                 return true;
             });
         }
 
         // Apply country filter
         if ($this->country && $this->country !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 return $worker->country && $worker->country->cty_code === $this->country;
             });
         }
 
         // Apply position filter
         if ($this->position && $this->position !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 return $worker->workTrade && $worker->workTrade->trade_code === $this->position;
             });
         }
 
         // Apply expiry status filter
         if ($this->expiryStatus && $this->expiryStatus !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) {
                 $passportExpired = $worker->wkr_passexp && $worker->wkr_passexp->isPast();
                 $passportExpiringSoon = $worker->wkr_passexp && $worker->wkr_passexp->isFuture() && now()->diffInDays($worker->wkr_passexp, false) <= 60;
                 $permitExpired = $worker->wkr_permitexp && $worker->wkr_permitexp->isPast();
                 $permitExpiringSoon = $worker->wkr_permitexp && $worker->wkr_permitexp->isFuture() && now()->diffInDays($worker->wkr_permitexp, false) <= 30;
 
-                return match($this->expiryStatus) {
+                return match ($this->expiryStatus) {
                     'expired' => $passportExpired || $permitExpired,
-                    'expiring_soon' => ($passportExpiringSoon || $permitExpiringSoon) && !$passportExpired && !$permitExpired,
-                    'valid' => !$passportExpired && !$permitExpired && !$passportExpiringSoon && !$permitExpiringSoon,
+                    'expiring_soon' => ($passportExpiringSoon || $permitExpiringSoon) && ! $passportExpired && ! $permitExpired,
+                    'valid' => ! $passportExpired && ! $permitExpired && ! $passportExpiringSoon && ! $permitExpiringSoon,
                     default => true,
                 };
             });
         }
 
         // Apply sorting
-        $allWorkers = $allWorkers->sort(function($a, $b) {
-            $primaryA = match($this->sortBy) {
+        $allWorkers = $allWorkers->sort(function ($a, $b) {
+            $primaryA = match ($this->sortBy) {
                 'wkr_id' => $a->wkr_id,
                 'name' => strtolower($a->name),
                 'ic_number' => $a->ic_number,
@@ -256,7 +258,7 @@ class Workers extends Component
                 default => $a->wkr_id,
             };
 
-            $primaryB = match($this->sortBy) {
+            $primaryB = match ($this->sortBy) {
                 'wkr_id' => $b->wkr_id,
                 'name' => strtolower($b->name),
                 'ic_number' => $b->ic_number,
@@ -282,11 +284,11 @@ class Workers extends Component
         })->values();
 
         // Calculate statistics
-        $activeWorkers = $allWorkers->filter(function($worker) {
+        $activeWorkers = $allWorkers->filter(function ($worker) {
             return $worker->contract_info && $worker->contract_info->isActive();
         });
 
-        $totalSalary = $allWorkers->sum(function($worker) {
+        $totalSalary = $allWorkers->sum(function ($worker) {
             return $worker->basic_salary ?? 0;
         });
 

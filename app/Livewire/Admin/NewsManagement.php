@@ -4,17 +4,20 @@ namespace App\Livewire\Admin;
 
 use App\Models\News;
 use Flux\Flux;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use Livewire\Attributes\Validate;
 
 class NewsManagement extends Component
 {
     use WithFileUploads;
 
     public $news;
+
     public $newsId;
+
     public $showModal = false;
+
     public $modalMode = 'create'; // create or edit
 
     #[Validate('required|string|max:255')]
@@ -120,7 +123,7 @@ class NewsManagement extends Component
             $news = News::findOrFail($this->newsId);
 
             // If no new image, keep existing
-            if (!$this->image && $this->existing_image_path) {
+            if (! $this->image && $this->existing_image_path) {
                 $data['image_path'] = $this->existing_image_path;
             }
 
@@ -142,7 +145,7 @@ class NewsManagement extends Component
     public function toggleActive($id)
     {
         $news = News::findOrFail($id);
-        $news->update(['is_active' => !$news->is_active]);
+        $news->update(['is_active' => ! $news->is_active]);
         $this->loadNews();
     }
 

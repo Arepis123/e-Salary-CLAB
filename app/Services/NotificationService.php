@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\NotificationTemplate;
-use App\Models\NotificationLog;
-use App\Models\User;
 use App\Mail\NotificationEmail;
-use Illuminate\Support\Facades\Mail;
+use App\Models\NotificationLog;
+use App\Models\NotificationTemplate;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
@@ -30,7 +30,7 @@ class NotificationService
         // Append custom message if provided
         $body = $rendered['body'];
         if ($customMessage) {
-            $body .= "\n\n" . $customMessage;
+            $body .= "\n\n".$customMessage;
         }
 
         // Create log entry

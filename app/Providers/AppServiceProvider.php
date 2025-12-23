@@ -26,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register custom authentication provider for third-party database
         Auth::provider('third_party', function ($app, array $config) {
-            return new ThirdPartyUserProvider();
+            return new ThirdPartyUserProvider;
         });
 
         // Share notification counts with client sidebar
@@ -59,12 +59,12 @@ class AppServiceProvider extends ServiceProvider
                             ->with('workers')
                             ->get();
 
-                        $submittedWorkerIds = $allSubmissionsThisMonth->flatMap(function($submission) {
+                        $submittedWorkerIds = $allSubmissionsThisMonth->flatMap(function ($submission) {
                             return $submission->workers->pluck('worker_id');
                         })->unique()->toArray();
 
-                        $unsubmittedWorkersCount = $activeContracts->filter(function($contract) use ($submittedWorkerIds) {
-                            return !in_array($contract->worker->wkr_id, $submittedWorkerIds);
+                        $unsubmittedWorkersCount = $activeContracts->filter(function ($contract) use ($submittedWorkerIds) {
+                            return ! in_array($contract->worker->wkr_id, $submittedWorkerIds);
                         })->count();
 
                         // Get pending payments count (submissions that need payment)

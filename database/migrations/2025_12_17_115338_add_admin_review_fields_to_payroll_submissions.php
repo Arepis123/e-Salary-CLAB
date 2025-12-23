@@ -1,10 +1,10 @@
 <?php
 
+use App\Models\PayrollSubmission;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
-use App\Models\PayrollSubmission;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -48,7 +48,7 @@ return new class extends Migration
 
         // Pre-populate admin_final_amount for all existing submissions with grand_total
         PayrollSubmission::query()->update([
-            'admin_final_amount' => DB::raw('grand_total')
+            'admin_final_amount' => DB::raw('grand_total'),
         ]);
 
         // Update status for pending_payment submissions (they need admin review in new workflow)

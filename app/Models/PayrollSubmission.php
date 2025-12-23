@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 
 class PayrollSubmission extends Model
 {
@@ -107,6 +107,7 @@ class PayrollSubmission extends Model
         if ($this->isOverdue()) {
             return $this->client_total * 0.08;
         }
+
         return 0;
     }
 
@@ -115,7 +116,7 @@ class PayrollSubmission extends Model
      */
     public function updatePenalty(): void
     {
-        if ($this->isOverdue() && !$this->has_penalty) {
+        if ($this->isOverdue() && ! $this->has_penalty) {
             $penalty = $this->calculatePenalty();
             $this->update([
                 'has_penalty' => true,
@@ -140,7 +141,7 @@ class PayrollSubmission extends Model
         $billableCount = 0;
         foreach ($workers as $worker) {
             // If worker is not excluded from billing, count them
-            if (!$worker->isExcludedFromBilling()) {
+            if (! $worker->isExcludedFromBilling()) {
                 $billableCount++;
             }
         }
@@ -192,6 +193,7 @@ class PayrollSubmission extends Model
         // Otherwise, calculate dynamically if overdue
         if ($this->isOverdue() && $this->status !== 'paid') {
             $penalty = $baseAmount * 0.08;
+
             return $baseAmount + $penalty;
         }
 
@@ -228,7 +230,7 @@ class PayrollSubmission extends Model
     public function scopeOverdue($query)
     {
         return $query->where('payment_deadline', '<', now())
-                    ->whereNotIn('status', ['paid']);
+            ->whereNotIn('status', ['paid']);
     }
 
     /**
@@ -267,7 +269,7 @@ class PayrollSubmission extends Model
         if ($latestInvoice && $latestInvoice->tax_invoice_number) {
             // Extract the number from format TINV-YYYY-NNNN
             $parts = explode('-', $latestInvoice->tax_invoice_number);
-            $lastNumber = isset($parts[2]) ? (int)$parts[2] : 0;
+            $lastNumber = isset($parts[2]) ? (int) $parts[2] : 0;
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
@@ -289,7 +291,7 @@ class PayrollSubmission extends Model
      */
     public function hasTaxInvoice(): bool
     {
-        return !empty($this->tax_invoice_number) && !empty($this->tax_invoice_generated_at);
+        return ! empty($this->tax_invoice_number) && ! empty($this->tax_invoice_generated_at);
     }
 
     /**
@@ -313,7 +315,7 @@ class PayrollSubmission extends Model
      */
     public function hasAdminReview(): bool
     {
-        return !is_null($this->admin_final_amount);
+        return ! is_null($this->admin_final_amount);
     }
 
     /**
@@ -321,7 +323,7 @@ class PayrollSubmission extends Model
      */
     public function hasBreakdownFile(): bool
     {
-        return !is_null($this->breakdown_file_path);
+        return ! is_null($this->breakdown_file_path);
     }
 
     /**
@@ -339,7 +341,7 @@ class PayrollSubmission extends Model
     public function canCreatePayment(): bool
     {
         // Must have admin review (final amount calculated)
-        if (!$this->hasAdminReview()) {
+        if (! $this->hasAdminReview()) {
             return false;
         }
 
@@ -352,9 +354,10 @@ class PayrollSubmission extends Model
      */
     public function getBreakdownFileUrl(): ?string
     {
-        if (!$this->hasBreakdownFile()) {
+        if (! $this->hasBreakdownFile()) {
             return null;
         }
+
         return route('payroll.breakdown.download', $this->id);
     }
 

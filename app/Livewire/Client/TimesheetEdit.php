@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Client;
 
-use App\Models\PayrollSubmission;
 use App\Models\MonthlyOTEntry;
-use App\Services\PayrollService;
+use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
+use App\Services\PayrollService;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -14,32 +14,48 @@ class TimesheetEdit extends Component
     use WithFileUploads;
 
     protected PayrollService $payrollService;
+
     protected ContractWorkerService $contractWorkerService;
 
     public $submissionId;
+
     public $workers = [];
+
     public $selectedWorkers = [];
+
     public $period;
+
     public $currentSubmission;
+
     public $errorMessage = '';
 
     // Worker breakdown file upload
     public $workerBreakdownFile;
+
     public $existingBreakdownFileName;
 
     // Transaction management
     public $showTransactionModal = false;
+
     public $currentWorkerIndex = null;
+
     public $transactions = [];
+
     public $newTransactionCategory = 'deduction';
+
     public $newTransactionType = 'advance_payment';
+
     public $newTransactionAmount = '';
+
     public $newTransactionRemarks = '';
 
     // OT management
     public $showOTModal = false;
+
     public $otNormalHours = 0;
+
     public $otRestHours = 0;
+
     public $otPublicHours = 0;
 
     // Calculation info modal
@@ -64,8 +80,9 @@ class TimesheetEdit extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             $this->errorMessage = 'No contractor CLAB number assigned to your account. Please contact administrator.';
+
             return;
         }
 
@@ -114,7 +131,7 @@ class TimesheetEdit extends Component
             ->keyBy('worker_id');
 
         // Prepare workers data with transactions
-        $this->workers = $submission->workers->map(function($draftWorker, $index) use ($clabNo, $submission, $monthlyOTEntries, $isAfterOTWindow) {
+        $this->workers = $submission->workers->map(function ($draftWorker, $index) use ($clabNo, $submission, $monthlyOTEntries, $isAfterOTWindow) {
             // Get worker model to check contract status
             $worker = \App\Models\Worker::find($draftWorker->worker_id);
             $contract = \App\Models\ContractWorker::where('con_wkr_id', $draftWorker->worker_id)
@@ -137,10 +154,10 @@ class TimesheetEdit extends Component
             }
 
             $previousMonthPayroll = \App\Models\PayrollWorker::where('worker_id', $draftWorker->worker_id)
-                ->whereHas('payrollSubmission', function($q) use ($previousMonth, $previousYear) {
+                ->whereHas('payrollSubmission', function ($q) use ($previousMonth, $previousYear) {
                     $q->where('month', $previousMonth)
-                      ->where('year', $previousYear)
-                      ->where('status', '!=', 'draft');
+                        ->where('year', $previousYear)
+                        ->where('status', '!=', 'draft');
                 })
                 ->first();
 
@@ -178,7 +195,7 @@ class TimesheetEdit extends Component
 
             if ($hasMonthlyOTEntry && $monthlyOTEntry->transactions) {
                 // Use transactions from monthly entry (locked)
-                $allTransactions = $monthlyOTEntry->transactions->map(function($txn) {
+                $allTransactions = $monthlyOTEntry->transactions->map(function ($txn) {
                     return [
                         'type' => $txn->type,
                         'amount' => $txn->amount,
@@ -191,7 +208,7 @@ class TimesheetEdit extends Component
                 $allTransactions = [];
             } else {
                 // Before Dec 15: use draft transactions (editable)
-                $allTransactions = $draftWorker->transactions->map(function($txn) {
+                $allTransactions = $draftWorker->transactions->map(function ($txn) {
                     return [
                         'type' => $txn->type,
                         'amount' => $txn->amount,
@@ -212,8 +229,8 @@ class TimesheetEdit extends Component
                 'ot_public_hours' => $otPublicHours,
                 'ot_from_monthly_entry' => $shouldLockOT, // Flag to make OT fields read-only
                 'previous_month_ot' => $previousMonthOT,
-                'contract_ended' => !$hasActiveContract,
-                'ot_payment_only' => !$hasActiveContract,
+                'contract_ended' => ! $hasActiveContract,
+                'ot_payment_only' => ! $hasActiveContract,
                 'transactions' => $allTransactions,
                 'transactions_from_monthly_entry' => $shouldLockOT, // Flag to indicate transactions are locked
                 'included' => true,
@@ -264,6 +281,7 @@ class TimesheetEdit extends Component
                 heading: 'Transactions Locked',
                 text: 'These transactions were submitted during the OT entry window (1st-15th) and cannot be modified. They will be automatically included in this payroll.'
             );
+
             return;
         }
 
@@ -372,7 +390,7 @@ class TimesheetEdit extends Component
         \Flux::toast(
             variant: 'success',
             heading: 'Transactions Saved',
-            text: "Successfully saved transactions for {$workerName}. Total: Advance RM " . number_format($totalAdvancePayment, 2) . ", Deduction RM " . number_format($totalDeduction, 2)
+            text: "Successfully saved transactions for {$workerName}. Total: Advance RM ".number_format($totalAdvancePayment, 2).', Deduction RM '.number_format($totalDeduction, 2)
         );
     }
 
@@ -420,6 +438,7 @@ class TimesheetEdit extends Component
                 text: 'These overtime hours were submitted during the OT entry window and cannot be modified.'
             );
             $this->closeOTModal();
+
             return;
         }
 
@@ -439,7 +458,7 @@ class TimesheetEdit extends Component
         \Flux::toast(
             variant: 'success',
             heading: 'OT Hours Saved',
-            text: "Successfully saved OT hours for {$workerName}. Total OT Pay: RM " . number_format($totalOTPay, 2)
+            text: "Successfully saved OT hours for {$workerName}. Total OT Pay: RM ".number_format($totalOTPay, 2)
         );
     }
 
@@ -484,8 +503,9 @@ class TimesheetEdit extends Component
 
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             $this->errorMessage = 'No contractor CLAB number assigned.';
+
             return;
         }
 
@@ -503,7 +523,7 @@ class TimesheetEdit extends Component
 
             // Additional validation: workers with active contracts must have minimum RM 1,700
             foreach ($this->workers as $index => $worker) {
-                if (!($worker['contract_ended'] ?? false) && $worker['basic_salary'] < 1700) {
+                if (! ($worker['contract_ended'] ?? false) && $worker['basic_salary'] < 1700) {
                     throw new \Exception("Worker {$worker['worker_name']} must have a basic salary of at least RM 1,700.");
                 }
                 // Workers with ended contracts must have exactly RM 0 basic salary
@@ -519,17 +539,19 @@ class TimesheetEdit extends Component
                 }
             }
         } catch (\Exception $e) {
-            $this->errorMessage = 'Validation failed: ' . $e->getMessage();
+            $this->errorMessage = 'Validation failed: '.$e->getMessage();
+
             return;
         }
 
         // Filter only selected workers
-        $selectedWorkersData = collect($this->workers)->filter(function($worker) {
+        $selectedWorkersData = collect($this->workers)->filter(function ($worker) {
             return in_array($worker['worker_id'], $this->selectedWorkers);
         })->toArray();
 
         if (empty($selectedWorkersData)) {
             $this->errorMessage = 'Please select at least one worker to submit payroll.';
+
             return;
         }
 
@@ -598,8 +620,8 @@ class TimesheetEdit extends Component
             $selectedWorkerCount = count($this->selectedWorkers);
             // Only charge service fee for active workers (exclude workers with ended contracts)
             $activeSelectedWorkers = collect($this->workers)
-                ->filter(function($worker) {
-                    return in_array($worker['worker_id'], $this->selectedWorkers) && !($worker['contract_ended'] ?? false);
+                ->filter(function ($worker) {
+                    return in_array($worker['worker_id'], $this->selectedWorkers) && ! ($worker['contract_ended'] ?? false);
                 })
                 ->count();
             $serviceCharge = $activeSelectedWorkers * 200; // RM200 per active worker only
@@ -633,7 +655,7 @@ class TimesheetEdit extends Component
                     ]);
 
                     return redirect()->route('timesheet')
-                        ->with('warning', "Draft submitted for {$submission->month_year}. LATE SUBMISSION: 8% penalty (RM " . number_format($penalty, 2) . ") has been applied. Total due: RM " . number_format($grandTotal + $penalty, 2));
+                        ->with('warning', "Draft submitted for {$submission->month_year}. LATE SUBMISSION: 8% penalty (RM ".number_format($penalty, 2).') has been applied. Total due: RM '.number_format($grandTotal + $penalty, 2));
                 }
 
                 return redirect()->route('timesheet')
@@ -651,7 +673,7 @@ class TimesheetEdit extends Component
             \Flux::toast(
                 variant: 'danger',
                 heading: 'Error',
-                text: 'Failed to save timesheet: ' . $e->getMessage()
+                text: 'Failed to save timesheet: '.$e->getMessage()
             );
         }
     }

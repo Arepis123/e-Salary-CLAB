@@ -2,39 +2,50 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\PayrollSubmission;
 use App\Mail\PayrollApproved;
+use App\Models\PayrollSubmission;
 use Flux\Flux;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class SalaryDetail extends Component
 {
     use WithFileUploads;
 
     public PayrollSubmission $submission;
+
     public $workers = [];
+
     public $stats = [];
+
     public $previousSubmission = null;
+
     public $previousWorkers = [];
+
     public $previousOtStats = [];
 
     // Review modal properties
     public $showReviewModal = false;
+
     public $reviewFinalAmount = '';
+
     public $reviewNotes = '';
+
     public $breakdownFile;
+
     public $isReviewing = false;
 
     // Re-upload modal properties
     public $showReuploadModal = false;
+
     public $newBreakdownFile;
+
     public $isReuploading = false;
 
     public function mount($id)
@@ -155,25 +166,25 @@ class SalaryDetail extends Component
     public function exportWorkerList()
     {
         try {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
 
             // Set document properties
             $spreadsheet->getProperties()
-                ->setTitle('Worker Payroll List - ' . $this->submission->month_year)
+                ->setTitle('Worker Payroll List - '.$this->submission->month_year)
                 ->setSubject('Worker Payroll Details');
 
             // Title row
-            $sheet->setCellValue('A1', 'PAYROLL SUBMISSION - ' . strtoupper($this->submission->month_year));
+            $sheet->setCellValue('A1', 'PAYROLL SUBMISSION - '.strtoupper($this->submission->month_year));
             $sheet->mergeCells('A1:L1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             // Submission info
-            $sheet->setCellValue('A2', 'Contractor: ' . $this->submission->user->name);
-            $sheet->setCellValue('A3', 'CLAB No: ' . $this->submission->contractor_clab_no);
-            $sheet->setCellValue('A4', 'Status: ' . strtoupper($this->submission->status));
-            $sheet->setCellValue('A5', 'Total Workers: ' . $this->stats['total_workers']);
+            $sheet->setCellValue('A2', 'Contractor: '.$this->submission->user->name);
+            $sheet->setCellValue('A3', 'CLAB No: '.$this->submission->contractor_clab_no);
+            $sheet->setCellValue('A4', 'Status: '.strtoupper($this->submission->status));
+            $sheet->setCellValue('A5', 'Total Workers: '.$this->stats['total_workers']);
 
             // Headers (row 7)
             $headers = [
@@ -200,45 +211,45 @@ class SalaryDetail extends Component
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4F46E5']
+                    'startColor' => ['rgb' => '4F46E5'],
                 ],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
-                ]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
+                ],
             ]);
 
             // Data rows
             $row = 8;
             $no = 1;
             foreach ($this->workers as $worker) {
-                $sheet->setCellValue('A' . $row, $no++);
-                $sheet->setCellValue('B' . $row, $worker->worker_id);
-                $sheet->setCellValue('C' . $row, $worker->worker_name);
-                $sheet->setCellValue('D' . $row, $worker->worker_passport);
-                $sheet->setCellValue('E' . $row, $worker->basic_salary);
-                $sheet->setCellValue('F' . $row, $worker->ot_normal_hours ?? 0);
-                $sheet->setCellValue('G' . $row, $worker->ot_rest_hours ?? 0);
-                $sheet->setCellValue('H' . $row, $worker->ot_public_hours ?? 0);
-                $sheet->setCellValue('I' . $row, $worker->advance_payment ?? 0);
-                $sheet->setCellValue('J' . $row, $worker->other_deduction ?? 0);
-                $sheet->setCellValue('K' . $row, $worker->npl_days ?? 0);
-                $sheet->setCellValue('L' . $row, $worker->allowance ?? 0);
+                $sheet->setCellValue('A'.$row, $no++);
+                $sheet->setCellValue('B'.$row, $worker->worker_id);
+                $sheet->setCellValue('C'.$row, $worker->worker_name);
+                $sheet->setCellValue('D'.$row, $worker->worker_passport);
+                $sheet->setCellValue('E'.$row, $worker->basic_salary);
+                $sheet->setCellValue('F'.$row, $worker->ot_normal_hours ?? 0);
+                $sheet->setCellValue('G'.$row, $worker->ot_rest_hours ?? 0);
+                $sheet->setCellValue('H'.$row, $worker->ot_public_hours ?? 0);
+                $sheet->setCellValue('I'.$row, $worker->advance_payment ?? 0);
+                $sheet->setCellValue('J'.$row, $worker->other_deduction ?? 0);
+                $sheet->setCellValue('K'.$row, $worker->npl_days ?? 0);
+                $sheet->setCellValue('L'.$row, $worker->allowance ?? 0);
 
                 // Format currency columns
                 foreach (['E', 'I', 'J', 'L'] as $col) {
-                    $sheet->getStyle($col . $row)->getNumberFormat()
+                    $sheet->getStyle($col.$row)->getNumberFormat()
                         ->setFormatCode('#,##0.00');
                 }
 
                 // Format hours columns
                 foreach (['F', 'G', 'H'] as $col) {
-                    $sheet->getStyle($col . $row)->getNumberFormat()
+                    $sheet->getStyle($col.$row)->getNumberFormat()
                         ->setFormatCode('0.00');
                 }
 
                 // Format NPL days column
-                $sheet->getStyle('K' . $row)->getNumberFormat()
+                $sheet->getStyle('K'.$row)->getNumberFormat()
                     ->setFormatCode('0.0');
 
                 $row++;
@@ -246,43 +257,43 @@ class SalaryDetail extends Component
 
             // Total row
             $totalRow = $row;
-            $sheet->setCellValue('A' . $totalRow, 'TOTAL');
-            $sheet->mergeCells('A' . $totalRow . ':D' . $totalRow);
-            $sheet->setCellValue('E' . $totalRow, '=SUM(E8:E' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('F' . $totalRow, '=SUM(F8:F' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('G' . $totalRow, '=SUM(G8:G' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('H' . $totalRow, '=SUM(H8:H' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('I' . $totalRow, '=SUM(I8:I' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('J' . $totalRow, '=SUM(J8:J' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('K' . $totalRow, '=SUM(K8:K' . ($totalRow - 1) . ')');
-            $sheet->setCellValue('L' . $totalRow, '=SUM(L8:L' . ($totalRow - 1) . ')');
+            $sheet->setCellValue('A'.$totalRow, 'TOTAL');
+            $sheet->mergeCells('A'.$totalRow.':D'.$totalRow);
+            $sheet->setCellValue('E'.$totalRow, '=SUM(E8:E'.($totalRow - 1).')');
+            $sheet->setCellValue('F'.$totalRow, '=SUM(F8:F'.($totalRow - 1).')');
+            $sheet->setCellValue('G'.$totalRow, '=SUM(G8:G'.($totalRow - 1).')');
+            $sheet->setCellValue('H'.$totalRow, '=SUM(H8:H'.($totalRow - 1).')');
+            $sheet->setCellValue('I'.$totalRow, '=SUM(I8:I'.($totalRow - 1).')');
+            $sheet->setCellValue('J'.$totalRow, '=SUM(J8:J'.($totalRow - 1).')');
+            $sheet->setCellValue('K'.$totalRow, '=SUM(K8:K'.($totalRow - 1).')');
+            $sheet->setCellValue('L'.$totalRow, '=SUM(L8:L'.($totalRow - 1).')');
 
             // Style total row
-            $sheet->getStyle('A' . $totalRow . ':L' . $totalRow)->applyFromArray([
+            $sheet->getStyle('A'.$totalRow.':L'.$totalRow)->applyFromArray([
                 'font' => ['bold' => true],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'E5E7EB']
+                    'startColor' => ['rgb' => 'E5E7EB'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
-                ]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
+                ],
             ]);
 
             // Format currency in total row
             foreach (['E', 'I', 'J', 'L'] as $col) {
-                $sheet->getStyle($col . $totalRow)->getNumberFormat()
+                $sheet->getStyle($col.$totalRow)->getNumberFormat()
                     ->setFormatCode('#,##0.00');
             }
 
             // Format hours in total row
             foreach (['F', 'G', 'H'] as $col) {
-                $sheet->getStyle($col . $totalRow)->getNumberFormat()
+                $sheet->getStyle($col.$totalRow)->getNumberFormat()
                     ->setFormatCode('0.00');
             }
 
             // Format NPL days in total row
-            $sheet->getStyle('K' . $totalRow)->getNumberFormat()
+            $sheet->getStyle('K'.$totalRow)->getNumberFormat()
                 ->setFormatCode('0.0');
 
             // Auto-size columns
@@ -313,15 +324,16 @@ class SalaryDetail extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Export Failed',
-                text: 'Failed to export worker list: ' . $e->getMessage()
+                text: 'Failed to export worker list: '.$e->getMessage()
             );
         }
     }
 
     public function openReviewModal()
     {
-        if (!$this->submission->canBeReviewed()) {
+        if (! $this->submission->canBeReviewed()) {
             Flux::toast(variant: 'warning', text: 'Cannot review this submission.');
+
             return;
         }
 
@@ -360,10 +372,10 @@ class SalaryDetail extends Component
             );
 
             // Ensure directory exists
-            $directory = 'payroll-breakdowns/' . $this->submission->year . '/' . $this->submission->month;
-            $fullDirectoryPath = storage_path('app/' . $directory);
+            $directory = 'payroll-breakdowns/'.$this->submission->year.'/'.$this->submission->month;
+            $fullDirectoryPath = storage_path('app/'.$directory);
 
-            if (!file_exists($fullDirectoryPath)) {
+            if (! file_exists($fullDirectoryPath)) {
                 mkdir($fullDirectoryPath, 0755, true);
             }
 
@@ -383,20 +395,20 @@ class SalaryDetail extends Component
 
             // Check if submission is overdue and apply penalty immediately
             $this->submission->refresh();
-            if ($this->submission->isOverdue() && !$this->submission->has_penalty) {
+            if ($this->submission->isOverdue() && ! $this->submission->has_penalty) {
                 $this->submission->updatePenalty();
                 $this->submission->refresh();
 
                 Flux::toast(
                     variant: 'warning',
                     heading: 'Late Submission - Penalty Applied',
-                    text: 'This is a late submission. 8% penalty (RM ' . number_format($this->submission->penalty_amount, 2) . ') has been automatically applied.'
+                    text: 'This is a late submission. 8% penalty (RM '.number_format($this->submission->penalty_amount, 2).') has been automatically applied.'
                 );
             } else {
                 Flux::toast(
                     variant: 'success',
                     heading: 'Submission Approved',
-                    text: 'Submission has been approved with final amount RM ' . number_format($this->reviewFinalAmount, 2)
+                    text: 'Submission has been approved with final amount RM '.number_format($this->reviewFinalAmount, 2)
                 );
             }
 
@@ -411,7 +423,7 @@ class SalaryDetail extends Component
             } catch (\Exception $e) {
                 \Log::error('Failed to send payroll approval email', [
                     'submission_id' => $this->submission->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
                 // Don't show error to admin - email failure shouldn't block the approval
             }
@@ -423,7 +435,7 @@ class SalaryDetail extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Error',
-                text: 'Failed to approve submission: ' . $e->getMessage()
+                text: 'Failed to approve submission: '.$e->getMessage()
             );
         } finally {
             $this->isReviewing = false;
@@ -435,11 +447,12 @@ class SalaryDetail extends Component
         // Refresh submission to get latest data
         $this->submission->refresh();
 
-        if (!$this->submission->hasBreakdownFile()) {
+        if (! $this->submission->hasBreakdownFile()) {
             Flux::toast(variant: 'warning', text: 'No breakdown file available.');
             \Log::warning('Download attempted but no file path in database', [
                 'submission_id' => $this->submission->id,
             ]);
+
             return;
         }
 
@@ -455,7 +468,7 @@ class SalaryDetail extends Component
         ]);
 
         // Check if the physical file actually exists
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             Flux::toast(
                 variant: 'danger',
                 heading: 'File Not Found',
@@ -484,7 +497,7 @@ class SalaryDetail extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Download Failed',
-                text: 'Unable to download the file: ' . $e->getMessage()
+                text: 'Unable to download the file: '.$e->getMessage()
             );
 
             \Log::error('Breakdown file download failed', [
@@ -548,10 +561,10 @@ class SalaryDetail extends Component
             );
 
             // Ensure directory exists
-            $directory = 'payroll-breakdowns/' . $this->submission->year . '/' . $this->submission->month;
-            $fullDirectoryPath = storage_path('app/' . $directory);
+            $directory = 'payroll-breakdowns/'.$this->submission->year.'/'.$this->submission->month;
+            $fullDirectoryPath = storage_path('app/'.$directory);
 
-            if (!file_exists($fullDirectoryPath)) {
+            if (! file_exists($fullDirectoryPath)) {
                 mkdir($fullDirectoryPath, 0755, true);
                 \Log::info('Created directory', ['path' => $fullDirectoryPath]);
             }
@@ -560,7 +573,7 @@ class SalaryDetail extends Component
             \Log::info('About to store file', [
                 'directory' => $directory,
                 'filename' => $customFileName,
-                'full_path' => $fullDirectoryPath . '/' . $customFileName,
+                'full_path' => $fullDirectoryPath.'/'.$customFileName,
             ]);
 
             // Store new breakdown file with custom name - use storeAs directly
@@ -568,7 +581,7 @@ class SalaryDetail extends Component
 
             \Log::info('storeAs() returned', [
                 'returned_path' => $filePath,
-                'expected_path' => $directory . '/' . $customFileName,
+                'expected_path' => $directory.'/'.$customFileName,
             ]);
 
             // Check if file actually exists on filesystem using Storage disk path
@@ -584,8 +597,8 @@ class SalaryDetail extends Component
             ]);
 
             // Verify the file was actually stored
-            if (!$fileExists) {
-                throw new \Exception('File upload verification failed. The file was not properly stored at: ' . $fullFilePath);
+            if (! $fileExists) {
+                throw new \Exception('File upload verification failed. The file was not properly stored at: '.$fullFilePath);
             }
 
             // Update submission with new file
@@ -623,7 +636,7 @@ class SalaryDetail extends Component
             Flux::toast(
                 variant: 'danger',
                 heading: 'Upload Failed',
-                text: 'Failed to re-upload breakdown file: ' . $e->getMessage()
+                text: 'Failed to re-upload breakdown file: '.$e->getMessage()
             );
         } finally {
             $this->isReuploading = false;

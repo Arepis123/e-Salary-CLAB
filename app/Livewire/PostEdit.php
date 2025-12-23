@@ -2,20 +2,25 @@
 
 namespace App\Livewire;
 
-use Flux\Flux;
-use Livewire\Component;
-use Livewire\Attributes\On;
 use App\Models\Post;
+use Flux\Flux;
+use Livewire\Attributes\On;
+use Livewire\Component;
 
 class PostEdit extends Component
 {
-    public $title, $body, $postId;
+    public $title;
+
+    public $body;
+
+    public $postId;
+
     public function render()
     {
         return view('livewire.post-edit');
     }
 
-    #[On("editPost")]
+    #[On('editPost')]
     public function editPost($id)
     {
         $post = Post::find($id);
@@ -23,14 +28,14 @@ class PostEdit extends Component
         $this->title = $post->title;
         $this->body = $post->body;
 
-        Flux::modal("edit-post")->show();
+        Flux::modal('edit-post')->show();
     }
 
     public function update()
     {
         $this->validate([
-            "title" => "required",
-            "body" => "required"
+            'title' => 'required',
+            'body' => 'required',
         ]);
 
         $post = Post::find($this->postId);
@@ -39,8 +44,8 @@ class PostEdit extends Component
 
         $post->save();
 
-        Flux::modal("edit-post")->close();
+        Flux::modal('edit-post')->close();
 
-        $this->dispatch("reloadPosts");
+        $this->dispatch('reloadPosts');
     }
 }

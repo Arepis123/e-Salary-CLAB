@@ -31,7 +31,7 @@ class PayrollApproved extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Payroll Approved - ' . $this->submission->month_year,
+            subject: 'Payroll Approved - '.$this->submission->month_year,
         );
     }
 

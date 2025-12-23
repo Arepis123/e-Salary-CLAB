@@ -21,7 +21,7 @@ class WorkerService
         return Cache::remember(
             "worker:{$workerId}",
             $this->cacheTTL,
-            fn() => Worker::find($workerId)
+            fn () => Worker::find($workerId)
         );
     }
 
@@ -30,7 +30,7 @@ class WorkerService
      */
     public function getWorkers(array $workerIds): Collection
     {
-        return collect($workerIds)->map(fn($id) => $this->getWorker($id))->filter();
+        return collect($workerIds)->map(fn ($id) => $this->getWorker($id))->filter();
     }
 
     /**
@@ -41,7 +41,7 @@ class WorkerService
         return Cache::remember(
             'workers:active',
             $this->cacheTTL,
-            fn() => Worker::active()->get()
+            fn () => Worker::active()->get()
         );
     }
 
@@ -53,7 +53,7 @@ class WorkerService
         return Cache::remember(
             "workers:contractor:{$contractorClabNo}",
             $this->cacheTTL,
-            fn() => Worker::where('wkr_currentemp', $contractorClabNo)->get()
+            fn () => Worker::where('wkr_currentemp', $contractorClabNo)->get()
         );
     }
 
@@ -62,12 +62,12 @@ class WorkerService
      */
     public function searchWorkers(string $query): Collection
     {
-        $cacheKey = "workers:search:" . md5($query);
+        $cacheKey = 'workers:search:'.md5($query);
 
         return Cache::remember(
             $cacheKey,
             $this->cacheTTL,
-            function() use ($query) {
+            function () use ($query) {
                 return Worker::where('wkr_name', 'LIKE', "%{$query}%")
                     ->orWhere('wkr_passno', 'LIKE', "%{$query}%")
                     ->get();
@@ -83,7 +83,7 @@ class WorkerService
         return Cache::remember(
             "workers:position:{$position}",
             $this->cacheTTL,
-            fn() => Worker::position($position)->get()
+            fn () => Worker::position($position)->get()
         );
     }
 
@@ -127,7 +127,7 @@ class WorkerService
         return Cache::remember(
             'workers:statistics',
             $this->cacheTTL,
-            function() {
+            function () {
                 return [
                     'total' => Worker::count(),
                     'active' => Worker::active()->count(),
@@ -158,6 +158,7 @@ class WorkerService
     public function setCacheTTL(int $seconds): self
     {
         $this->cacheTTL = $seconds;
+
         return $this;
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 class ResetAdminPassword extends Command
 {
     protected $signature = 'admin:reset-password {email?}';
+
     protected $description = 'Reset admin user password';
 
     public function handle()
@@ -17,13 +18,15 @@ class ResetAdminPassword extends Command
 
         $user = User::where('email', $email)->first();
 
-        if (!$user) {
+        if (! $user) {
             $this->error("User with email {$email} not found!");
+
             return 1;
         }
 
-        if (!in_array($user->role, ['super_admin', 'admin'])) {
+        if (! in_array($user->role, ['super_admin', 'admin'])) {
             $this->error("User is not an admin! Role: {$user->role}");
+
             return 1;
         }
 
@@ -34,11 +37,13 @@ class ResetAdminPassword extends Command
 
         if ($newPassword !== $confirmPassword) {
             $this->error('Passwords do not match!');
+
             return 1;
         }
 
         if (strlen($newPassword) < 6) {
             $this->error('Password must be at least 6 characters!');
+
             return 1;
         }
 

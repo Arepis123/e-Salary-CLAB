@@ -54,6 +54,7 @@ class SendPaymentReminders extends Command
 
                 if ($alreadySent) {
                     $this->line("  - Skipped INV-{$submission->id} ({$days} days reminder already sent)");
+
                     continue;
                 }
 
@@ -63,13 +64,15 @@ class SendPaymentReminders extends Command
                     ->where('is_active', true)
                     ->first();
 
-                if (!$template) {
+                if (! $template) {
                     $this->warn("  - No active template found for {$days} days before deadline");
+
                     continue;
                 }
 
-                if (!$submission->user) {
+                if (! $submission->user) {
                     $this->warn("  - Submission INV-{$submission->id} has no associated user");
+
                     continue;
                 }
 

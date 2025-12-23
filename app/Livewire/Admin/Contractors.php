@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\User;
 use App\Models\PayrollSubmission;
-use Livewire\Component;
-use Livewire\Attributes\Url;
+use App\Models\User;
 use Flux\Flux;
+use Livewire\Attributes\Url;
+use Livewire\Component;
 
 class Contractors extends Component
 {
@@ -22,8 +22,11 @@ class Contractors extends Component
     public $page = 1;
 
     public $perPage = 10;
+
     public $showFilters = true;
+
     public $sortBy = 'name';
+
     public $sortDirection = 'asc';
 
     public function mount()
@@ -33,7 +36,7 @@ class Contractors extends Component
 
     public function toggleFilters()
     {
-        $this->showFilters = !$this->showFilters;
+        $this->showFilters = ! $this->showFilters;
     }
 
     public function sortByColumn($column)
@@ -56,6 +59,7 @@ class Contractors extends Component
                 heading: 'No data to export',
                 text: 'No contractors found matching your filters.'
             );
+
             return;
         }
 
@@ -124,11 +128,11 @@ class Contractors extends Component
         // Apply search filter
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%')
-                    ->orWhere('email', 'like', '%' . $this->search . '%')
-                    ->orWhere('contractor_clab_no', 'like', '%' . $this->search . '%')
-                    ->orWhere('phone', 'like', '%' . $this->search . '%')
-                    ->orWhere('person_in_charge', 'like', '%' . $this->search . '%');
+                $q->where('name', 'like', '%'.$this->search.'%')
+                    ->orWhere('email', 'like', '%'.$this->search.'%')
+                    ->orWhere('contractor_clab_no', 'like', '%'.$this->search.'%')
+                    ->orWhere('phone', 'like', '%'.$this->search.'%')
+                    ->orWhere('person_in_charge', 'like', '%'.$this->search.'%');
             });
         }
 

@@ -2,17 +2,15 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\PayrollSubmission;
-use App\Models\PayrollPayment;
 use App\Exports\PayrollSubmissionsExport;
+use App\Models\PayrollSubmission;
 use Flux\Flux;
-use Maatwebsite\Excel\Facades\Excel;
-use Livewire\Component;
 use Livewire\Attributes\Url;
+use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
 
 class Salary extends Component
 {
-
     public $stats = [];
 
     #[Url(except: '')]
@@ -31,13 +29,18 @@ class Salary extends Component
     public $page = 1;
 
     public $contractors = [];
+
     public $perPage = 10;
+
     public $showFilters = true;
+
     public $sortBy = 'created_at';
+
     public $sortDirection = 'desc';
 
     // Payment Log Modal
     public $showPaymentLog = false;
+
     public $selectedSubmission = null;
 
     public function mount()
@@ -48,7 +51,7 @@ class Salary extends Component
 
     public function toggleFilters()
     {
-        $this->showFilters = !$this->showFilters;
+        $this->showFilters = ! $this->showFilters;
     }
 
     public function sortByColumn($column)
@@ -73,6 +76,7 @@ class Salary extends Component
                 heading: 'No data to export',
                 text: 'No payroll submissions found matching your filters.'
             );
+
             return;
         }
 
@@ -85,7 +89,7 @@ class Salary extends Component
         ];
 
         // Generate filename with current date
-        $filename = 'payroll_submissions_' . now()->format('Y-m-d_His') . '.xlsx';
+        $filename = 'payroll_submissions_'.now()->format('Y-m-d_His').'.xlsx';
 
         // Return Excel download
         return Excel::download(new PayrollSubmissionsExport($submissions, $filters), $filename);
@@ -191,10 +195,10 @@ class Salary extends Component
         // Apply search filter
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('id', 'like', '%' . $this->search . '%')
-                  ->orWhereHas('user', function ($userQuery) {
-                      $userQuery->where('name', 'like', '%' . $this->search . '%');
-                  });
+                $q->where('id', 'like', '%'.$this->search.'%')
+                    ->orWhereHas('user', function ($userQuery) {
+                        $userQuery->where('name', 'like', '%'.$this->search.'%');
+                    });
             });
         }
 
@@ -217,9 +221,9 @@ class Salary extends Component
             } elseif ($this->paymentStatusFilter === 'awaiting') {
                 $query->where(function ($q) {
                     $q->whereDoesntHave('payment')
-                      ->orWhereHas('payment', function ($paymentQuery) {
-                          $paymentQuery->where('status', '!=', 'completed');
-                      });
+                        ->orWhereHas('payment', function ($paymentQuery) {
+                            $paymentQuery->where('status', '!=', 'completed');
+                        });
                 });
             }
         }

@@ -11,14 +11,13 @@ trait LogsActivity
     /**
      * Log an activity
      *
-     * @param string $module Module name (e.g., 'payment', 'timesheet', 'worker')
-     * @param string $action Action performed (e.g., 'created', 'updated', 'submitted')
-     * @param string $description Human-readable description
-     * @param Model|null $subject The model that was acted upon
-     * @param array|null $oldValues Previous state
-     * @param array|null $newValues New state
-     * @param array|null $properties Additional metadata
-     * @return ActivityLog
+     * @param  string  $module  Module name (e.g., 'payment', 'timesheet', 'worker')
+     * @param  string  $action  Action performed (e.g., 'created', 'updated', 'submitted')
+     * @param  string  $description  Human-readable description
+     * @param  Model|null  $subject  The model that was acted upon
+     * @param  array|null  $oldValues  Previous state
+     * @param  array|null  $newValues  New state
+     * @param  array|null  $properties  Additional metadata
      */
     protected function logActivity(
         string $module,

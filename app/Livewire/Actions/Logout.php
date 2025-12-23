@@ -25,7 +25,7 @@ class Logout
                 'user_email' => $user->email,
                 'module' => 'authentication',
                 'action' => 'logout',
-                'description' => "User logged out successfully",
+                'description' => 'User logged out successfully',
                 'subject_type' => get_class($user),
                 'subject_id' => $user->id,
                 'properties' => [],

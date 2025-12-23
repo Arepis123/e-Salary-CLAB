@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class ViewDbStructure extends Command
 {
     protected $signature = 'db:structure';
+
     protected $description = 'View structure of workers and contractors tables';
 
     public function handle()
@@ -24,12 +25,12 @@ class ViewDbStructure extends Command
 
             $this->table(
                 ['Field', 'Type', 'Null', 'Key', 'Default'],
-                collect($contractorColumns)->map(fn($col) => [
+                collect($contractorColumns)->map(fn ($col) => [
                     $col->Field,
                     $col->Type,
                     $col->Null,
                     $col->Key ?? '',
-                    $col->Default ?? 'NULL'
+                    $col->Default ?? 'NULL',
                 ])
             );
 
@@ -44,12 +45,12 @@ class ViewDbStructure extends Command
 
                 $this->table(
                     $headers,
-                    $sampleContractors->map(fn($row) => (array) $row)
+                    $sampleContractors->map(fn ($row) => (array) $row)
                 );
             }
 
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
         }
 
         $this->newLine(2);
@@ -63,12 +64,12 @@ class ViewDbStructure extends Command
 
             $this->table(
                 ['Field', 'Type', 'Null', 'Key', 'Default'],
-                collect($workerColumns)->map(fn($col) => [
+                collect($workerColumns)->map(fn ($col) => [
                     $col->Field,
                     $col->Type,
                     $col->Null,
                     $col->Key ?? '',
-                    $col->Default ?? 'NULL'
+                    $col->Default ?? 'NULL',
                 ])
             );
 
@@ -83,12 +84,12 @@ class ViewDbStructure extends Command
 
                 $this->table(
                     $headers,
-                    $sampleWorkers->map(fn($row) => (array) $row)
+                    $sampleWorkers->map(fn ($row) => (array) $row)
                 );
             }
 
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
         }
 
         $this->newLine();

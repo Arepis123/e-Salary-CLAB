@@ -15,8 +15,6 @@ $app = require_once __DIR__.'/bootstrap/app.php';
 $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
 use App\Models\PayrollSubmission;
-use App\Models\PayrollWorker;
-use App\Models\PayrollPayment;
 
 echo "\n";
 echo "==========================================\n";
@@ -44,7 +42,7 @@ try {
 
     foreach ($submissions as $submission) {
         $workerCount = $submission->workers->count();
-        $transactionCount = $submission->workers->sum(function($worker) {
+        $transactionCount = $submission->workers->sum(function ($worker) {
             return $worker->transactions->count();
         });
         $paymentCount = $submission->payments->count();
@@ -72,9 +70,9 @@ try {
 
     // Confirmation prompt
     echo "⚠️  WARNING: This action cannot be undone!\n";
-    echo "Are you sure you want to delete all December 2025 payroll data? (yes/no): ";
+    echo 'Are you sure you want to delete all December 2025 payroll data? (yes/no): ';
 
-    $handle = fopen("php://stdin", "r");
+    $handle = fopen('php://stdin', 'r');
     $line = trim(fgets($handle));
     fclose($handle);
 

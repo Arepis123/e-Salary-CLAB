@@ -21,7 +21,7 @@ class ContractorService
         return Cache::remember(
             "contractor:{$clabNo}",
             $this->cacheTTL,
-            fn() => Contractor::find($clabNo)
+            fn () => Contractor::find($clabNo)
         );
     }
 
@@ -33,7 +33,7 @@ class ContractorService
         return Cache::remember(
             "contractor:{$clabNo}:with_workers",
             $this->cacheTTL,
-            fn() => Contractor::with('workers')->find($clabNo)
+            fn () => Contractor::with('workers')->find($clabNo)
         );
     }
 
@@ -45,7 +45,7 @@ class ContractorService
         return Cache::remember(
             'contractors:active',
             $this->cacheTTL,
-            fn() => Contractor::active()->get()
+            fn () => Contractor::active()->get()
         );
     }
 
@@ -54,12 +54,12 @@ class ContractorService
      */
     public function searchContractors(string $query): Collection
     {
-        $cacheKey = "contractors:search:" . md5($query);
+        $cacheKey = 'contractors:search:'.md5($query);
 
         return Cache::remember(
             $cacheKey,
             $this->cacheTTL,
-            function() use ($query) {
+            function () use ($query) {
                 return Contractor::where('ctr_comp_name', 'LIKE', "%{$query}%")
                     ->orWhere('ctr_comp_regno', 'LIKE', "%{$query}%")
                     ->orWhere('ctr_contact_name', 'LIKE', "%{$query}%")
@@ -77,7 +77,7 @@ class ContractorService
         return Cache::remember(
             'contractors:active_contracts',
             $this->cacheTTL,
-            function() {
+            function () {
                 return Contractor::active()
                     ->where('ctr_datereg', '<=', now())
                     ->where('ctr_clabexp_date', '>=', now())
@@ -94,7 +94,7 @@ class ContractorService
         return Cache::remember(
             'contractors:statistics',
             $this->cacheTTL,
-            function() {
+            function () {
                 return [
                     'total' => Contractor::count(),
                     'active' => Contractor::active()->count(),
@@ -140,6 +140,7 @@ class ContractorService
     public function setCacheTTL(int $seconds): self
     {
         $this->cacheTTL = $seconds;
+
         return $this;
     }
 }

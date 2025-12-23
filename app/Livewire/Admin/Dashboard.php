@@ -2,21 +2,24 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\User;
+use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
-use App\Models\PayrollPayment;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use App\Models\User;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
     public $stats = [];
+
     public $recentPayments = [];
+
     public $chartData = [];
+
     public $contractorStatusChartData = [];
+
     public $selectedMonth;
+
     public $selectedYear;
 
     public function mount()
@@ -88,7 +91,7 @@ class Dashboard extends Component
         $outstandingSubmissions = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
             ->get();
 
-        $outstandingBalance = $outstandingSubmissions->sum(function($submission) {
+        $outstandingBalance = $outstandingSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -119,9 +122,9 @@ class Dashboard extends Component
         $this->recentPayments = $recentSubmissions->map(function ($submission) {
             $clientName = $submission->user
                 ? $submission->user->name
-                : 'Client ' . $submission->contractor_clab_no;
+                : 'Client '.$submission->contractor_clab_no;
 
-            $status = match($submission->status) {
+            $status = match ($submission->status) {
                 'paid' => 'completed',
                 'pending_payment' => 'pending',
                 'overdue' => 'pending',

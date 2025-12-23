@@ -13,7 +13,9 @@ class NotificationEmail extends Mailable
     use Queueable, SerializesModels;
 
     public string $emailSubject;
+
     public string $emailBody;
+
     public array $emailAttachments;
 
     /**

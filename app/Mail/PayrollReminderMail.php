@@ -11,10 +11,15 @@ class PayrollReminderMail extends Mailable
     use Queueable, SerializesModels;
 
     public $contractorName;
+
     public $contractorClabNo;
+
     public $pendingWorkers;
+
     public $totalWorkers;
+
     public $periodMonth;
+
     public $reminderMessage;
 
     /**
@@ -35,7 +40,7 @@ class PayrollReminderMail extends Mailable
      */
     public function build()
     {
-        return $this->subject('Payroll Submission Reminder - ' . $this->periodMonth)
-                    ->view('emails.payroll-reminder');
+        return $this->subject('Payroll Submission Reminder - '.$this->periodMonth)
+            ->view('emails.payroll-reminder');
     }
 }

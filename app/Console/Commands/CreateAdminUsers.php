@@ -37,6 +37,7 @@ class CreateAdminUsers extends Command
 
         if ($superAdminPassword !== $superAdminPasswordConfirm) {
             $this->error('Passwords do not match for Super Admin!');
+
             return 1;
         }
 
@@ -75,6 +76,7 @@ class CreateAdminUsers extends Command
 
             if ($adminPassword !== $adminPasswordConfirm) {
                 $this->error('Passwords do not match for Admin!');
+
                 return 1;
             }
 

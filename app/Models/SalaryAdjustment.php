@@ -45,6 +45,7 @@ class SalaryAdjustment extends Model
         if ($this->old_salary == 0) {
             return 0;
         }
+
         return (($this->new_salary - $this->old_salary) / $this->old_salary) * 100;
     }
 }

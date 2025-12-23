@@ -4,14 +4,14 @@ namespace App\Exports;
 
 use App\Models\PayrollWorker;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PayrollDetailsSheet implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
+class PayrollDetailsSheet implements FromCollection, WithColumnWidths, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected $workers;
 
@@ -117,7 +117,8 @@ class PayrollDetailsSheet implements FromCollection, WithHeadings, WithMapping, 
         if ($amount === null || $amount == 0) {
             return 'RM 0.00';
         }
-        return 'RM ' . number_format($amount, 2);
+
+        return 'RM '.number_format($amount, 2);
     }
 
     public function styles(Worksheet $sheet)

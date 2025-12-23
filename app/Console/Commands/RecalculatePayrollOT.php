@@ -31,7 +31,7 @@ class RecalculatePayrollOT extends Command
         $this->info('Starting OT recalculation...');
 
         // Build query
-        $query = PayrollWorker::whereHas('payrollSubmission', function($q) {
+        $query = PayrollWorker::whereHas('payrollSubmission', function ($q) {
             $q->where('status', '!=', 'draft');
         });
 
@@ -42,20 +42,20 @@ class RecalculatePayrollOT extends Command
         }
 
         // Filter by workers with OT hours but no pay (unless --force)
-        if (!$this->option('force')) {
-            $query->where(function($q) {
-                $q->where(function($q) {
+        if (! $this->option('force')) {
+            $query->where(function ($q) {
+                $q->where(function ($q) {
                     $q->where('ot_normal_hours', '>', 0)
-                      ->where('ot_normal_pay', 0);
+                        ->where('ot_normal_pay', 0);
                 })
-                ->orWhere(function($q) {
-                    $q->where('ot_rest_hours', '>', 0)
-                      ->where('ot_rest_pay', 0);
-                })
-                ->orWhere(function($q) {
-                    $q->where('ot_public_hours', '>', 0)
-                      ->where('ot_public_pay', 0);
-                });
+                    ->orWhere(function ($q) {
+                        $q->where('ot_rest_hours', '>', 0)
+                            ->where('ot_rest_pay', 0);
+                    })
+                    ->orWhere(function ($q) {
+                        $q->where('ot_public_hours', '>', 0)
+                            ->where('ot_public_pay', 0);
+                    });
             });
         }
 
@@ -63,6 +63,7 @@ class RecalculatePayrollOT extends Command
 
         if ($workers->isEmpty()) {
             $this->warn('No workers found that need OT recalculation.');
+
             return 0;
         }
 
@@ -108,7 +109,7 @@ class RecalculatePayrollOT extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->info("Recalculation complete!");
+        $this->info('Recalculation complete!');
         $this->table(
             ['Status', 'Count'],
             [

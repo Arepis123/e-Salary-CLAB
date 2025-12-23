@@ -59,7 +59,7 @@ class Login extends Component
             'user_email' => $user->email,
             'module' => 'authentication',
             'action' => 'login',
-            'description' => "User logged in successfully",
+            'description' => 'User logged in successfully',
             'subject_type' => get_class($user),
             'subject_id' => $user->id,
             'properties' => [

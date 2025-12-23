@@ -32,7 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 if (request()->expectsJson()) {
                     return response()->json([
                         'message' => 'The request took too long to process. Please try again or contact support if the issue persists.',
-                        'error' => 'timeout'
+                        'error' => 'timeout',
                     ], 504);
                 }
 

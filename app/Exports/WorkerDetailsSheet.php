@@ -3,14 +3,14 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class WorkerDetailsSheet implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
+class WorkerDetailsSheet implements FromCollection, WithColumnWidths, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected $workers;
 
@@ -86,7 +86,7 @@ class WorkerDetailsSheet implements FromCollection, WithHeadings, WithMapping, W
             is_object($worker) ? ($worker->position ?? ($worker->workTrade ? $worker->workTrade->trade_desc : '-')) : '-',
             is_object($worker) ? $this->getGender($worker->wkr_gender) : '-',
             is_object($worker) ? ($worker->phone ?? '-') : '-',
-            is_object($worker) && $worker->basic_salary ? 'RM ' . number_format($worker->basic_salary, 2) : '-',
+            is_object($worker) && $worker->basic_salary ? 'RM '.number_format($worker->basic_salary, 2) : '-',
             $contract ? $contract->con_start->format('Y-m-d') : '-',
             $contract ? $contract->con_end->format('Y-m-d') : '-',
             $contractActive ? 'Active' : 'Inactive',
@@ -95,7 +95,7 @@ class WorkerDetailsSheet implements FromCollection, WithHeadings, WithMapping, W
 
     private function getGender($gender)
     {
-        return match($gender) {
+        return match ($gender) {
             1 => 'Male',
             2 => 'Female',
             default => '-'

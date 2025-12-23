@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 
 class PaymentHistoryController extends Controller
 {
@@ -17,7 +16,7 @@ class PaymentHistoryController extends Controller
     {
         $clabNo = $request->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('client.payments', [
                 'error' => 'No contractor CLAB number assigned to your account.',
             ]);
@@ -29,12 +28,12 @@ class PaymentHistoryController extends Controller
         // Get all payments for this contractor with submission details
         $payments = PayrollPayment::whereHas('submission', function ($query) use ($clabNo, $selectedYear) {
             $query->where('contractor_clab_no', $clabNo)
-                  ->whereYear('created_at', $selectedYear);
+                ->whereYear('created_at', $selectedYear);
         })
-        ->with(['submission'])
-        ->orderBy('completed_at', 'desc')
-        ->orderBy('created_at', 'desc')
-        ->paginate(10);
+            ->with(['submission'])
+            ->orderBy('completed_at', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
 
         // Calculate statistics
         $currentMonth = now()->month;
@@ -47,7 +46,7 @@ class PaymentHistoryController extends Controller
             ->where('year', $currentYear)
             ->get();
 
-        $thisMonthAmount = $thisMonthSubmissions->sum(function($submission) {
+        $thisMonthAmount = $thisMonthSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -61,7 +60,7 @@ class PaymentHistoryController extends Controller
             ->where('status', 'paid')
             ->get();
 
-        $lastMonthAmount = $lastMonthSubmissions->sum(function($submission) {
+        $lastMonthAmount = $lastMonthSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -71,7 +70,7 @@ class PaymentHistoryController extends Controller
             ->where('status', 'paid')
             ->get();
 
-        $thisYearAmount = $thisYearSubmissions->sum(function($submission) {
+        $thisYearAmount = $thisYearSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 

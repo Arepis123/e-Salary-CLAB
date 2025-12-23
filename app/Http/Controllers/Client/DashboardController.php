@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
-use App\Models\PayrollSubmission;
 use App\Models\News;
+use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
 use Illuminate\Http\Request;
 
@@ -24,7 +24,7 @@ class DashboardController extends Controller
         $clabNo = $request->user()->contractor_clab_no ?? $request->user()->username;
 
         // If user doesn't have a CLAB number or username, show error
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('client.dashboard', [
                 'error' => 'No contractor identifier assigned to your account. Please contact administrator.',
                 'workers' => collect([]),
@@ -56,7 +56,7 @@ class DashboardController extends Controller
         $allExpiringContracts = $this->contractWorkerService->getExpiringContracts(30);
 
         // Filter expiring contracts for this contractor only
-        $expiringContracts = $allExpiringContracts->filter(function($contract) use ($clabNo) {
+        $expiringContracts = $allExpiringContracts->filter(function ($contract) use ($clabNo) {
             return $contract->con_ctr_clab_no === $clabNo;
         });
 
@@ -86,12 +86,12 @@ class DashboardController extends Controller
             ->with('workers')
             ->get();
 
-        $submittedWorkerIds = $allSubmissionsThisMonth->flatMap(function($submission) {
+        $submittedWorkerIds = $allSubmissionsThisMonth->flatMap(function ($submission) {
             return $submission->workers->pluck('worker_id');
         })->unique()->toArray();
 
-        $remainingWorkers = $activeContracts->filter(function($contract) use ($submittedWorkerIds) {
-            return !in_array($contract->worker->wkr_id, $submittedWorkerIds);
+        $remainingWorkers = $activeContracts->filter(function ($contract) use ($submittedWorkerIds) {
+            return ! in_array($contract->worker->wkr_id, $submittedWorkerIds);
         });
 
         $unsubmittedWorkersCount = $remainingWorkers->count();
@@ -115,7 +115,7 @@ class DashboardController extends Controller
             ->whereIn('status', ['pending_payment', 'overdue'])
             ->get();
 
-        $outstandingBalance = $outstandingSubmissions->sum(function($submission) {
+        $outstandingBalance = $outstandingSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -126,7 +126,7 @@ class DashboardController extends Controller
             ->where('status', 'paid')
             ->get();
 
-        $yearToDatePaid = $paidSubmissions->sum(function($submission) {
+        $yearToDatePaid = $paidSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -180,7 +180,7 @@ class DashboardController extends Controller
             ->orderBy('month', 'desc')
             ->get();
 
-        return $drafts->map(function($draft) use ($clabNo) {
+        return $drafts->map(function ($draft) use ($clabNo) {
             // Get total active workers for that period
             $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
                 ->where('con_end', '>=', \Carbon\Carbon::create($draft->year, $draft->month, 1)->startOfMonth()->toDateString())
@@ -193,12 +193,12 @@ class DashboardController extends Controller
 
             // Get workers that have already been paid through finalized submissions for this same period
             $paidWorkerIds = \App\Models\PayrollWorker::whereHas('payrollSubmission', function ($query) use ($clabNo, $draft) {
-                    $query->where('contractor_clab_no', $clabNo)
-                          ->where('month', $draft->month)
-                          ->where('year', $draft->year)
-                          ->where('status', '!=', 'draft') // Finalized submissions only
-                          ->where('status', 'paid'); // Only paid submissions
-                })
+                $query->where('contractor_clab_no', $clabNo)
+                    ->where('month', $draft->month)
+                    ->where('year', $draft->year)
+                    ->where('status', '!=', 'draft') // Finalized submissions only
+                    ->where('status', 'paid'); // Only paid submissions
+            })
                 ->whereIn('worker_id', $activeWorkerIds)
                 ->pluck('worker_id')
                 ->unique();
@@ -210,7 +210,7 @@ class DashboardController extends Controller
                 ->where('con_ctr_clab_no', $clabNo)
                 ->with('worker')
                 ->get()
-                ->map(function($contractWorker) {
+                ->map(function ($contractWorker) {
                     return [
                         'worker_id' => $contractWorker->con_wkr_id,
                         'name' => $contractWorker->worker ? $contractWorker->worker->wkr_name : 'Unknown Worker',
@@ -230,7 +230,7 @@ class DashboardController extends Controller
                 'missing_worker_details' => $missingWorkerDetails,
                 'created_at' => $draft->created_at,
             ];
-        })->filter(function($draft) {
+        })->filter(function ($draft) {
             // Only show drafts that still have workers to submit (either in draft or missing)
             return ($draft['draft_workers'] + $draft['missing_workers']) > 0;
         })->values(); // Re-index array after filtering
@@ -295,7 +295,7 @@ class DashboardController extends Controller
                     ->where('con_ctr_clab_no', $clabNo)
                     ->with('worker') // Load worker relationship for names
                     ->get()
-                    ->map(function($contractWorker) {
+                    ->map(function ($contractWorker) {
                         return [
                             'worker_id' => $contractWorker->con_wkr_id,
                             'name' => $contractWorker->worker ? $contractWorker->worker->wkr_name : 'Unknown Worker',

@@ -2,13 +2,13 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\NotificationTemplate;
 use App\Models\NotificationLog;
+use App\Models\NotificationTemplate;
 use App\Models\User;
 use App\Services\NotificationService;
 use Flux\Flux;
-use Livewire\Component;
 use Livewire\Attributes\Url;
+use Livewire\Component;
 use Livewire\WithFileUploads;
 
 class Notifications extends Component
@@ -19,7 +19,9 @@ class Notifications extends Component
     public $activeTab = 'templates';
 
     public $showTemplateModal = false;
+
     public $editingTemplateId = null;
+
     public $templateForm = [
         'name' => '',
         'slug' => '',
@@ -32,9 +34,13 @@ class Notifications extends Component
     ];
 
     public $selectedTemplateId = null;
+
     public $selectedRecipients = [];
+
     public $customBody = '';
+
     public $sendToAll = false;
+
     public $attachments = null;
 
     protected $notificationService;
@@ -90,7 +96,7 @@ class Notifications extends Component
     {
         $validated = $this->validate([
             'templateForm.name' => 'required|string|max:255',
-            'templateForm.slug' => 'required|string|max:255|unique:notification_templates,slug,' . $this->editingTemplateId,
+            'templateForm.slug' => 'required|string|max:255|unique:notification_templates,slug,'.$this->editingTemplateId,
             'templateForm.type' => 'required|in:email,sms,system',
             'templateForm.trigger_type' => 'required',
             'templateForm.subject' => 'required_if:templateForm.type,email',
@@ -124,7 +130,7 @@ class Notifications extends Component
     public function toggleTemplateStatus($templateId)
     {
         $template = NotificationTemplate::findOrFail($templateId);
-        $template->update(['is_active' => !$template->is_active]);
+        $template->update(['is_active' => ! $template->is_active]);
     }
 
     public function removeAttachment()
@@ -161,7 +167,7 @@ class Notifications extends Component
 
                 // Add timestamp to avoid conflicts if same file is uploaded multiple times
                 $timestamp = now()->format('YmdHis');
-                $filename = $sanitized . '_' . $timestamp . '.' . $extension;
+                $filename = $sanitized.'_'.$timestamp.'.'.$extension;
 
                 // Store the file with the sanitized original name
                 $path = $this->attachments->storeAs('notifications/attachments', $filename, 'local');
@@ -173,7 +179,7 @@ class Notifications extends Component
                     if ($disk->exists($path)) {
                         $uploadedFiles[] = [
                             'path' => $path,
-                            'original_name' => $originalName
+                            'original_name' => $originalName,
                         ];
                     } else {
                         \Log::error('File was stored but cannot be found', ['path' => $path]);
@@ -183,7 +189,7 @@ class Notifications extends Component
                 }
             } catch (\Exception $e) {
                 \Log::error('File upload failed', [
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -204,7 +210,7 @@ class Notifications extends Component
         Flux::toast(
             variant: 'success',
             heading: 'Notifications sent!',
-            text: 'Successfully sent to ' . $recipients->count() . ' recipient(s).'
+            text: 'Successfully sent to '.$recipients->count().' recipient(s).'
         );
         $this->reset(['selectedTemplateId', 'selectedRecipients', 'customBody', 'sendToAll', 'attachments']);
     }
@@ -227,8 +233,8 @@ class Notifications extends Component
         // Group logs by batch (same template, similar time, same sender)
         $groupedLogs = [];
         foreach ($allLogs as $log) {
-            $key = $log->notification_template_id . '_' . $log->sent_by . '_' . $log->created_at->format('Y-m-d H:i');
-            if (!isset($groupedLogs[$key])) {
+            $key = $log->notification_template_id.'_'.$log->sent_by.'_'.$log->created_at->format('Y-m-d H:i');
+            if (! isset($groupedLogs[$key])) {
                 $groupedLogs[$key] = [
                     'primary' => $log,
                     'recipients' => [],

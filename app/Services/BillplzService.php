@@ -9,10 +9,15 @@ use Illuminate\Support\Facades\Log;
 class BillplzService
 {
     protected Client $client;
+
     protected string $apiKey;
+
     protected string $collectionId;
+
     protected string $xSignatureKey;
+
     protected string $baseUrl;
+
     protected bool $sandbox;
 
     public function __construct()
@@ -29,15 +34,14 @@ class BillplzService
             'headers' => [
                 'Accept' => 'application/json',
             ],
-            'verify' => !$this->sandbox, // Disable SSL verification in sandbox
+            'verify' => ! $this->sandbox, // Disable SSL verification in sandbox
         ]);
     }
 
     /**
      * Create a new bill for payroll payment
      *
-     * @param array $data Bill data
-     * @return array|null
+     * @param  array  $data  Bill data
      */
     public function createBill(array $data): ?array
     {
@@ -76,14 +80,12 @@ class BillplzService
 
     /**
      * Get bill details
-     *
-     * @param string $billId
-     * @return array|null
      */
     public function getBill(string $billId): ?array
     {
         try {
             $response = $this->client->get("bills/{$billId}");
+
             return json_decode($response->getBody()->getContents(), true);
         } catch (GuzzleException $e) {
             Log::error('Billplz get bill failed', [
@@ -97,9 +99,6 @@ class BillplzService
 
     /**
      * Delete a bill
-     *
-     * @param string $billId
-     * @return bool
      */
     public function deleteBill(string $billId): bool
     {
@@ -123,14 +122,10 @@ class BillplzService
 
     /**
      * Validate webhook signature
-     *
-     * @param string $billplzId
-     * @param string $xSignature
-     * @return bool
      */
     public function validateSignature(string $billplzId, string $xSignature): bool
     {
-        $computedSignature = hash_hmac('sha256', $this->xSignatureKey . '|' . $billplzId, $this->apiKey);
+        $computedSignature = hash_hmac('sha256', $this->xSignatureKey.'|'.$billplzId, $this->apiKey);
 
         return hash_equals($computedSignature, $xSignature);
     }
@@ -138,9 +133,6 @@ class BillplzService
     /**
      * Convert RM amount to sen (cents)
      * RM 1,721.25 = 172125 sen
-     *
-     * @param float $amount
-     * @return int
      */
     protected function convertToSen(float $amount): int
     {
@@ -149,9 +141,6 @@ class BillplzService
 
     /**
      * Convert sen to RM amount
-     *
-     * @param int $sen
-     * @return float
      */
     public function convertToRinggit(int $sen): float
     {
@@ -160,20 +149,14 @@ class BillplzService
 
     /**
      * Get payment URL with auto-submit for direct gateway
-     *
-     * @param string $billUrl
-     * @return string
      */
     public function getDirectPaymentUrl(string $billUrl): string
     {
-        return $billUrl . '?auto_submit=true';
+        return $billUrl.'?auto_submit=true';
     }
 
     /**
      * Create a collection (one-time setup)
-     *
-     * @param string $title
-     * @return array|null
      */
     public function createCollection(string $title): ?array
     {
@@ -196,8 +179,6 @@ class BillplzService
 
     /**
      * Check if sandbox mode is enabled
-     *
-     * @return bool
      */
     public function isSandbox(): bool
     {

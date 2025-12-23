@@ -3,8 +3,8 @@
 namespace App\Livewire\Client;
 
 use App\Models\PayrollSubmission;
-use Livewire\Component;
 use Livewire\Attributes\Url;
+use Livewire\Component;
 
 class Invoices extends Component
 {
@@ -30,7 +30,7 @@ class Invoices extends Component
 
     public function mount($highlight = null)
     {
-        if (!$this->year) {
+        if (! $this->year) {
             $this->year = now()->year;
         }
 
@@ -82,8 +82,9 @@ class Invoices extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             session()->flash('error', 'No contractor CLAB number assigned.');
+
             return;
         }
 
@@ -102,7 +103,7 @@ class Invoices extends Component
 
             session()->flash('success', "Draft for {$submission->month_year} has been submitted for admin review. Payment will be available after admin approval.");
         } catch (\Exception $e) {
-            session()->flash('error', 'Failed to finalize draft: ' . $e->getMessage());
+            session()->flash('error', 'Failed to finalize draft: '.$e->getMessage());
         }
     }
 
@@ -110,7 +111,7 @@ class Invoices extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('livewire.client.invoices', [
                 'error' => 'No contractor CLAB number assigned to your account.',
                 'invoices' => collect([]),
@@ -139,9 +140,10 @@ class Invoices extends Component
 
         // Apply search filter
         if ($this->search) {
-            $allInvoices = $allInvoices->filter(function($invoice) {
+            $allInvoices = $allInvoices->filter(function ($invoice) {
                 $searchLower = strtolower($this->search);
-                $invoiceNumber = 'INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT);
+                $invoiceNumber = 'INV-'.str_pad($invoice->id, 4, '0', STR_PAD_LEFT);
+
                 return str_contains(strtolower($invoiceNumber), $searchLower) ||
                        str_contains(strtolower($invoice->month_year ?? ''), $searchLower);
             });
@@ -149,21 +151,21 @@ class Invoices extends Component
 
         // Apply status filter
         if ($this->statusFilter && $this->statusFilter !== 'all') {
-            $allInvoices = $allInvoices->filter(function($invoice) {
+            $allInvoices = $allInvoices->filter(function ($invoice) {
                 return $invoice->status === $this->statusFilter;
             });
         }
 
         // Apply sorting
-        $allInvoices = $allInvoices->sort(function($a, $b) {
-            $primaryA = match($this->sortBy) {
+        $allInvoices = $allInvoices->sort(function ($a, $b) {
+            $primaryA = match ($this->sortBy) {
                 'invoice_number' => str_pad($a->id, 4, '0', STR_PAD_LEFT),
                 'period' => $a->month_year ?? '',
                 'workers' => $a->total_workers ?? 0,
                 'amount' => $a->total_with_penalty ?? 0,
                 'issue_date' => $a->submitted_at ? $a->submitted_at->timestamp : 0,
                 'due_date' => $a->payment_deadline ? $a->payment_deadline->timestamp : 0,
-                'status' => match($a->status) {
+                'status' => match ($a->status) {
                     'overdue' => 0,
                     'pending_payment' => 1,
                     'paid' => 2,
@@ -173,14 +175,14 @@ class Invoices extends Component
                 default => $a->submitted_at ? $a->submitted_at->timestamp : 0,
             };
 
-            $primaryB = match($this->sortBy) {
+            $primaryB = match ($this->sortBy) {
                 'invoice_number' => str_pad($b->id, 4, '0', STR_PAD_LEFT),
                 'period' => $b->month_year ?? '',
                 'workers' => $b->total_workers ?? 0,
                 'amount' => $b->total_with_penalty ?? 0,
                 'issue_date' => $b->submitted_at ? $b->submitted_at->timestamp : 0,
                 'due_date' => $b->payment_deadline ? $b->payment_deadline->timestamp : 0,
-                'status' => match($b->status) {
+                'status' => match ($b->status) {
                     'overdue' => 0,
                     'pending_payment' => 1,
                     'paid' => 2,
@@ -210,7 +212,7 @@ class Invoices extends Component
         $pendingInvoices = $allSubmissions->whereIn('status', ['draft', 'pending_payment', 'overdue'])->count();
         $paidInvoices = $allSubmissions->where('status', 'paid')->count();
         // Use total_due accessor to include dynamic penalty calculation
-        $totalInvoiced = $allSubmissions->sum(function($submission) {
+        $totalInvoiced = $allSubmissions->sum(function ($submission) {
             return $submission->total_due;
         });
 
@@ -258,11 +260,13 @@ class Invoices extends Component
         // Authorization check - user can only download their own breakdown
         if ($submission->contractor_clab_no !== auth()->user()->contractor_clab_no) {
             \Flux\Flux::toast(variant: 'danger', text: 'Unauthorized access.');
+
             return;
         }
 
-        if (!$submission->hasBreakdownFile()) {
+        if (! $submission->hasBreakdownFile()) {
             \Flux\Flux::toast(variant: 'warning', text: 'No breakdown file available for this invoice.');
+
             return;
         }
 

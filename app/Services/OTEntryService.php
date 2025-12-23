@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\ContractorWindowSetting;
 use App\Models\MonthlyOTEntry;
-use App\Models\Worker;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class OTEntryService
 {
@@ -15,7 +16,54 @@ class OTEntryService
     public function isWithinEntryWindow(?Carbon $date = null): bool
     {
         $checkDate = $date ?? now();
+
         return $checkDate->day >= 1 && $checkDate->day <= 15;
+    }
+
+    /**
+     * Check if contractor window is open (manual override or date-based)
+     * This replaces the simple isWithinEntryWindow check
+     */
+    public function isContractorWindowOpen(string $clabNo, ?Carbon $date = null): bool
+    {
+        // Check cache first for performance
+        return Cache::remember("contractor_window:{$clabNo}", 300, function () use ($clabNo, $date) {
+            $setting = ContractorWindowSetting::where('contractor_clab_no', $clabNo)->first();
+
+            // If manual override exists, use it
+            if ($setting && $setting->is_window_open) {
+                return true;
+            }
+
+            // If custom date range exists, check it
+            if ($setting && $setting->custom_start_date && $setting->custom_end_date) {
+                $checkDate = $date ?? now();
+
+                return $checkDate->between($setting->custom_start_date, $setting->custom_end_date);
+            }
+
+            // Fall back to default 1-15 rule
+            return $this->isWithinEntryWindow($date);
+        });
+    }
+
+    /**
+     * Get window status for contractor with detailed info
+     */
+    public function getContractorWindowStatus(string $clabNo): array
+    {
+        $setting = ContractorWindowSetting::where('contractor_clab_no', $clabNo)->first();
+        $isOpen = $this->isContractorWindowOpen($clabNo);
+        $defaultWindowOpen = $this->isWithinEntryWindow();
+
+        return [
+            'is_open' => $isOpen,
+            'is_manually_controlled' => $setting && $setting->is_window_open,
+            'is_default_window_open' => $defaultWindowOpen,
+            'setting' => $setting,
+            'can_enter_ot' => $isOpen,
+            'can_submit_transactions' => $isOpen,
+        ];
     }
 
     /**
@@ -131,10 +179,11 @@ class OTEntryService
     public function saveEntry(array $data): MonthlyOTEntry
     {
         $period = $this->getEntryPeriod();
+        $clabNo = $data['contractor_clab_no'];
 
-        // Check if within window
-        if (!$period['is_within_window']) {
-            throw new \Exception('OT entry window is closed. Entries can only be submitted between 1st and 15th of the month.');
+        // Use contractor-specific window check
+        if (! $this->isContractorWindowOpen($clabNo)) {
+            throw new \Exception('OT entry window is closed for your contractor. Please contact administrator.');
         }
 
         // Find or create entry
@@ -167,9 +216,9 @@ class OTEntryService
     {
         $period = $this->getEntryPeriod();
 
-        // Check if within window
-        if (!$period['is_within_window']) {
-            throw new \Exception('OT entry window is closed. Entries can only be submitted between 1st and 15th of the month.');
+        // Use contractor-specific window check
+        if (! $this->isContractorWindowOpen($clabNo)) {
+            throw new \Exception('OT entry window is closed for your contractor. Please contact administrator.');
         }
 
         $entries = MonthlyOTEntry::forContractorPeriod(

@@ -34,7 +34,7 @@ echo "\n";
 
 // Get all IDs
 $ids = $submissions->pluck('id')->toArray();
-echo "Submission IDs to delete: " . implode(', ', $ids) . "\n\n";
+echo 'Submission IDs to delete: '.implode(', ', $ids)."\n\n";
 
 // Start deletion
 echo "Starting deletion...\n\n";
@@ -48,10 +48,10 @@ try {
         ->pluck('id')
         ->toArray();
 
-    echo "Worker IDs found: " . count($workerIds) . "\n";
+    echo 'Worker IDs found: '.count($workerIds)."\n";
 
     // Delete in order
-    if (!empty($workerIds)) {
+    if (! empty($workerIds)) {
         $t = DB::table('payroll_worker_transactions')->whereIn('payroll_worker_id', $workerIds)->delete();
         echo "Deleted {$t} transactions\n";
     }
@@ -70,7 +70,7 @@ try {
 
 } catch (\Exception $e) {
     DB::rollBack();
-    echo "\n❌ ERROR: " . $e->getMessage() . "\n\n";
+    echo "\n❌ ERROR: ".$e->getMessage()."\n\n";
     exit(1);
 }
 

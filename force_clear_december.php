@@ -38,8 +38,8 @@ try {
         exit(0);
     }
 
-    echo "Found " . count($submissionIds) . " December 2025 submission(s)\n";
-    echo "Submission IDs: " . implode(', ', $submissionIds) . "\n\n";
+    echo 'Found '.count($submissionIds)." December 2025 submission(s)\n";
+    echo 'Submission IDs: '.implode(', ', $submissionIds)."\n\n";
 
     // Get worker IDs for these submissions
     $workerIds = DB::table('payroll_workers')
@@ -47,12 +47,12 @@ try {
         ->pluck('id')
         ->toArray();
 
-    echo "Found " . count($workerIds) . " worker record(s)\n\n";
+    echo 'Found '.count($workerIds)." worker record(s)\n\n";
 
     echo "🗑️  Deleting data...\n\n";
 
     // Delete transactions (if worker IDs exist)
-    if (!empty($workerIds)) {
+    if (! empty($workerIds)) {
         $deletedTransactions = DB::table('payroll_transactions')
             ->whereIn('payroll_worker_id', $workerIds)
             ->delete();
@@ -88,7 +88,7 @@ try {
     echo "--------\n";
     echo "Submissions: {$deletedSubmissions}\n";
     echo "Workers: {$deletedWorkers}\n";
-    echo "Transactions: " . ($deletedTransactions ?? 0) . "\n";
+    echo 'Transactions: '.($deletedTransactions ?? 0)."\n";
     echo "Payments: {$deletedPayments}\n";
     echo "\n";
 

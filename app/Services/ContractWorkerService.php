@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Contractor;
 use App\Models\ContractWorker;
 use App\Models\Worker;
-use App\Models\Contractor;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -23,7 +23,7 @@ class ContractWorkerService
         return Cache::remember(
             'contract_workers:active',
             $this->cacheTTL,
-            fn() => ContractWorker::active()
+            fn () => ContractWorker::active()
                 ->with(['contractor', 'worker'])
                 ->get()
         );
@@ -37,7 +37,7 @@ class ContractWorkerService
         return Cache::remember(
             "contract_workers:contractor:{$clabNo}",
             $this->cacheTTL,
-            fn() => ContractWorker::byContractor($clabNo)
+            fn () => ContractWorker::byContractor($clabNo)
                 ->with('worker')
                 ->get()
         );
@@ -51,7 +51,7 @@ class ContractWorkerService
         return Cache::remember(
             "contract_workers:contractor:{$clabNo}:active",
             $this->cacheTTL,
-            fn() => ContractWorker::byContractor($clabNo)
+            fn () => ContractWorker::byContractor($clabNo)
                 ->active()
                 ->with('worker')
                 ->get()
@@ -68,14 +68,14 @@ class ContractWorkerService
         return Cache::remember(
             "contracted_workers:contractor:{$clabNo}",
             $this->cacheTTL,
-            function() use ($clabNo) {
+            function () use ($clabNo) {
                 $contractWorkerIds = ContractWorker::byContractor($clabNo)
                     ->pluck('con_wkr_id');
 
                 return Worker::whereIn('wkr_id', $contractWorkerIds)
                     ->with(['country', 'workTrade'])
                     ->get()
-                    ->map(function($worker) use ($clabNo) {
+                    ->map(function ($worker) use ($clabNo) {
                         // Attach contract info to each worker (most recent contract)
                         $contract = ContractWorker::where('con_wkr_id', $worker->wkr_id)
                             ->where('con_ctr_clab_no', $clabNo)
@@ -83,15 +83,16 @@ class ContractWorkerService
                             ->first();
 
                         $worker->contract_info = $contract;
+
                         return $worker;
                     })
                     ->sortBy([
                         // Sort by active status first (active = 0, inactive = 1, so active comes first)
-                        fn($worker) => $worker->contract_info && $worker->contract_info->isActive() ? 0 : 1,
+                        fn ($worker) => $worker->contract_info && $worker->contract_info->isActive() ? 0 : 1,
                         // Then by country name (ascending)
-                        fn($worker) => $worker->country?->cty_desc ?? 'ZZZ',
+                        fn ($worker) => $worker->country?->cty_desc ?? 'ZZZ',
                         // Then by worker name
-                        fn($worker) => $worker->wkr_name,
+                        fn ($worker) => $worker->wkr_name,
                     ])
                     ->values(); // Reset array keys after sorting
             }
@@ -108,7 +109,7 @@ class ContractWorkerService
         return Cache::remember(
             "contracted_workers:contractor:{$clabNo}:active_only",
             $this->cacheTTL,
-            function() use ($clabNo) {
+            function () use ($clabNo) {
                 $contractWorkerIds = ContractWorker::byContractor($clabNo)
                     ->active()
                     ->pluck('con_wkr_id');
@@ -116,7 +117,7 @@ class ContractWorkerService
                 return Worker::whereIn('wkr_id', $contractWorkerIds)
                     ->with(['country', 'workTrade'])
                     ->get()
-                    ->map(function($worker) use ($clabNo) {
+                    ->map(function ($worker) use ($clabNo) {
                         // Attach contract info to each worker
                         $contract = ContractWorker::where('con_wkr_id', $worker->wkr_id)
                             ->where('con_ctr_clab_no', $clabNo)
@@ -124,13 +125,14 @@ class ContractWorkerService
                             ->first();
 
                         $worker->contract_info = $contract;
+
                         return $worker;
                     })
                     ->sortBy([
                         // Sort by country name (ascending)
-                        fn($worker) => $worker->country?->cty_desc ?? 'ZZZ',
+                        fn ($worker) => $worker->country?->cty_desc ?? 'ZZZ',
                         // Then by worker name
-                        fn($worker) => $worker->wkr_name,
+                        fn ($worker) => $worker->wkr_name,
                     ])
                     ->values(); // Reset array keys after sorting
             }
@@ -145,7 +147,7 @@ class ContractWorkerService
         return Cache::remember(
             'contracted_contractors:active',
             $this->cacheTTL,
-            function() {
+            function () {
                 $clabNumbers = ContractWorker::active()
                     ->distinct()
                     ->pluck('con_ctr_clab_no');
@@ -163,7 +165,7 @@ class ContractWorkerService
         return Cache::remember(
             "contract_worker:{$contractId}",
             $this->cacheTTL,
-            fn() => ContractWorker::with(['contractor', 'worker'])->find($contractId)
+            fn () => ContractWorker::with(['contractor', 'worker'])->find($contractId)
         );
     }
 
@@ -175,7 +177,7 @@ class ContractWorkerService
         return Cache::remember(
             "contract_workers:expiring:{$days}",
             $this->cacheTTL,
-            function() use ($days) {
+            function () use ($days) {
                 $endDate = now()->addDays($days)->toDateString();
 
                 return ContractWorker::where('con_end', '>=', now()->toDateString())
@@ -195,7 +197,7 @@ class ContractWorkerService
         return Cache::remember(
             'contract_workers:statistics',
             $this->cacheTTL,
-            function() {
+            function () {
                 $total = ContractWorker::count();
                 $active = ContractWorker::active()->count();
                 $expired = ContractWorker::expired()->count();
@@ -228,12 +230,12 @@ class ContractWorkerService
      */
     public function searchContracts(string $query): Collection
     {
-        $cacheKey = "contract_workers:search:" . md5($query);
+        $cacheKey = 'contract_workers:search:'.md5($query);
 
         return Cache::remember(
             $cacheKey,
             $this->cacheTTL,
-            function() use ($query) {
+            function () use ($query) {
                 // Get matching worker IDs
                 $workerIds = Worker::where('wkr_name', 'LIKE', "%{$query}%")
                     ->orWhere('wkr_passno', 'LIKE', "%{$query}%")
@@ -318,18 +320,18 @@ class ContractWorkerService
         }
 
         // Get workers who had OT in the previous month's payroll
-        $workersWithOT = \App\Models\PayrollWorker::whereHas('payrollSubmission', function($query) use ($clabNo, $previousMonth, $previousYear) {
+        $workersWithOT = \App\Models\PayrollWorker::whereHas('payrollSubmission', function ($query) use ($clabNo, $previousMonth, $previousYear) {
             $query->where('contractor_clab_no', $clabNo)
-                  ->where('month', $previousMonth)
-                  ->where('year', $previousYear);
+                ->where('month', $previousMonth)
+                ->where('year', $previousYear);
         })
-        ->where(function($query) {
-            $query->where('ot_normal_hours', '>', 0)
-                  ->orWhere('ot_rest_hours', '>', 0)
-                  ->orWhere('ot_public_hours', '>', 0);
-        })
-        ->pluck('worker_id')
-        ->unique();
+            ->where(function ($query) {
+                $query->where('ot_normal_hours', '>', 0)
+                    ->orWhere('ot_rest_hours', '>', 0)
+                    ->orWhere('ot_public_hours', '>', 0);
+            })
+            ->pluck('worker_id')
+            ->unique();
 
         if ($workersWithOT->isEmpty()) {
             return collect([]);
@@ -339,7 +341,7 @@ class ContractWorkerService
         return Worker::whereIn('wkr_id', $workersWithOT)
             ->with(['country', 'workTrade'])
             ->get()
-            ->map(function($worker) use ($clabNo) {
+            ->map(function ($worker) use ($clabNo) {
                 // Attach contract info (most recent contract with this contractor)
                 $contract = ContractWorker::where('con_wkr_id', $worker->wkr_id)
                     ->where('con_ctr_clab_no', $clabNo)
@@ -347,6 +349,7 @@ class ContractWorkerService
                     ->first();
 
                 $worker->contract_info = $contract;
+
                 return $worker;
             });
     }
@@ -357,6 +360,7 @@ class ContractWorkerService
     public function setCacheTTL(int $seconds): self
     {
         $this->cacheTTL = $seconds;
+
         return $this;
     }
 }

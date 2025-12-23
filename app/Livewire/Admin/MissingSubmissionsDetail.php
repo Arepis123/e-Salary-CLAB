@@ -2,19 +2,22 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\PayrollSubmission;
+use App\Models\Contractor;
+use App\Models\ContractWorker;
 use App\Models\PayrollWorker;
 use App\Models\User;
-use App\Models\ContractWorker;
-use App\Models\Contractor;
 use Livewire\Component;
 
 class MissingSubmissionsDetail extends Component
 {
     public $clabNo;
+
     public $contractor;
+
     public $submittedWorkers = [];
+
     public $unsubmittedWorkers = [];
+
     public $stats = [];
 
     public function mount($clabNo)
@@ -45,7 +48,7 @@ class MissingSubmissionsDetail extends Component
 
             $this->contractor = [
                 'clab_no' => $this->clabNo,
-                'name' => $contractorData ? $contractorData->ctr_comp_name : 'Contractor ' . $this->clabNo,
+                'name' => $contractorData ? $contractorData->ctr_comp_name : 'Contractor '.$this->clabNo,
                 'email' => $contractorData ? $contractorData->ctr_email : null,
                 'phone' => $contractorData ? ($contractorData->ctr_contact_mobileno ?? $contractorData->ctr_telno) : null,
             ];
@@ -65,10 +68,10 @@ class MissingSubmissionsDetail extends Component
 
         // Get submitted worker IDs for current month
         $submittedWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($currentMonth, $currentYear) {
-                $query->where('month', $currentMonth)
-                      ->where('year', $currentYear)
-                      ->where('contractor_clab_no', $this->clabNo);
-            })
+            $query->where('month', $currentMonth)
+                ->where('year', $currentYear)
+                ->where('contractor_clab_no', $this->clabNo);
+        })
             ->pluck('worker_id')
             ->toArray();
 

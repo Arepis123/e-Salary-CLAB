@@ -4,8 +4,8 @@ namespace App\Livewire\Admin;
 
 use App\Models\ActivityLog;
 use App\Models\User;
-use Livewire\Component;
 use Livewire\Attributes\Url;
+use Livewire\Component;
 
 class ActivityLogs extends Component
 {
@@ -31,11 +31,17 @@ class ActivityLogs extends Component
     public $page = 1;
 
     public $perPage = 40;
+
     public $showFilters = false;
+
     public $contractors = [];
+
     public $modules = [];
+
     public $actions = [];
+
     public $selectedLog = null;
+
     public $showDetailModal = false;
 
     public function mount()
@@ -53,7 +59,7 @@ class ActivityLogs extends Component
 
     public function toggleFilters()
     {
-        $this->showFilters = !$this->showFilters;
+        $this->showFilters = ! $this->showFilters;
     }
 
     public function clearFilters()
@@ -159,9 +165,9 @@ class ActivityLogs extends Component
         // Apply search
         if ($this->search) {
             $query->where(function ($q) {
-                $q->where('description', 'like', '%' . $this->search . '%')
-                  ->orWhere('user_name', 'like', '%' . $this->search . '%')
-                  ->orWhere('user_email', 'like', '%' . $this->search . '%');
+                $q->where('description', 'like', '%'.$this->search.'%')
+                    ->orWhere('user_name', 'like', '%'.$this->search.'%')
+                    ->orWhere('user_email', 'like', '%'.$this->search.'%');
             });
         }
 

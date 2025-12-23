@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 class PayrollSubmissionsExport implements WithMultipleSheets
 {
     protected $submissions;
+
     protected $filters;
 
     public function __construct($submissions, $filters = [])

@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\PayrollWorkerTransaction;
-use App\Models\PayrollPayment;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -42,13 +42,14 @@ class ClearDecemberPayroll extends Command
 
         if ($submissions->isEmpty()) {
             $this->info("No December {$year} payroll data found.");
+
             return Command::SUCCESS;
         }
 
         // Count related records
         $submissionIds = $submissions->pluck('id');
         $workersCount = PayrollWorker::whereIn('payroll_submission_id', $submissionIds)->count();
-        $transactionsCount = PayrollWorkerTransaction::whereIn('payroll_worker_id', function($query) use ($submissionIds) {
+        $transactionsCount = PayrollWorkerTransaction::whereIn('payroll_worker_id', function ($query) use ($submissionIds) {
             $query->select('id')
                 ->from('payroll_workers')
                 ->whereIn('payroll_submission_id', $submissionIds);
@@ -57,7 +58,7 @@ class ClearDecemberPayroll extends Command
 
         // Display what will be deleted
         $this->newLine();
-        $this->warn("The following records will be PERMANENTLY DELETED:");
+        $this->warn('The following records will be PERMANENTLY DELETED:');
         $this->table(
             ['Type', 'Count'],
             [
@@ -70,15 +71,16 @@ class ClearDecemberPayroll extends Command
 
         // Show submission details
         $this->newLine();
-        $this->info("Submission Details:");
+        $this->info('Submission Details:');
         foreach ($submissions as $submission) {
-            $this->line("  - ID: {$submission->id} | Contractor: {$submission->contractor_clab_no} | Status: {$submission->status} | Workers: " . $submission->workers()->count());
+            $this->line("  - ID: {$submission->id} | Contractor: {$submission->contractor_clab_no} | Status: {$submission->status} | Workers: ".$submission->workers()->count());
         }
 
         // Confirm deletion
-        if (!$this->option('force')) {
-            if (!$this->confirm('Do you want to proceed with deleting all December payroll data?')) {
+        if (! $this->option('force')) {
+            if (! $this->confirm('Do you want to proceed with deleting all December payroll data?')) {
                 $this->info('Operation cancelled.');
+
                 return Command::SUCCESS;
             }
         }
@@ -133,7 +135,8 @@ class ClearDecemberPayroll extends Command
 
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('Failed to clear December payroll data: ' . $e->getMessage());
+            $this->error('Failed to clear December payroll data: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }

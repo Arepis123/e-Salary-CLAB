@@ -22,7 +22,7 @@ class WorkersController extends Controller
         $clabNo = $request->user()->contractor_clab_no ?? $request->user()->username;
 
         // If user doesn't have a CLAB number, show error
-        if (!$clabNo) {
+        if (! $clabNo) {
             return view('client.workers', [
                 'error' => 'No contractor identifier assigned to your account. Please contact administrator.',
                 'workers' => collect([]),
@@ -55,7 +55,7 @@ class WorkersController extends Controller
         // Apply search filter
         $search = $request->input('search');
         if ($search) {
-            $allWorkers = $allWorkers->filter(function($worker) use ($search) {
+            $allWorkers = $allWorkers->filter(function ($worker) use ($search) {
                 return str_contains(strtolower($worker->name), strtolower($search)) ||
                        str_contains(strtolower($worker->ic_number), strtolower($search)) ||
                        str_contains(strtolower($worker->wkr_id), strtolower($search));
@@ -65,21 +65,22 @@ class WorkersController extends Controller
         // Apply status filter
         $statusFilter = $request->input('status');
         if ($statusFilter && $statusFilter !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) use ($statusFilter) {
+            $allWorkers = $allWorkers->filter(function ($worker) use ($statusFilter) {
                 if ($statusFilter === 'active') {
                     return $worker->contract_info && $worker->contract_info->isActive();
                 } elseif ($statusFilter === 'inactive') {
-                    return !$worker->contract_info || !$worker->contract_info->isActive();
+                    return ! $worker->contract_info || ! $worker->contract_info->isActive();
                 }
+
                 return true;
             });
         }
 
         // Apply country filter
         $countryFilter = $request->input('country');
-        \Log::info('Country Filter Received: ' . ($countryFilter ?? 'NULL'));
+        \Log::info('Country Filter Received: '.($countryFilter ?? 'NULL'));
         if ($countryFilter && $countryFilter !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) use ($countryFilter) {
+            $allWorkers = $allWorkers->filter(function ($worker) use ($countryFilter) {
                 return $worker->country && $worker->country->cty_code === $countryFilter;
             });
         }
@@ -87,17 +88,17 @@ class WorkersController extends Controller
         // Apply position filter
         $positionFilter = $request->input('position');
         if ($positionFilter && $positionFilter !== 'all') {
-            $allWorkers = $allWorkers->filter(function($worker) use ($positionFilter) {
+            $allWorkers = $allWorkers->filter(function ($worker) use ($positionFilter) {
                 return $worker->workTrade && $worker->workTrade->trade_code === $positionFilter;
             });
         }
 
         // Calculate statistics
-        $activeWorkers = $allWorkers->filter(function($worker) {
+        $activeWorkers = $allWorkers->filter(function ($worker) {
             return $worker->contract_info && $worker->contract_info->isActive();
         });
 
-        $totalSalary = $allWorkers->sum(function($worker) {
+        $totalSalary = $allWorkers->sum(function ($worker) {
             return $worker->basic_salary ?? 0;
         });
 
@@ -128,7 +129,7 @@ class WorkersController extends Controller
             'to' => min($currentPage * $perPage, $total),
         ];
 
-        \Log::info('Passing to view - countryFilter: ' . ($countryFilter ?? 'NULL') . ', positionFilter: ' . ($positionFilter ?? 'NULL'));
+        \Log::info('Passing to view - countryFilter: '.($countryFilter ?? 'NULL').', positionFilter: '.($positionFilter ?? 'NULL'));
 
         return view('client.workers', compact('workers', 'stats', 'pagination', 'search', 'statusFilter', 'countryFilter', 'positionFilter', 'countries', 'positions'));
     }
@@ -139,7 +140,7 @@ class WorkersController extends Controller
         // Use username as fallback for matching with worker database
         $clabNo = $request->user()->contractor_clab_no ?? $request->user()->username;
 
-        if (!$clabNo) {
+        if (! $clabNo) {
             abort(403, 'No contractor identifier assigned.');
         }
 
@@ -147,7 +148,7 @@ class WorkersController extends Controller
         $workers = $this->contractWorkerService->getContractedWorkers($clabNo);
         $worker = $workers->firstWhere('wkr_id', $workerId);
 
-        if (!$worker) {
+        if (! $worker) {
             abort(404, 'Worker not found or not assigned to your company.');
         }
 
