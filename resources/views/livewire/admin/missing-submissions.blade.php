@@ -252,6 +252,9 @@
                                 <flux:button variant="ghost" size="sm" icon="bell" icon-variant="outline" wire:click="openRemindModal('{{ $contractor['clab_no'] }}')">
                                     Remind
                                 </flux:button>
+                                <flux:button variant="ghost" size="sm" icon="paper-airplane" icon-variant="outline" wire:click="openBulkSubmitModal('{{ $contractor['clab_no'] }}')">
+                                    Submit on Behalf
+                                </flux:button>
                                 <flux:button variant="ghost" size="sm" icon="eye" icon-variant="outline" href="{{ route('missing-submissions.detail', $contractor['clab_no']) }}" wire:navigate>
                                     View Details
                                 </flux:button>
@@ -384,6 +387,66 @@
                     <flux:button wire:click="closeRemindModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>
                     <flux:button wire:click="sendReminder" variant="primary" icon="paper-airplane" class="w-full sm:w-auto">
                         Send Reminder
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
+
+    <!-- Bulk Submit Modal -->
+    @if($showBulkSubmitModal && $bulkSubmitContractor)
+        <flux:modal wire:model="showBulkSubmitModal" class="w-full max-w-lg">
+            <div class="space-y-4 p-4 sm:p-6">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                        Create Draft Submission
+                    </h2>
+                    <p class="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        Create a draft payroll submission on behalf of a contractor.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p class="text-sm text-zinc-700 dark:text-zinc-300">
+                        {!! $bulkSubmitMessage !!}
+                    </p>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:button wire:click="closeBulkSubmitModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>
+                    <flux:button wire:click="performBulkSubmission" variant="primary" icon="document-plus" class="w-full sm:w-auto">
+                        Create Draft
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
+
+    <!-- Bulk Submit Modal -->
+    @if($showBulkSubmitModal && $bulkSubmitContractor)
+        <flux:modal wire:model="showBulkSubmitModal" class="w-full max-w-lg">
+            <div class="space-y-4 p-4 sm:p-6">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                        Submit on Behalf of Contractor
+                    </h2>
+                    <p class="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        Create and submit a payroll submission on behalf of a contractor.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                    <p class="text-sm text-zinc-700 dark:text-zinc-300">
+                        {!! $bulkSubmitMessage !!}
+                    </p>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:button wire:click="closeBulkSubmitModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>
+                    <flux:button wire:click="performBulkSubmission" variant="primary" icon="paper-airplane" class="w-full sm:w-auto">
+                        Confirm & Submit
                     </flux:button>
                 </div>
             </div>

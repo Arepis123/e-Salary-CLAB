@@ -10,6 +10,7 @@ use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
 use Flux\Flux;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Response;
 use Livewire\Component;
@@ -25,6 +26,11 @@ class MissingSubmissions extends Component
     public $reminderMessage = '';
 
     public $pastReminders;
+
+    // Bulk submission properties
+    public $showBulkSubmitModal = false;
+    public $bulkSubmitContractor = null;
+    public $bulkSubmitMessage = '';
 
     // Filter properties
     public $selectedMonth;
@@ -140,6 +146,122 @@ class MissingSubmissions extends Component
         $this->selectedContractor = null;
         $this->reminderMessage = '';
         $this->pastReminders = collect();
+    }
+
+    public function openBulkSubmitModal($clabNo)
+    {
+        $this->bulkSubmitContractor = collect($this->missingContractors)->firstWhere('clab_no', $clabNo);
+
+        if ($this->bulkSubmitContractor) {
+            $periodLabel = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, 1)->format('F Y');
+            $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for the period of <strong>{$periodLabel}</strong>.<br><br>This will include all their active workers with basic salary and zero overtime. This action is final for this submission period and will move directly to the approval stage.<br><br>Are you sure you want to proceed?";
+            $this->showBulkSubmitModal = true;
+        }
+    }
+
+    public function closeBulkSubmitModal()
+    {
+        $this->showBulkSubmitModal = false;
+        $this->bulkSubmitContractor = null;
+        $this->bulkSubmitMessage = '';
+    }
+
+    public function performBulkSubmission()
+    {
+        if (!$this->bulkSubmitContractor) {
+            return;
+        }
+
+        $clabNo = $this->bulkSubmitContractor['clab_no'];
+        $month = $this->selectedMonth;
+        $year = $this->selectedYear;
+
+        try {
+            DB::transaction(function () use ($clabNo, $month, $year) {
+                $existingSubmission = PayrollSubmission::where('contractor_clab_no', $clabNo)
+                    ->where('month', $month)
+                    ->where('year', $year)
+                    ->first();
+
+                if ($existingSubmission) {
+                    throw new \Exception('A submission for this period already exists.');
+                }
+
+                $targetDate = \Carbon\Carbon::create($year, $month, 1);
+                $activeContractWorkers = ContractWorker::with('worker')
+                    ->where('con_ctr_clab_no', $clabNo)
+                    ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
+                    ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
+                    ->get();
+
+                if ($activeContractWorkers->isEmpty()) {
+                    throw new \Exception('No active workers found for this contractor for the selected period.');
+                }
+
+                // Find the Client User to assign ownership (so they see it in their dashboard)
+                $user = User::where('contractor_clab_no', $clabNo)
+                            ->where('role', 'client')
+                            ->first();
+
+                if (!$user) {
+                    // Auto-provision user account if they haven't logged in yet
+                    $contractorInfo = Contractor::where('ctr_clab_no', $clabNo)->first();
+                    
+                    $name = $contractorInfo ? $contractorInfo->ctr_comp_name : $this->bulkSubmitContractor['name'];
+                    $email = ($contractorInfo && $contractorInfo->ctr_email) ? $contractorInfo->ctr_email : ($this->bulkSubmitContractor['email'] ?? $clabNo . '@placeholder.local');
+
+                    $user = User::create([
+                        'username' => $clabNo,
+                        'name' => $name,
+                        'email' => $email,
+                        'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                        'role' => 'client',
+                        'contractor_clab_no' => $clabNo,
+                        'phone' => $contractorInfo ? ($contractorInfo->ctr_contact_mobileno ?? $contractorInfo->ctr_telno) : null,
+                    ]);
+                }
+
+                // Create Submission: user_id = Client, submitted_by = Admin
+                $submission = PayrollSubmission::create([
+                    'contractor_clab_no' => $clabNo,
+                    'user_id' => $user->id,
+                    'month' => $month,
+                    'year' => $year,
+                    'status' => 'submitted',
+                    'submitted_by' => auth()->id(),
+                    'submitted_at' => now(),
+                    'payment_deadline' => $targetDate->copy()->endOfMonth(),
+                ]);
+
+                $totalAmount = 0;
+                foreach ($activeContractWorkers as $contractWorker) {
+                    $worker = $contractWorker->worker;
+                    if (!$worker) {
+                        continue;
+                    }
+
+                    $payrollWorker = new PayrollWorker(['worker_id' => $worker->wkr_id, 'worker_name' => $worker->wkr_name, 'worker_passport' => $worker->wkr_passno, 'basic_salary' => $worker->wkr_salary ?? 1700, 'ot_normal_hours' => 0, 'ot_rest_hours' => 0, 'ot_public_hours' => 0,]);
+                    $payrollWorker->payroll_submission_id = $submission->id;
+                    $payrollWorker->calculateSalary(0);
+                    $payrollWorker->save();
+                    $totalAmount += $payrollWorker->total_payment;
+                }
+
+                $serviceCharge = $activeContractWorkers->count() * 200;
+                $sst = $serviceCharge * 0.08;
+                $grandTotal = $totalAmount + $serviceCharge + $sst;
+
+                $submission->update(['total_workers' => $activeContractWorkers->count(), 'total_amount' => $totalAmount, 'service_charge' => $serviceCharge, 'sst' => $sst, 'grand_total' => $grandTotal, 'total_with_penalty' => $grandTotal,]);
+            });
+
+            Flux::toast(variant: 'success', heading: 'Submission Created', text: "Payroll for " . \Carbon\Carbon::create($year, $month, 1)->format('F Y') . " submitted successfully on behalf of {$this->bulkSubmitContractor['name']}.");
+            $this->closeBulkSubmitModal();
+            $this->loadMissingContractors();
+        } catch (\Exception $e) {
+            Flux::toast(variant: 'danger', heading: 'Error', text: 'Failed to create draft submission: ' . $e->getMessage());
+            \Log::error('Bulk submission failed: ' . $e->getMessage());
+            $this->closeBulkSubmitModal();
+        }
     }
 
     public function export()
