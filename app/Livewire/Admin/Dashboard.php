@@ -55,20 +55,20 @@ class Dashboard extends Component
         $allClients = User::where('role', 'client')->get();
         $totalClients = $allClients->count();
 
-        // Get clients who have submitted and paid for current month
+        // Get clients who have submitted for current month (exclude drafts)
         $clientsWithSubmission = PayrollSubmission::where('month', $currentMonth)
             ->where('year', $currentYear)
-            ->whereIn('status', ['paid', 'pending_payment'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_payment', 'paid', 'overdue'])
             ->distinct('contractor_clab_no')
             ->pluck('contractor_clab_no');
 
-        // Clients without submission or payment this month
+        // Clients without submission this month
         $clientsWithoutSubmission = $allClients->whereNotIn('contractor_clab_no', $clientsWithSubmission)->count();
 
         // Previous month for comparison
         $clientsWithSubmissionLastMonth = PayrollSubmission::where('month', $lastMonth)
             ->where('year', $lastMonthYear)
-            ->whereIn('status', ['paid', 'pending_payment'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_payment', 'paid', 'overdue'])
             ->distinct('contractor_clab_no')
             ->count();
 
@@ -86,9 +86,9 @@ class Dashboard extends Component
             ->whereMonth('completed_at', $lastMonth)
             ->sum('amount');
 
-        // Outstanding balance (pending + overdue submissions)
+        // Outstanding balance (approved + pending + overdue submissions)
         // Use total_due accessor to include penalty calculation
-        $outstandingSubmissions = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
+        $outstandingSubmissions = PayrollSubmission::whereIn('status', ['approved', 'pending_payment', 'overdue'])
             ->get();
 
         $outstandingBalance = $outstandingSubmissions->sum(function ($submission) {
@@ -115,7 +115,11 @@ class Dashboard extends Component
     protected function loadRecentPayments()
     {
         $recentSubmissions = PayrollSubmission::with(['user', 'payment'])
-            ->orderBy('created_at', 'desc')
+            ->where('status', 'paid')
+            ->whereHas('payment', function ($query) {
+                $query->where('status', 'completed');
+            })
+            ->orderBy('updated_at', 'desc')
             ->limit(5)
             ->get();
 
@@ -124,23 +128,16 @@ class Dashboard extends Component
                 ? $submission->user->name
                 : 'Client '.$submission->contractor_clab_no;
 
-            $status = match ($submission->status) {
-                'paid' => 'completed',
-                'pending_payment' => 'pending',
-                'overdue' => 'pending',
-                default => 'draft',
-            };
-
             $date = $submission->payment && $submission->payment->completed_at
                 ? $submission->payment->completed_at->format('M d, Y')
-                : $submission->created_at->format('M d, Y');
+                : $submission->updated_at->format('M d, Y');
 
             return [
                 'client' => $clientName,
                 'amount' => $submission->total_amount,
                 'workers' => $submission->total_workers,
                 'date' => $date,
-                'status' => $status,
+                'status' => 'completed',
             ];
         })->toArray();
     }

@@ -147,19 +147,25 @@ class Salary extends Component
         $currentMonth = now()->month;
         $currentYear = now()->year;
 
-        // Total submissions this month
-        $totalSubmissions = PayrollSubmission::whereYear('created_at', $currentYear)
-            ->whereMonth('created_at', $currentMonth)
+        // Total submissions for current payroll period (exclude drafts)
+        $totalSubmissions = PayrollSubmission::where('month', $currentMonth)
+            ->where('year', $currentYear)
+            ->whereIn('status', ['submitted', 'approved', 'pending_payment', 'paid', 'overdue'])
             ->count();
 
-        // Grand total this month (including service charge and SST)
-        $grandTotal = PayrollSubmission::whereYear('created_at', $currentYear)
-            ->whereMonth('created_at', $currentMonth)
-            ->sum('grand_total');
+        // Grand total for current payroll period (sum of admin final amount + grand total)
+        $submissions = PayrollSubmission::where('month', $currentMonth)
+            ->where('year', $currentYear)
+            ->whereIn('status', ['approved', 'pending_payment', 'paid', 'overdue'])
+            ->get();
 
-        // Completed submissions (paid)
-        $completed = PayrollSubmission::whereYear('created_at', $currentYear)
-            ->whereMonth('created_at', $currentMonth)
+        $grandTotal = $submissions->sum(function ($submission) {
+            return ($submission->admin_final_amount ?? 0) + ($submission->grand_total ?? 0);
+        });
+
+        // Completed submissions (paid) for current payroll period
+        $completed = PayrollSubmission::where('month', $currentMonth)
+            ->where('year', $currentYear)
             ->where('status', 'paid')
             ->count();
 

@@ -212,33 +212,35 @@
         </flux:table>
 
         <!-- Pagination -->
-        @if($pagination['total'] > 0)
-            <div class="mt-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ $pagination['from'] }} to {{ $pagination['to'] }} of {{ $pagination['total'] }} results
-                </p>
-                <div class="flex items-center gap-2">
-                    @if($pagination['current_page'] > 1)
-                        <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] - 1 }})">Previous</flux:button>
-                    @else
-                        <flux:button variant="ghost" size="sm" disabled>Previous</flux:button>
-                    @endif
-
-                    @for($i = 1; $i <= $pagination['last_page']; $i++)
-                        @if($i == $pagination['current_page'])
-                            <flux:button variant="primary" size="xs">{{ $i }}</flux:button>
-                        @else
-                            <flux:button variant="ghost" size="xs" wire:click="$set('page', {{ $i }})">{{ $i }}</flux:button>
-                        @endif
-                    @endfor
-
-                    @if($pagination['current_page'] < $pagination['last_page'])
-                        <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] + 1 }})">Next</flux:button>
-                    @else
-                        <flux:button variant="ghost" size="sm" disabled>Next</flux:button>
-                    @endif
-                </div>
+        @if($pagination['total'] > $perPage)
+        <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-zinc-600 dark:text-zinc-400">
+                Showing {{ $pagination['from'] }} to {{ $pagination['to'] }} of {{ $pagination['total'] }} submissions
             </div>
+            <div class="flex gap-2">
+                <flux:button
+                    wire:click="$set('page', {{ $pagination['current_page'] - 1 }})"
+                    variant="ghost"
+                    size="sm"
+                    icon="chevron-left"
+                    icon-variant="micro"
+                    :disabled="$pagination['current_page'] === 1"
+                >
+                    Previous
+                </flux:button>
+                <flux:button
+                    wire:click="$set('page', {{ $pagination['current_page'] + 1 }})"
+                    variant="ghost"
+                    size="sm"
+                    icon="chevron-right"
+                    icon-trailing
+                    icon-variant="micro"
+                    :disabled="$pagination['current_page'] >= $pagination['last_page']"
+                >
+                    Next
+                </flux:button>
+            </div>
+        </div>
         @endif
     </flux:card>
 

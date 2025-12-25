@@ -29,7 +29,9 @@ class MissingSubmissions extends Component
 
     // Bulk submission properties
     public $showBulkSubmitModal = false;
+
     public $bulkSubmitContractor = null;
+
     public $bulkSubmitMessage = '';
 
     // Filter properties
@@ -45,6 +47,15 @@ class MissingSubmissions extends Component
     public $historicalSummary = [];
 
     public $showHistoricalSummary = true;
+
+    // Pagination
+    public $historicalPage = 1;
+
+    public $historicalPerPage = 10;
+
+    public $currentPage = 1;
+
+    public $currentPerPage = 10;
 
     public function mount()
     {
@@ -70,6 +81,7 @@ class MissingSubmissions extends Component
     {
         $previousCount = $this->missingContractors->count();
 
+        $this->currentPage = 1;
         $this->loadMissingContractors();
 
         $newCount = $this->missingContractors->count();
@@ -168,7 +180,7 @@ class MissingSubmissions extends Component
 
     public function performBulkSubmission()
     {
-        if (!$this->bulkSubmitContractor) {
+        if (! $this->bulkSubmitContractor) {
             return;
         }
 
@@ -200,15 +212,15 @@ class MissingSubmissions extends Component
 
                 // Find the Client User to assign ownership (so they see it in their dashboard)
                 $user = User::where('contractor_clab_no', $clabNo)
-                            ->where('role', 'client')
-                            ->first();
+                    ->where('role', 'client')
+                    ->first();
 
-                if (!$user) {
+                if (! $user) {
                     // Auto-provision user account if they haven't logged in yet
                     $contractorInfo = Contractor::where('ctr_clab_no', $clabNo)->first();
-                    
+
                     $name = $contractorInfo ? $contractorInfo->ctr_comp_name : $this->bulkSubmitContractor['name'];
-                    $email = ($contractorInfo && $contractorInfo->ctr_email) ? $contractorInfo->ctr_email : ($this->bulkSubmitContractor['email'] ?? $clabNo . '@placeholder.local');
+                    $email = ($contractorInfo && $contractorInfo->ctr_email) ? $contractorInfo->ctr_email : ($this->bulkSubmitContractor['email'] ?? $clabNo.'@placeholder.local');
 
                     $user = User::create([
                         'username' => $clabNo,
@@ -236,11 +248,11 @@ class MissingSubmissions extends Component
                 $totalAmount = 0;
                 foreach ($activeContractWorkers as $contractWorker) {
                     $worker = $contractWorker->worker;
-                    if (!$worker) {
+                    if (! $worker) {
                         continue;
                     }
 
-                    $payrollWorker = new PayrollWorker(['worker_id' => $worker->wkr_id, 'worker_name' => $worker->wkr_name, 'worker_passport' => $worker->wkr_passno, 'basic_salary' => $worker->wkr_salary ?? 1700, 'ot_normal_hours' => 0, 'ot_rest_hours' => 0, 'ot_public_hours' => 0,]);
+                    $payrollWorker = new PayrollWorker(['worker_id' => $worker->wkr_id, 'worker_name' => $worker->wkr_name, 'worker_passport' => $worker->wkr_passno, 'basic_salary' => $worker->wkr_salary ?? 1700, 'ot_normal_hours' => 0, 'ot_rest_hours' => 0, 'ot_public_hours' => 0]);
                     $payrollWorker->payroll_submission_id = $submission->id;
                     $payrollWorker->calculateSalary(0);
                     $payrollWorker->save();
@@ -251,15 +263,15 @@ class MissingSubmissions extends Component
                 $sst = $serviceCharge * 0.08;
                 $grandTotal = $totalAmount + $serviceCharge + $sst;
 
-                $submission->update(['total_workers' => $activeContractWorkers->count(), 'total_amount' => $totalAmount, 'service_charge' => $serviceCharge, 'sst' => $sst, 'grand_total' => $grandTotal, 'total_with_penalty' => $grandTotal,]);
+                $submission->update(['total_workers' => $activeContractWorkers->count(), 'total_amount' => $totalAmount, 'service_charge' => $serviceCharge, 'sst' => $sst, 'grand_total' => $grandTotal, 'total_with_penalty' => $grandTotal]);
             });
 
-            Flux::toast(variant: 'success', heading: 'Submission Created', text: "Payroll for " . \Carbon\Carbon::create($year, $month, 1)->format('F Y') . " submitted successfully on behalf of {$this->bulkSubmitContractor['name']}.");
+            Flux::toast(variant: 'success', heading: 'Submission Created', text: 'Payroll for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y')." submitted successfully on behalf of {$this->bulkSubmitContractor['name']}.");
             $this->closeBulkSubmitModal();
             $this->loadMissingContractors();
         } catch (\Exception $e) {
-            Flux::toast(variant: 'danger', heading: 'Error', text: 'Failed to create draft submission: ' . $e->getMessage());
-            \Log::error('Bulk submission failed: ' . $e->getMessage());
+            Flux::toast(variant: 'danger', heading: 'Error', text: 'Failed to create draft submission: '.$e->getMessage());
+            \Log::error('Bulk submission failed: '.$e->getMessage());
             $this->closeBulkSubmitModal();
         }
     }
@@ -514,9 +526,13 @@ class MissingSubmissions extends Component
 
     protected function getWorkerDetailsForPeriod($clabNo, $month, $year)
     {
-        // Get all active workers for this contractor with worker relationship
-        $activeWorkers = ContractWorker::active()
-            ->where('con_ctr_clab_no', $clabNo)
+        // Get workers with active contracts during this specific period
+        $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
+
+        $activeWorkers = ContractWorker::where('con_ctr_clab_no', $clabNo)
+            ->where('con_start', '<=', $periodEnd->toDateString())
+            ->where('con_end', '>=', $periodStart->toDateString())
             ->with('worker') // Eager load worker relationship
             ->get();
 
@@ -576,10 +592,13 @@ class MissingSubmissions extends Component
             return;
         }
 
+        // Extract first email if multiple emails are present (separated by comma or semicolon)
+        $emailAddress = trim(preg_split('/[,;]/', $this->selectedContractor['email'])[0]);
+
         try {
             // Send email
             $periodLabel = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, 1)->format('F Y');
-            Mail::to($this->selectedContractor['email'])->send(
+            Mail::to($emailAddress)->send(
                 new PayrollReminderMail(
                     $this->selectedContractor['name'],
                     $this->selectedContractor['clab_no'],
@@ -594,7 +613,7 @@ class MissingSubmissions extends Component
             PayrollReminder::create([
                 'contractor_clab_no' => $this->selectedContractor['clab_no'],
                 'contractor_name' => $this->selectedContractor['name'],
-                'contractor_email' => $this->selectedContractor['email'],
+                'contractor_email' => $emailAddress,
                 'month' => $this->selectedMonth,
                 'year' => $this->selectedYear,
                 'message' => $this->reminderMessage,
@@ -604,7 +623,7 @@ class MissingSubmissions extends Component
             Flux::toast(
                 variant: 'success',
                 heading: 'Reminder sent!',
-                text: "Email sent to {$this->selectedContractor['name']} ({$this->selectedContractor['email']})"
+                text: "Email sent to {$this->selectedContractor['name']} ({$emailAddress})"
             );
         } catch (\Exception $e) {
             Flux::toast(variant: 'danger', heading: 'Failed to send', text: $e->getMessage());
@@ -646,12 +665,16 @@ class MissingSubmissions extends Component
 
     public function updatedSelectedMonth()
     {
+        $this->currentPage = 1;
+        $this->historicalPage = 1;
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
     }
 
     public function updatedSelectedYear()
     {
+        $this->currentPage = 1;
+        $this->historicalPage = 1;
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
     }
@@ -661,14 +684,20 @@ class MissingSubmissions extends Component
         $currentMonth = $this->selectedMonth;
         $currentYear = $this->selectedYear;
 
-        // Get all contractors with active workers
-        $contractorsWithActiveWorkers = ContractWorker::active()
+        // Get period boundaries
+        $periodStart = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
+
+        // Get all contractors with workers who had active contracts during this period
+        $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
+            ->where('con_end', '>=', $periodStart->toDateString())
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
 
-        // Count total active workers per contractor
-        $totalActiveWorkers = ContractWorker::active()
+        // Count total active workers per contractor for this period
+        $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
+            ->where('con_end', '>=', $periodStart->toDateString())
             ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
             ->groupBy('con_ctr_clab_no')
             ->pluck('count', 'con_ctr_clab_no');
@@ -692,7 +721,8 @@ class MissingSubmissions extends Component
             ->unique();
 
         // Count workers by issue type per contractor
-        $contractors = ContractWorker::active()
+        $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
+            ->where('con_end', '>=', $periodStart->toDateString())
             ->select('con_ctr_clab_no')
             ->groupBy('con_ctr_clab_no')
             ->get();
@@ -702,9 +732,10 @@ class MissingSubmissions extends Component
         foreach ($contractors as $contractor) {
             $clabNo = $contractor->con_ctr_clab_no;
 
-            // Get all active worker IDs for this contractor
-            $activeWorkerIds = ContractWorker::active()
-                ->where('con_ctr_clab_no', $clabNo)
+            // Get all worker IDs with active contracts during this period
+            $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
+                ->where('con_start', '<=', $periodEnd->toDateString())
+                ->where('con_end', '>=', $periodStart->toDateString())
                 ->pluck('con_wkr_id');
 
             if ($activeWorkerIds->isEmpty()) {
@@ -796,8 +827,12 @@ class MissingSubmissions extends Component
         $currentMonth = now()->month;
         $currentYear = now()->year;
 
-        // Get all contractors with active workers
-        $allContractors = ContractWorker::active()
+        // Get all contractors who had active contracts during the 6-month period
+        $periodStart = $startDate->copy()->startOfMonth();
+        $periodEnd = $endDate->copy()->endOfMonth();
+
+        $allContractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
+            ->where('con_end', '>=', $periodStart->toDateString())
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
@@ -836,9 +871,13 @@ class MissingSubmissions extends Component
                     continue;
                 }
 
-                // Get active workers for this contractor in this period
-                $activeWorkerIds = ContractWorker::active()
-                    ->where('con_ctr_clab_no', $clabNo)
+                // Get workers with active contracts during this specific period
+                $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
+                $periodEnd = $periodStart->copy()->endOfMonth();
+
+                $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
+                    ->where('con_start', '<=', $periodEnd->toDateString())
+                    ->where('con_end', '>=', $periodStart->toDateString())
                     ->pluck('con_wkr_id');
 
                 if ($activeWorkerIds->isNotEmpty()) {
@@ -903,7 +942,56 @@ class MissingSubmissions extends Component
             }
         }
 
-        $this->historicalSummary = $result->sortByDesc('missing_count')->values()->toArray();
+        $allResults = $result->sortByDesc('missing_count')->values();
+        $this->historicalSummary = $allResults->toArray();
+    }
+
+    public function getHistoricalPaginatedProperty()
+    {
+        $start = ($this->historicalPage - 1) * $this->historicalPerPage;
+
+        return collect($this->historicalSummary)->slice($start, $this->historicalPerPage)->values();
+    }
+
+    public function getHistoricalPaginationProperty()
+    {
+        $total = count($this->historicalSummary);
+        $lastPage = ceil($total / $this->historicalPerPage);
+        $from = (($this->historicalPage - 1) * $this->historicalPerPage) + 1;
+        $to = min($this->historicalPage * $this->historicalPerPage, $total);
+
+        return [
+            'current_page' => $this->historicalPage,
+            'per_page' => $this->historicalPerPage,
+            'total' => $total,
+            'last_page' => $lastPage,
+            'from' => $from,
+            'to' => $to,
+        ];
+    }
+
+    public function getMissingPaginatedProperty()
+    {
+        $start = ($this->currentPage - 1) * $this->currentPerPage;
+
+        return $this->missingContractors->slice($start, $this->currentPerPage)->values();
+    }
+
+    public function getMissingPaginationProperty()
+    {
+        $total = $this->missingContractors->count();
+        $lastPage = ceil($total / $this->currentPerPage);
+        $from = (($this->currentPage - 1) * $this->currentPerPage) + 1;
+        $to = min($this->currentPage * $this->currentPerPage, $total);
+
+        return [
+            'current_page' => $this->currentPage,
+            'per_page' => $this->currentPerPage,
+            'total' => $total,
+            'last_page' => $lastPage,
+            'from' => $from,
+            'to' => $to,
+        ];
     }
 
     public function render()

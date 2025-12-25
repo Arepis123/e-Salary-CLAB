@@ -13,6 +13,10 @@ class PayrollWorker extends Model
         'worker_name',
         'worker_passport',
         'basic_salary',
+        'is_pro_rated',
+        'days_worked',
+        'total_days_in_month',
+        'prorating_notes',
         'regular_hours',
         'ot_normal_hours',
         'ot_rest_hours',
@@ -39,6 +43,9 @@ class PayrollWorker extends Model
 
     protected $casts = [
         'basic_salary' => 'decimal:2',
+        'is_pro_rated' => 'boolean',
+        'days_worked' => 'integer',
+        'total_days_in_month' => 'integer',
         'regular_hours' => 'decimal:2',
         'ot_normal_hours' => 'decimal:2',
         'ot_rest_hours' => 'decimal:2',

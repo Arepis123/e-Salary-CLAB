@@ -137,7 +137,11 @@
                             <div class="space-y-1">
                                 <div class="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
                                     <flux:icon.envelope class="size-3 flex-shrink-0" />
-                                    <span class="truncate">{{ $contractor->email }}</span>
+                                    @php
+                                        // Extract first email if multiple emails separated by comma or semicolon
+                                        $firstEmail = trim(preg_split('/[,;]/', $contractor->email)[0]);
+                                    @endphp
+                                    <span class="truncate">{{ $firstEmail }}</span>
                                 </div>
                                 @if($contractor->phone)
                                 <div class="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 whitespace-nowrap">

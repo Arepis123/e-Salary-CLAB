@@ -5,21 +5,6 @@
             <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Missing Submissions & Payments</h1>
             <p class="text-sm text-zinc-600 dark:text-zinc-400">Track contractors with missing submissions or unpaid payroll for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}</p>
         </div>
-
-        <!-- Period Selector - Hidden as per user request (confusing) -->
-        {{-- <div class="flex gap-2 items-center">
-            <flux:select wire:model.live="selectedMonth"  class="w-40">
-                @foreach($availableMonths as $monthNum => $monthName)
-                    <option value="{{ $monthNum }}">{{ $monthName }}</option>
-                @endforeach
-            </flux:select>
-
-            <flux:select wire:model.live="selectedYear"  class="w-28">
-                @foreach($availableYears as $year)
-                    <option value="{{ $year }}">{{ $year }}</option>
-                @endforeach
-            </flux:select>
-        </div> --}}
     </div>
 
     <!-- Historical Summary Section -->
@@ -27,11 +12,8 @@
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="flex items-start justify-between gap-4">
             <div class="flex items-start gap-3 flex-1">
-                <div class="rounded-full bg-red-100 dark:bg-red-900/30 p-2 flex-shrink-0">
-                    <flux:icon.exclamation-circle class="size-6 text-red-600 dark:text-red-400" />
-                </div>
                 <div class="flex-1">
-                    <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Contractor List With Missing Submissions</h3>
+                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Contractor List With Missing Submissions</h2>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                         {{ count($historicalSummary) }} {{ Str::plural('contractor', count($historicalSummary)) }} with multiple missing submissions or payments in the last 6 months (excluding current month)
                     </p>
@@ -70,9 +52,9 @@
                 </flux:table.columns>
 
                 <flux:table.rows>
-                    @foreach($historicalSummary as $index => $contractor)
+                    @foreach($this->historicalPaginated as $index => $contractor)
                         <flux:table.rows :key="$contractor['clab_no']">
-                            <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
+                            <flux:table.cell align="center">{{ $this->historicalPagination['from'] + $index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">
                                 <div>
@@ -115,26 +97,42 @@
                     @endforeach
                 </flux:table.rows>
             </flux:table>
+
+            <!-- Pagination -->
+            @if($this->historicalPagination['total'] > $historicalPerPage)
+            <div class="mt-4 flex items-center justify-between">
+                <div class="text-sm text-zinc-600 dark:text-zinc-400">
+                    Showing {{ $this->historicalPagination['from'] }} to {{ $this->historicalPagination['to'] }} of {{ $this->historicalPagination['total'] }} contractors
+                </div>
+                <div class="flex gap-2">
+                    <flux:button
+                        wire:click="$set('historicalPage', {{ $this->historicalPagination['current_page'] - 1 }})"
+                        variant="ghost"
+                        size="sm"
+                        icon="chevron-left"
+                        icon-variant="micro"
+                        :disabled="$this->historicalPagination['current_page'] === 1"
+                    >
+                        Previous
+                    </flux:button>
+                    <flux:button
+                        wire:click="$set('historicalPage', {{ $this->historicalPagination['current_page'] + 1 }})"
+                        variant="ghost"
+                        size="sm"
+                        icon="chevron-right"
+                        icon-trailing
+                        icon-variant="micro"
+                        :disabled="$this->historicalPagination['current_page'] >= $this->historicalPagination['last_page']"
+                    >
+                        Next
+                    </flux:button>
+                </div>
+            </div>
+            @endif
         </div>
         @endif
     </flux:card>
     @endif
-
-    <!-- Statistics Card - Removed as per user request -->
-    {{-- <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg hidden">
-        <div class="flex items-center gap-4">
-            <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
-                <flux:icon.exclamation-triangle class="size-8 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">Contractors With Issues</p>
-                <p class="text-3xl font-bold text-orange-600 dark:text-orange-400">{{ $missingContractors->count() }}</p>
-                <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                    Missing submissions or payments for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}
-                </p>
-            </div>
-        </div>
-    </flux:card> --}}
 
     <!-- Contractors Without Submission Table -->
     @if($missingContractors->count() > 0)
@@ -173,9 +171,9 @@
             </flux:table.columns>
 
             <flux:table.rows>
-                @foreach($missingContractors as $index => $contractor)
+                @foreach($this->missingPaginated as $index => $contractor)
                     <flux:table.rows :key="$contractor['clab_no']">
-                        <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
+                        <flux:table.cell align="center">{{ $this->missingPagination['from'] + $index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
                             {{ $contractor['clab_no'] }}
@@ -188,9 +186,13 @@
                         <flux:table.cell>
                             <div class="text-sm">
                                 @if($contractor['email'])
+                                    @php
+                                        // Extract first email if multiple emails separated by comma or semicolon
+                                        $firstEmail = trim(preg_split('/[,;]/', $contractor['email'])[0]);
+                                    @endphp
                                     <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
                                         <flux:icon.envelope class="size-3 me-1" />
-                                        <span>{{ $contractor['email'] }}</span>
+                                        <span>{{ $firstEmail }}</span>
                                     </div>
                                 @endif
                                 @if($contractor['phone'])
@@ -248,22 +250,59 @@
                         </flux:table.cell>
 
                         <flux:table.cell align="center">
-                            <div class="flex items-center justify-center gap-2">
-                                <flux:button variant="ghost" size="sm" icon="bell" icon-variant="outline" wire:click="openRemindModal('{{ $contractor['clab_no'] }}')">
-                                    Remind
-                                </flux:button>
-                                <flux:button variant="ghost" size="sm" icon="paper-airplane" icon-variant="outline" wire:click="openBulkSubmitModal('{{ $contractor['clab_no'] }}')">
-                                    Submit on Behalf
-                                </flux:button>
-                                <flux:button variant="ghost" size="sm" icon="eye" icon-variant="outline" href="{{ route('missing-submissions.detail', $contractor['clab_no']) }}" wire:navigate>
-                                    View Details
-                                </flux:button>
-                            </div>
+                            <flux:dropdown align="end">
+                                <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" icon-variant="micro" inset="top bottom"></flux:button>
+
+                                <flux:menu>
+                                    <flux:menu.item icon="bell" wire:click="openRemindModal('{{ $contractor['clab_no'] }}')">
+                                        Send Reminder
+                                    </flux:menu.item>
+                                    <flux:menu.item icon="paper-airplane" wire:click="openBulkSubmitModal('{{ $contractor['clab_no'] }}')">
+                                        Submit on Behalf
+                                    </flux:menu.item>
+                                    <flux:menu.separator />
+                                    <flux:menu.item icon="eye" href="{{ route('missing-submissions.detail', $contractor['clab_no']) }}" wire:navigate>
+                                        View Details
+                                    </flux:menu.item>
+                                </flux:menu>
+                            </flux:dropdown>
                         </flux:table.cell>
                     </flux:table.rows>
                 @endforeach
             </flux:table.rows>
         </flux:table>
+
+        <!-- Pagination -->
+        @if($this->missingPagination['total'] > $currentPerPage)
+        <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-zinc-600 dark:text-zinc-400">
+                Showing {{ $this->missingPagination['from'] }} to {{ $this->missingPagination['to'] }} of {{ $this->missingPagination['total'] }} contractors
+            </div>
+            <div class="flex gap-2">
+                <flux:button
+                    wire:click="$set('currentPage', {{ $this->missingPagination['current_page'] - 1 }})"
+                    variant="ghost"
+                    size="sm"
+                    icon="chevron-left"
+                    icon-variant="micro"
+                    :disabled="$this->missingPagination['current_page'] === 1"
+                >
+                    Previous
+                </flux:button>
+                <flux:button
+                    wire:click="$set('currentPage', {{ $this->missingPagination['current_page'] + 1 }})"
+                    variant="ghost"
+                    size="sm"
+                    icon="chevron-right"
+                    icon-trailing
+                    icon-variant="micro"
+                    :disabled="$this->missingPagination['current_page'] >= $this->missingPagination['last_page']"
+                >
+                    Next
+                </flux:button>
+            </div>
+        </div>
+        @endif
     </flux:card>
     @else
     <flux:card class="p-12 text-center dark:bg-zinc-900 rounded-lg">
@@ -303,9 +342,13 @@
                             <p class="text-xs text-zinc-600 dark:text-zinc-400">CLAB No: {{ $selectedContractor['clab_no'] }}</p>
                             <div class="flex flex-col sm:flex-row sm:gap-3 mt-1 space-y-1 sm:space-y-0">
                                 @if($selectedContractor['email'])
+                                    @php
+                                        // Extract first email if multiple emails separated by comma or semicolon
+                                        $firstEmail = trim(preg_split('/[,;]/', $selectedContractor['email'])[0]);
+                                    @endphp
                                     <div class="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 truncate">
                                         <flux:icon.envelope class="size-3 flex-shrink-0" />
-                                        <span class="truncate">{{ $selectedContractor['email'] }}</span>
+                                        <span class="truncate">{{ $firstEmail }}</span>
                                     </div>
                                 @endif
                                 @if($selectedContractor['phone'])

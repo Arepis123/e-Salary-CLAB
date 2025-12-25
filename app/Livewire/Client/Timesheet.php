@@ -275,8 +275,29 @@ class Timesheet extends Component
                                  $worker->contract_info->con_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
                                  $worker->contract_info->con_start <= $payrollPeriodDate->endOfMonth()->toDateString();
 
-            // If no active contract during the payroll period, set basic salary to 0 (OT payment only)
-            $basicSalary = $hasActiveContract ? ($worker->basic_salary ?? 1700) : 0;
+            // Calculate pro-rated basic salary based on contract dates
+            $basicSalary = 0;
+            $isProRated = false;
+            $daysWorked = null;
+            $totalDaysInMonth = null;
+            $proratingNotes = null;
+
+            if ($hasActiveContract && $worker->contract_info) {
+                $proratingService = app(\App\Services\SalaryProratingService::class);
+                $proratingResult = $proratingService->calculateProratedSalary(
+                    $worker->contract_info->con_start,
+                    $worker->contract_info->con_end,
+                    $currentMonth,
+                    $currentYear,
+                    $worker->basic_salary ?? 1700
+                );
+
+                $basicSalary = $proratingResult['pro_rated_salary'];
+                $isProRated = $proratingResult['is_pro_rated'];
+                $daysWorked = $proratingResult['days_worked'];
+                $totalDaysInMonth = $proratingResult['total_days'];
+                $proratingNotes = $proratingResult['notes'];
+            }
 
             // Check if this worker has monthly OT entry
             $monthlyOTEntry = $monthlyOTEntries->get($worker->wkr_id);
@@ -322,6 +343,10 @@ class Timesheet extends Component
                 'worker_name' => $worker->name,
                 'worker_passport' => $worker->ic_number,
                 'basic_salary' => $basicSalary,
+                'is_pro_rated' => $isProRated,
+                'days_worked' => $daysWorked,
+                'total_days_in_month' => $totalDaysInMonth,
+                'prorating_notes' => $proratingNotes,
                 'ot_normal_hours' => $otNormalHours,
                 'ot_rest_hours' => $otRestHours,
                 'ot_public_hours' => $otPublicHours,

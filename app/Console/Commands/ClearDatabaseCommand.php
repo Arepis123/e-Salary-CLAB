@@ -27,9 +27,10 @@ class ClearDatabaseCommand extends Command
     public function handle()
     {
         // Confirm before proceeding (unless --force is used)
-        if (!$this->option('force')) {
-            if (!$this->confirm('⚠️  This will delete ALL data except admin and super_admin users. Are you sure?')) {
+        if (! $this->option('force')) {
+            if (! $this->confirm('⚠️  This will delete ALL data except admin and super_admin users. Are you sure?')) {
                 $this->info('Operation cancelled.');
+
                 return 0;
             }
         }
@@ -44,10 +45,11 @@ class ClearDatabaseCommand extends Command
 
         if (empty($adminUsers)) {
             $this->error('❌ No admin or super_admin users found! Aborting to prevent complete data loss.');
+
             return 1;
         }
 
-        $this->info('✓ Found ' . count($adminUsers) . ' admin/super_admin users to preserve.');
+        $this->info('✓ Found '.count($adminUsers).' admin/super_admin users to preserve.');
 
         // Disable foreign key checks
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
@@ -69,6 +71,7 @@ class ClearDatabaseCommand extends Command
                 // Skip excluded tables
                 if (in_array($tableName, $excludedTables)) {
                     $this->line("  → Skipping: {$tableName}");
+
                     continue;
                 }
 
@@ -78,6 +81,7 @@ class ClearDatabaseCommand extends Command
                         ->whereNotIn('role', ['admin', 'super_admin'])
                         ->delete();
                     $this->line("  → Cleared: {$tableName} ({$deleted} rows deleted, admins preserved)");
+
                     continue;
                 }
 
@@ -96,7 +100,8 @@ class ClearDatabaseCommand extends Command
             }
 
         } catch (\Exception $e) {
-            $this->error('❌ Error clearing database: ' . $e->getMessage());
+            $this->error('❌ Error clearing database: '.$e->getMessage());
+
             return 1;
         } finally {
             // Re-enable foreign key checks
@@ -105,6 +110,7 @@ class ClearDatabaseCommand extends Command
 
         $this->newLine();
         $this->info('✅ Database cleanup completed! You can now start fresh.');
+
         return 0;
     }
 }

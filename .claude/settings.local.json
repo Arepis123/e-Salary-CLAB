@@ -41,7 +41,8 @@
       "Bash(if exist clear_december.php del clear_december.php)",
       "Bash(if exist check_december_status.php del check_december_status.php)",
       "Bash(cat:*)",
-      "Bash(./vendor/bin/pint:*)"
+      "Bash(./vendor/bin/pint:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

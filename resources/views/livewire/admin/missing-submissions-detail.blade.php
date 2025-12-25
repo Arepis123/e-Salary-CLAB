@@ -23,11 +23,15 @@
                     <div class="flex gap-4 mt-2">
                         <div class="flex items-center gap-1">
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">CLAB No: {{ $contractor['clab_no'] }}</p>
-                        </div>                        
+                        </div>
                         @if($contractor['email'])
                             <div class="flex items-center gap-1 text-sm text-zinc-600 dark:text-zinc-400">
                                 <flux:icon.envelope class="size-4" />
-                                <span>{{ $contractor['email'] }}</span>
+                                @php
+                                    // Extract first email if multiple emails separated by comma or semicolon
+                                    $firstEmail = trim(preg_split('/[,;]/', $contractor['email'])[0]);
+                                @endphp
+                                <span>{{ $firstEmail }}</span>
                             </div>
                         @endif
                         @if($contractor['phone'])

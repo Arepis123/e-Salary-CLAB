@@ -19,12 +19,12 @@
                                 {{ __('Dashboard') }}
                             </flux:button>
                         @else
-                            <flux:button :href="route('login')" wire:navigate variant="ghost">
+                            <flux:button :href="route('login')" wire:navigate variant="primary">
                                 {{ __('Login') }}
                             </flux:button>
-                            <flux:button :href="route('register')" wire:navigate variant="primary">
+                            <!-- <flux:button :href="route('register')" wire:navigate variant="primary">
                                 {{ __('Register') }}
-                            </flux:button>
+                            </flux:button> -->
                         @endauth
                     </div>
                 </div>

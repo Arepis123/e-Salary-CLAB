@@ -38,7 +38,11 @@
                 </div>
                 <div>
                     <label class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Email</label>
-                    <p class="text-sm text-zinc-900 dark:text-zinc-100 mt-1">{{ $contractor->email }}</p>
+                    @php
+                        // Extract first email if multiple emails separated by comma or semicolon
+                        $firstEmail = trim(preg_split('/[,;]/', $contractor->email)[0]);
+                    @endphp
+                    <p class="text-sm text-zinc-900 dark:text-zinc-100 mt-1">{{ $firstEmail }}</p>
                 </div>
                 <div>
                     <label class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Phone</label>
