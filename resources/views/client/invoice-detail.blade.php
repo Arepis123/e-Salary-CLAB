@@ -121,6 +121,19 @@
             </flux:card>
         @endif
 
+        <!-- Admin Update Notice -->
+        @if($invoice->admin_notes && str_contains($invoice->admin_notes, 'Updated by'))
+            <flux:callout icon="exclamation-triangle" color="amber">
+                <flux:callout.heading>Invoice Updated by Admin</flux:callout.heading>
+                <flux:callout.text>
+                    <p class="mb-2">This invoice has been updated by our admin team. Please review the changes below:</p>
+                    <div class="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700">
+                        <pre class="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-mono">{{ $invoice->admin_notes }}</pre>
+                    </div>
+                </flux:callout.text>
+            </flux:callout>
+        @endif
+
         <!-- Invoice Summary -->
         <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
             <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Invoice Summary</h3>
@@ -128,7 +141,7 @@
             <div class="space-y-3">
                 <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }}):</span>
-                    <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount ?? $invoice->total_amount, 2) }}</span>
+                    <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount, 2) }}</span>
                 </div>
 
                 <div class="flex justify-between py-2">

@@ -90,6 +90,7 @@
                         <flux:select.option value="draft">Draft</flux:select.option>
                         <flux:select.option value="submitted">Submitted</flux:select.option>
                         <flux:select.option value="approved">Approved</flux:select.option>
+                        <flux:select.option value="pending_payment">Pending Payment</flux:select.option>
                         <flux:select.option value="paid">Paid</flux:select.option>
                         <flux:select.option value="overdue">Overdue</flux:select.option>
                     </flux:select>

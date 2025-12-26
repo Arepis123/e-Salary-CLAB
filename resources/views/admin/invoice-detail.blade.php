@@ -151,7 +151,7 @@
                 <!-- Payroll Amount -->
                 <div class="flex justify-between py-3">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }})</span>
-                    <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount ?? $invoice->total_amount, 2) }}</span>
+                    <span class="text-sm text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount, 2) }}</span>
                 </div>
 
                 <!-- Service Charge -->

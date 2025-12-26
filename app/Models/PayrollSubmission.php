@@ -296,10 +296,13 @@ class PayrollSubmission extends Model
 
     /**
      * Calculate grand total (total amount + service charge + SST)
+     *
+     * @deprecated Use client_total accessor instead
      */
     public function calculateGrandTotal(): float
     {
-        return $this->total_amount + $this->calculateServiceCharge() + $this->calculateSST();
+        // Use admin_final_amount instead of deprecated total_amount
+        return ($this->admin_final_amount ?? 0) + $this->calculateServiceCharge() + $this->calculateSST();
     }
 
     /**

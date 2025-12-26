@@ -626,15 +626,13 @@ class TimesheetEdit extends Component
                 ->count();
             $serviceCharge = $activeSelectedWorkers * 200; // RM200 per active worker only
             $sst = $serviceCharge * 0.08; // 8% SST on service charge
-            $grandTotal = $totalAmount + $serviceCharge + $sst;
 
             $submission->update([
                 'total_workers' => $selectedWorkerCount,
-                'total_amount' => $totalAmount,
                 'service_charge' => $serviceCharge,
                 'sst' => $sst,
-                'grand_total' => $grandTotal,
-                'total_with_penalty' => $grandTotal,
+                // Note: total_amount, grand_total, and total_with_penalty are deprecated
+                // Actual amounts are calculated via admin_final_amount + accessors
             ]);
 
             if ($action === 'submit') {

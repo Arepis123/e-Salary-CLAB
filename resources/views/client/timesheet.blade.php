@@ -286,7 +286,7 @@
                             <flux:table.cell variant="strong">{{ $submission->total_workers }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">
-                                RM {{ number_format($submission->total_amount, 2) }}
+                                RM {{ number_format($submission->admin_final_amount, 2) }}
                             </flux:table.cell>
 
                             <flux:table.cell variant="strong">

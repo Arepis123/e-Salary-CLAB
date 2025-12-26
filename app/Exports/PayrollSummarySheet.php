@@ -69,10 +69,11 @@ class PayrollSummarySheet implements FromCollection, WithColumnWidths, WithStyle
         $data->push(['Metric', 'Value']);
         $data->push(['Total Submissions', $this->submissions->count()]);
         $data->push(['Total Workers', $this->submissions->sum('total_workers')]);
-        $data->push(['Total Amount (before service & SST)', 'RM '.number_format($this->submissions->sum('total_amount'), 2)]);
+        $data->push(['Total Payroll Amount', 'RM '.number_format($this->submissions->sum('admin_final_amount'), 2)]);
         $data->push(['Total Service Charges', 'RM '.number_format($this->submissions->sum('service_charge'), 2)]);
         $data->push(['Total SST', 'RM '.number_format($this->submissions->sum('sst'), 2)]);
-        $data->push(['Grand Total', 'RM '.number_format($this->submissions->sum('grand_total'), 2)]);
+        $totalClientAmount = $this->submissions->sum(fn($s) => $s->client_total);
+        $data->push(['Grand Total (Payroll + Service + SST)', 'RM '.number_format($totalClientAmount, 2)]);
         $data->push(['Total Penalties', 'RM '.number_format($this->submissions->sum('penalty_amount'), 2)]);
         $data->push([]);
 

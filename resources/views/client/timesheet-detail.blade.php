@@ -245,7 +245,7 @@
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm">
                                 <span class="text-zinc-600 dark:text-zinc-400">Total Amount (Payroll)</span>
-                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->admin_final_amount ?? $submission->total_amount, 2) }}</span>
+                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->admin_final_amount, 2) }}</span>
                             </div>
                             <div class="flex justify-between text-sm">
                                 <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }})</span>

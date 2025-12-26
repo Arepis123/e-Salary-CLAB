@@ -83,7 +83,7 @@
                             <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $invoice->month_year }}</td>
                             <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $invoice->total_workers }}</td>
                             <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                RM {{ number_format($invoice->total_amount, 2) }}
+                                RM {{ number_format($invoice->admin_final_amount, 2) }}
                                 @if($invoice->has_penalty)
                                     <span class="text-xs text-red-600 dark:text-red-400">
                                         (+RM {{ number_format($invoice->penalty_amount, 2) }})

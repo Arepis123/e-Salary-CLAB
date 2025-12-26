@@ -134,7 +134,7 @@ class Dashboard extends Component
 
             return [
                 'client' => $clientName,
-                'amount' => $submission->total_amount,
+                'amount' => $submission->client_total,
                 'workers' => $submission->total_workers,
                 'date' => $date,
                 'status' => 'completed',

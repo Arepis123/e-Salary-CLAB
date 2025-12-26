@@ -41,12 +41,23 @@ class SalaryDetail extends Component
 
     public $isReviewing = false;
 
+    public $calculatedBreakdown = null; // Store parsed Excel breakdown
+
     // Re-upload modal properties
     public $showReuploadModal = false;
 
     public $newBreakdownFile;
 
     public $isReuploading = false;
+
+    // Edit amount modal properties
+    public $showEditAmountModal = false;
+
+    public $editPayrollAmount = '';
+
+    public $editAmountNotes = '';
+
+    public $isUpdatingAmount = false;
 
     public function mount($id)
     {
@@ -337,10 +348,193 @@ class SalaryDetail extends Component
             return;
         }
 
-        // Do NOT pre-fill amount - admin must enter from external system
+        // Reset form
         $this->reviewFinalAmount = '';
         $this->reviewNotes = $this->submission->admin_notes ?? '';
+        $this->calculatedBreakdown = null;
         $this->showReviewModal = true;
+    }
+
+    /**
+     * Parse uploaded Excel file and extract payroll amount automatically
+     * Reads totals from last row: Gross Salary + EPF + SOCSO + EIS + HRDF
+     */
+    public function updatedBreakdownFile()
+    {
+        // Validate file first
+        $this->validate([
+            'breakdownFile' => 'required|file|mimes:xlsx,xls|max:10240',
+        ]);
+
+        try {
+            $filePath = $this->breakdownFile->getRealPath();
+
+            // Load the spreadsheet
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $highestColumn = $sheet->getHighestColumn();
+            $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+
+            // Search for header row in the first 10 rows
+            $headerRow = null;
+            $headers = [];
+            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS', 'HRDF'];
+
+            for ($row = 1; $row <= min(10, $sheet->getHighestRow()); $row++) {
+                $rowHeaders = [];
+                for ($col = 1; $col <= $highestColumnIndex; $col++) {
+                    $cellValue = $sheet->getCellByColumnAndRow($col, $row)->getValue();
+                    if ($cellValue) {
+                        // Normalize: trim whitespace and remove extra spaces
+                        $normalized = preg_replace('/\s+/', ' ', trim($cellValue));
+                        $rowHeaders[$col] = $normalized;
+                    }
+                }
+
+                // Check if this row contains at least 3 of the required columns (to be flexible)
+                $foundCount = 0;
+                foreach ($requiredColumns as $requiredCol) {
+                    foreach ($rowHeaders as $headerName) {
+                        if (strcasecmp($headerName, $requiredCol) === 0) {
+                            $foundCount++;
+                            break;
+                        }
+                    }
+                }
+
+                // If we found at least 3 required columns, this is likely the header row
+                if ($foundCount >= 3) {
+                    $headerRow = $row;
+                    $headers = $rowHeaders;
+                    break;
+                }
+            }
+
+            if ($headerRow === null) {
+                Flux::toast(
+                    variant: 'danger',
+                    heading: 'Header Row Not Found',
+                    text: 'Could not find header row with required columns in the first 10 rows.'
+                );
+                $this->breakdownFile = null;
+
+                return;
+            }
+
+            // Log found headers for debugging
+            \Log::info('Excel headers found', [
+                'headers' => $headers,
+                'submission_id' => $this->submission->id,
+            ]);
+
+            // Find required columns (case-insensitive)
+            // Note: HRDF is optional as some Excel formats don't have it
+            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
+            $optionalColumns = ['HRDF'];
+            $columnIndices = [];
+            $missingColumns = [];
+
+            foreach ($requiredColumns as $requiredCol) {
+                $found = false;
+                foreach ($headers as $colIndex => $headerName) {
+                    if (strcasecmp($headerName, $requiredCol) === 0) {
+                        // For EPF, SOCSO, EIS: Take the LAST occurrence (employer contribution)
+                        // Don't break, keep searching for later occurrences
+                        $columnIndices[$requiredCol] = $colIndex;
+                        $found = true;
+                        // Don't break - continue searching to find the last occurrence
+                    }
+                }
+
+                if (! $found) {
+                    $missingColumns[] = $requiredCol;
+                }
+            }
+
+            // Check for optional columns
+            foreach ($optionalColumns as $optionalCol) {
+                foreach ($headers as $colIndex => $headerName) {
+                    if (strcasecmp($headerName, $optionalCol) === 0) {
+                        $columnIndices[$optionalCol] = $colIndex;
+                        // Don't break - take last occurrence
+                    }
+                }
+            }
+
+            if (! empty($missingColumns)) {
+                $foundColumnsList = implode(', ', array_values($headers));
+
+                Flux::toast(
+                    variant: 'danger',
+                    heading: 'Invalid Excel Format',
+                    text: "Missing required columns: ".implode(', ', $missingColumns).". Found columns: ".$foundColumnsList
+                );
+
+                \Log::warning('Excel parsing failed - missing columns', [
+                    'submission_id' => $this->submission->id,
+                    'missing' => $missingColumns,
+                    'found' => $headers,
+                ]);
+
+                $this->breakdownFile = null;
+
+                return;
+            }
+
+            // Read totals from the last row (which contains the sum of all columns)
+            $highestRow = $sheet->getHighestRow();
+
+            // Read CALCULATED values from the last row (formulas are evaluated)
+            $totals = [];
+            foreach (array_merge($requiredColumns, $optionalColumns) as $colName) {
+                if (isset($columnIndices[$colName])) {
+                    $value = $sheet->getCellByColumnAndRow($columnIndices[$colName], $highestRow)->getCalculatedValue();
+                    $totals[$colName] = floatval($value);
+                } else {
+                    // Optional column not found, set to 0
+                    $totals[$colName] = 0;
+                }
+            }
+
+            // Calculate total payroll amount
+            $totalAmount = array_sum($totals);
+
+            // Store breakdown for display
+            $this->calculatedBreakdown = [
+                'gross_salary' => $totals['Gross Salary'],
+                'epf' => $totals['EPF'],
+                'socso' => $totals['SOCSO'],
+                'eis' => $totals['EIS'],
+                'hrdf' => $totals['HRDF'],
+                'total' => $totalAmount,
+            ];
+
+            // Auto-fill the amount
+            $this->reviewFinalAmount = number_format($totalAmount, 2, '.', '');
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Excel Parsed Successfully',
+                text: 'Total payroll amount: RM '.number_format($totalAmount, 2)
+            );
+
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Excel Parsing Failed',
+                text: 'Unable to read Excel file: '.$e->getMessage()
+            );
+
+            \Log::error('Excel parsing failed during review', [
+                'submission_id' => $this->submission->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $this->breakdownFile = null;
+            $this->calculatedBreakdown = null;
+        }
     }
 
     public function closeReviewModal()
@@ -640,6 +834,387 @@ class SalaryDetail extends Component
             );
         } finally {
             $this->isReuploading = false;
+        }
+    }
+
+    public function openEditAmountModal()
+    {
+        // Reset form fields (don't pre-fill amount - admin chooses what to edit)
+        $this->editPayrollAmount = '';
+        $this->newBreakdownFile = null;
+        $this->editAmountNotes = '';
+        $this->calculatedBreakdown = null;
+        $this->showEditAmountModal = true;
+    }
+
+    /**
+     * Parse uploaded Excel file in Edit modal and extract payroll amount automatically
+     * Reads totals from last row: Gross Salary + EPF + SOCSO + EIS + HRDF
+     */
+    public function updatedNewBreakdownFile()
+    {
+        // Validate file first
+        $this->validate([
+            'newBreakdownFile' => 'required|file|mimes:xlsx,xls|max:10240',
+        ]);
+
+        try {
+            $filePath = $this->newBreakdownFile->getRealPath();
+
+            // Load the spreadsheet
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $highestColumn = $sheet->getHighestColumn();
+            $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+
+            // Search for header row in the first 10 rows
+            $headerRow = null;
+            $headers = [];
+            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS', 'HRDF'];
+
+            for ($row = 1; $row <= min(10, $sheet->getHighestRow()); $row++) {
+                $rowHeaders = [];
+                for ($col = 1; $col <= $highestColumnIndex; $col++) {
+                    $cellValue = $sheet->getCellByColumnAndRow($col, $row)->getValue();
+                    if ($cellValue) {
+                        // Normalize: trim whitespace and remove extra spaces
+                        $normalized = preg_replace('/\s+/', ' ', trim($cellValue));
+                        $rowHeaders[$col] = $normalized;
+                    }
+                }
+
+                // Check if this row contains at least 3 of the required columns (to be flexible)
+                $foundCount = 0;
+                foreach ($requiredColumns as $requiredCol) {
+                    foreach ($rowHeaders as $headerName) {
+                        if (strcasecmp($headerName, $requiredCol) === 0) {
+                            $foundCount++;
+                            break;
+                        }
+                    }
+                }
+
+                // If we found at least 3 required columns, this is likely the header row
+                if ($foundCount >= 3) {
+                    $headerRow = $row;
+                    $headers = $rowHeaders;
+                    break;
+                }
+            }
+
+            if ($headerRow === null) {
+                Flux::toast(
+                    variant: 'danger',
+                    heading: 'Header Row Not Found',
+                    text: 'Could not find header row with required columns in the first 10 rows.'
+                );
+                $this->newBreakdownFile = null;
+
+                return;
+            }
+
+            // Log found headers for debugging
+            \Log::info('Excel headers found', [
+                'headers' => $headers,
+                'submission_id' => $this->submission->id,
+            ]);
+
+            // Find required columns (case-insensitive)
+            // Note: HRDF is optional as some Excel formats don't have it
+            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
+            $optionalColumns = ['HRDF'];
+            $columnIndices = [];
+            $missingColumns = [];
+
+            foreach ($requiredColumns as $requiredCol) {
+                $found = false;
+                foreach ($headers as $colIndex => $headerName) {
+                    if (strcasecmp($headerName, $requiredCol) === 0) {
+                        // For EPF, SOCSO, EIS: Take the LAST occurrence (employer contribution)
+                        // Don't break, keep searching for later occurrences
+                        $columnIndices[$requiredCol] = $colIndex;
+                        $found = true;
+                        // Don't break - continue searching to find the last occurrence
+                    }
+                }
+
+                if (! $found) {
+                    $missingColumns[] = $requiredCol;
+                }
+            }
+
+            // Check for optional columns
+            foreach ($optionalColumns as $optionalCol) {
+                foreach ($headers as $colIndex => $headerName) {
+                    if (strcasecmp($headerName, $optionalCol) === 0) {
+                        $columnIndices[$optionalCol] = $colIndex;
+                        // Don't break - take last occurrence
+                    }
+                }
+            }
+
+            if (! empty($missingColumns)) {
+                $foundColumnsList = implode(', ', array_values($headers));
+
+                Flux::toast(
+                    variant: 'danger',
+                    heading: 'Invalid Excel Format',
+                    text: "Missing required columns: ".implode(', ', $missingColumns).". Found columns: ".$foundColumnsList
+                );
+
+                \Log::warning('Excel parsing failed - missing columns', [
+                    'submission_id' => $this->submission->id,
+                    'missing' => $missingColumns,
+                    'found' => $headers,
+                ]);
+
+                $this->newBreakdownFile = null;
+
+                return;
+            }
+
+            // Read totals from the last row (which contains the sum of all columns)
+            $highestRow = $sheet->getHighestRow();
+
+            // Read CALCULATED values from the last row (formulas are evaluated)
+            $totals = [];
+            foreach (array_merge($requiredColumns, $optionalColumns) as $colName) {
+                if (isset($columnIndices[$colName])) {
+                    $value = $sheet->getCellByColumnAndRow($columnIndices[$colName], $highestRow)->getCalculatedValue();
+                    $totals[$colName] = floatval($value);
+                } else {
+                    // Optional column not found, set to 0
+                    $totals[$colName] = 0;
+                }
+            }
+
+            // Calculate total payroll amount
+            $totalAmount = array_sum($totals);
+
+            // Store breakdown for display
+            $this->calculatedBreakdown = [
+                'gross_salary' => $totals['Gross Salary'],
+                'epf' => $totals['EPF'],
+                'socso' => $totals['SOCSO'],
+                'eis' => $totals['EIS'],
+                'hrdf' => $totals['HRDF'],
+                'total' => $totalAmount,
+            ];
+
+            // Auto-fill the amount
+            $this->editPayrollAmount = number_format($totalAmount, 2, '.', '');
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Excel Parsed Successfully',
+                text: 'Total payroll amount: RM '.number_format($totalAmount, 2)
+            );
+
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Excel Parsing Failed',
+                text: 'Unable to read Excel file: '.$e->getMessage()
+            );
+
+            \Log::error('Excel parsing failed during edit', [
+                'submission_id' => $this->submission->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $this->newBreakdownFile = null;
+            $this->calculatedBreakdown = null;
+        }
+    }
+
+    public function closeEditAmountModal()
+    {
+        $this->showEditAmountModal = false;
+        $this->editPayrollAmount = '';
+        $this->newBreakdownFile = null;
+        $this->editAmountNotes = '';
+        $this->resetValidation();
+    }
+
+    public function updatePayrollAmount()
+    {
+        // Validate that at least one change is being made
+        $this->validate([
+            'editPayrollAmount' => 'nullable|numeric|min:0.01',
+            'newBreakdownFile' => 'nullable|file|mimes:xlsx,xls,pdf|max:10240',
+            'editAmountNotes' => 'required|string|min:5|max:500',
+        ], [
+            'editAmountNotes.required' => 'Please provide a reason for your changes.',
+            'editAmountNotes.min' => 'Reason must be at least 5 characters.',
+        ]);
+
+        // Ensure at least one field is being updated
+        if (empty($this->editPayrollAmount) && empty($this->newBreakdownFile)) {
+            Flux::toast(
+                variant: 'warning',
+                text: 'Please update the amount or upload a new file.'
+            );
+
+            return;
+        }
+
+        try {
+            $this->isUpdatingAmount = true;
+
+            // Check if there's a pending Billplz payment that needs to be cancelled
+            $hasPendingPayment = in_array($this->submission->status, ['pending_payment', 'overdue']);
+            $billplzCancelled = false;
+
+            if ($hasPendingPayment && ! empty($this->editPayrollAmount)) {
+                // Get the active payment record
+                $payment = $this->submission->payment;
+
+                if ($payment && $payment->billplz_bill_id && $payment->status === 'pending') {
+                    // Cancel the Billplz bill
+                    try {
+                        $apiKey = config('services.billplz.api_key');
+                        $billId = $payment->billplz_bill_id;
+
+                        $response = \Http::withBasicAuth($apiKey, '')
+                            ->delete(config('services.billplz.url').'bills/'.$billId);
+
+                        if ($response->successful()) {
+                            // Mark payment as cancelled
+                            $payment->update([
+                                'status' => 'cancelled',
+                                'payment_response' => json_encode([
+                                    'cancelled_at' => now(),
+                                    'cancelled_by' => auth()->user()->name,
+                                    'reason' => 'Amount amended by admin',
+                                ]),
+                            ]);
+
+                            // Update submission status back to approved
+                            $this->submission->update(['status' => 'approved']);
+
+                            $billplzCancelled = true;
+
+                            \Log::info('Billplz bill cancelled due to amount amendment', [
+                                'submission_id' => $this->submission->id,
+                                'bill_id' => $billId,
+                                'old_amount' => $this->submission->admin_final_amount,
+                                'new_amount' => $this->editPayrollAmount,
+                            ]);
+                        } else {
+                            throw new \Exception('Billplz API returned error: '.$response->body());
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to cancel Billplz bill', [
+                            'submission_id' => $this->submission->id,
+                            'bill_id' => $payment->billplz_bill_id ?? null,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        Flux::toast(
+                            variant: 'warning',
+                            heading: 'Billplz Cancellation Failed',
+                            text: 'Could not cancel old payment bill. Please cancel manually in Billplz dashboard.'
+                        );
+                    }
+                }
+            }
+
+            $changes = [];
+            $updateData = [];
+
+            // Handle amount update
+            if (! empty($this->editPayrollAmount)) {
+                $oldAmount = $this->submission->admin_final_amount;
+                $newAmount = $this->editPayrollAmount;
+
+                $updateData['admin_final_amount'] = $newAmount;
+                $changes[] = "Amount: RM ".number_format($oldAmount, 2)." → RM ".number_format($newAmount, 2);
+            }
+
+            // Handle file upload
+            if ($this->newBreakdownFile) {
+                // Delete old file if it exists
+                if ($this->submission->breakdown_file_path && \Storage::disk('local')->exists($this->submission->breakdown_file_path)) {
+                    \Storage::disk('local')->delete($this->submission->breakdown_file_path);
+                }
+
+                // Generate custom filename
+                $extension = $this->newBreakdownFile->getClientOriginalExtension();
+                $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));
+                $customFileName = sprintf(
+                    'worker_breakdown_%s_%s_%s.%s',
+                    $this->submission->contractor_clab_no,
+                    $monthName,
+                    $this->submission->year,
+                    $extension
+                );
+
+                // Store file
+                $directory = 'payroll-breakdowns/'.$this->submission->year.'/'.$this->submission->month;
+                $fullDirectoryPath = storage_path('app/'.$directory);
+
+                if (! file_exists($fullDirectoryPath)) {
+                    mkdir($fullDirectoryPath, 0755, true);
+                }
+
+                $filePath = $this->newBreakdownFile->storeAs($directory, $customFileName, 'local');
+
+                $updateData['breakdown_file_path'] = $filePath;
+                $updateData['breakdown_file_name'] = $customFileName;
+
+                $changes[] = "File: ".$customFileName;
+            }
+
+            // Append update notes
+            $existingNotes = $this->submission->admin_notes ?? '';
+            $updateNote = "\n\n[".now()->format('Y-m-d H:i:s')."] Updated by ".auth()->user()->name.":\n".implode("\n", $changes)."\nReason: ".$this->editAmountNotes;
+            $updateData['admin_notes'] = $existingNotes.$updateNote;
+
+            // Update submission
+            $this->submission->update($updateData);
+
+            // Log the change for audit trail
+            \Log::info('Payroll submission updated by admin', [
+                'submission_id' => $this->submission->id,
+                'contractor_clab_no' => $this->submission->contractor_clab_no,
+                'changes' => $changes,
+                'updated_by' => auth()->user()->name,
+                'reason' => $this->editAmountNotes,
+            ]);
+
+            $this->closeEditAmountModal();
+            $this->mount($this->submission->id); // Refresh data
+
+            if ($billplzCancelled) {
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Submission Updated & Payment Cancelled',
+                    text: 'Changes saved: '.implode(', ', $changes).'. Old Billplz bill cancelled - client must create new payment.'
+                );
+            } else {
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Submission Updated',
+                    text: 'Changes saved: '.implode(', ', $changes)
+                );
+            }
+
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Update Failed',
+                text: 'Failed to update submission: '.$e->getMessage()
+            );
+
+            \Log::error('Payroll submission update failed', [
+                'submission_id' => $this->submission->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        } finally {
+            $this->isUpdatingAmount = false;
         }
     }
 

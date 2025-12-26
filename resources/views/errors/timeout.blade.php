@@ -1,5 +1,5 @@
-<x-layouts.app :title="__('Request Timeout')">
-    <div class="flex h-full w-full flex-1 flex-col items-center justify-center gap-6 px-4">
+<x-layouts.guest>
+    <div class="flex min-h-screen w-full flex-1 flex-col items-center justify-center gap-6 px-4">
         <div class="text-center max-w-2xl">
             <!-- Icon -->
             <div class="mb-6">
@@ -67,4 +67,4 @@
             </div>
         </div>
     </div>
-</x-layouts.app>
+</x-layouts.guest>

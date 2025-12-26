@@ -261,9 +261,14 @@ class MissingSubmissions extends Component
 
                 $serviceCharge = $activeContractWorkers->count() * 200;
                 $sst = $serviceCharge * 0.08;
-                $grandTotal = $totalAmount + $serviceCharge + $sst;
 
-                $submission->update(['total_workers' => $activeContractWorkers->count(), 'total_amount' => $totalAmount, 'service_charge' => $serviceCharge, 'sst' => $sst, 'grand_total' => $grandTotal, 'total_with_penalty' => $grandTotal]);
+                $submission->update([
+                    'total_workers' => $activeContractWorkers->count(),
+                    'admin_final_amount' => $totalAmount, // Set payroll amount directly
+                    'service_charge' => $serviceCharge,
+                    'sst' => $sst,
+                    // Note: total_amount, grand_total, and total_with_penalty are deprecated
+                ]);
             });
 
             Flux::toast(variant: 'success', heading: 'Submission Created', text: 'Payroll for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y')." submitted successfully on behalf of {$this->bulkSubmitContractor['name']}.");

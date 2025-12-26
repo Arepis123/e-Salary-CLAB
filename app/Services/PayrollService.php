@@ -108,16 +108,14 @@ class PayrollService
         }));
         $serviceCharge = $activeWorkersCount * 200; // RM200 per active worker only
         $sst = $serviceCharge * 0.08; // 8% SST on service charge
-        $grandTotal = $totalAmount + $serviceCharge + $sst;
 
         // Update submission totals
         $submission->update([
             'total_workers' => count($workersData),
-            'total_amount' => $totalAmount,
+            'admin_final_amount' => $totalAmount, // Set payroll amount
             'service_charge' => $serviceCharge,
             'sst' => $sst,
-            'grand_total' => $grandTotal,
-            'total_with_penalty' => $grandTotal,
+            // Note: total_amount, grand_total, total_with_penalty are deprecated
         ]);
 
         return $submission->fresh(['workers']);
@@ -195,16 +193,14 @@ class PayrollService
         }));
         $serviceCharge = $activeWorkersCount * 200; // RM200 per active worker only
         $sst = $serviceCharge * 0.08; // 8% SST on service charge
-        $grandTotal = $totalAmount + $serviceCharge + $sst;
 
         // Update submission totals
         $submission->update([
             'total_workers' => count($workersData),
-            'total_amount' => $totalAmount,
+            'admin_final_amount' => $totalAmount, // Set payroll amount
             'service_charge' => $serviceCharge,
             'sst' => $sst,
-            'grand_total' => $grandTotal,
-            'total_with_penalty' => $grandTotal,
+            // Note: total_amount, grand_total, total_with_penalty are deprecated
         ]);
 
         return $submission->fresh(['workers']);

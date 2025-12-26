@@ -703,13 +703,13 @@ class Timesheet extends Component
             // Log activity
             $this->logTimesheetActivity(
                 action: 'submitted',
-                description: "Submitted payroll timesheet for {$submission->month_year} with {$submission->total_workers} workers (Total: RM ".number_format($submission->total_amount, 2).')',
+                description: "Submitted payroll timesheet for {$submission->month_year} with {$submission->total_workers} workers (Total: RM ".number_format($submission->client_total, 2).')',
                 timesheet: $submission,
                 properties: [
                     'period' => $submission->month_year,
                     'workers_count' => $submission->total_workers,
-                    'total_amount' => $submission->total_amount,
-                    'grand_total' => $submission->grand_total,
+                    'payroll_amount' => $submission->admin_final_amount,
+                    'total_amount' => $submission->client_total,
                 ]
             );
 
@@ -839,19 +839,19 @@ class Timesheet extends Component
                 // Log activity
                 $this->logTimesheetActivity(
                     action: 'submitted',
-                    description: "Submitted payroll timesheet for {$submission->month_year} with {$workerCount} workers (Total: RM ".number_format($submission->total_amount, 2).')',
+                    description: "Submitted payroll timesheet for {$submission->month_year} with {$workerCount} workers (Total: RM ".number_format($submission->client_total, 2).')',
                     timesheet: $submission,
                     properties: [
                         'period' => $submission->month_year,
                         'workers_count' => $workerCount,
-                        'total_amount' => $submission->total_amount,
-                        'grand_total' => $submission->grand_total,
+                        'payroll_amount' => $submission->admin_final_amount,
+                        'total_amount' => $submission->client_total,
                     ]
                 );
 
                 // Redirect to invoices page with highlight parameter
                 return redirect()->route('invoices', ['highlight' => $submission->id])
-                    ->with('success', "Timesheet submitted successfully for {$submission->month_year}. {$workerCount} worker(s) included. Total amount: RM ".number_format($submission->total_amount, 2));
+                    ->with('success', "Timesheet submitted successfully for {$submission->month_year}. {$workerCount} worker(s) included. Total amount: RM ".number_format($submission->client_total, 2));
             }
 
             // Reload data
