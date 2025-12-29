@@ -114,12 +114,13 @@ class Dashboard extends Component
 
     protected function loadRecentPayments()
     {
-        $recentSubmissions = PayrollSubmission::with(['user', 'payment'])
+        $recentSubmissions = PayrollSubmission::with(['user', 'payments'])
             ->where('status', 'paid')
-            ->whereHas('payment', function ($query) {
+            ->whereHas('payments', function ($query) {
+                // Check if submission has ANY completed payment (not just latest)
                 $query->where('status', 'completed');
             })
-            ->orderBy('updated_at', 'desc')
+            ->orderBy('paid_at', 'desc')
             ->limit(5)
             ->get();
 
@@ -128,9 +129,15 @@ class Dashboard extends Component
                 ? $submission->user->name
                 : 'Client '.$submission->contractor_clab_no;
 
-            $date = $submission->payment && $submission->payment->completed_at
-                ? $submission->payment->completed_at->format('M d, Y')
-                : $submission->updated_at->format('M d, Y');
+            // Get actual completed payment (exclude redirect logs)
+            $actualPayment = $submission->payments()
+                ->where('status', 'completed')
+                ->latest()
+                ->first();
+
+            $date = $actualPayment && $actualPayment->completed_at
+                ? $actualPayment->completed_at->format('M d, Y')
+                : $submission->paid_at->format('M d, Y');
 
             return [
                 'client' => $clientName,

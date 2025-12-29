@@ -311,6 +311,10 @@
                                 usePointStyle: true,
                                 generateLabels: function(chart) {
                                     const data = chart.data;
+                                    // Get current theme color when generating labels
+                                    const currentIsDark = document.documentElement.classList.contains('dark');
+                                    const labelColor = currentIsDark ? '#e4e4e7' : '#18181b';
+
                                     if (data.labels.length && data.datasets.length) {
                                         return data.labels.map((label, i) => {
                                             const value = data.datasets[0].data[i];
@@ -319,7 +323,8 @@
                                             return {
                                                 text: `${label}: ${value} (${percentage}%)`,
                                                 fillStyle: data.datasets[0].backgroundColor[i],
-                                                fontColor: textColor,
+                                                fontColor: labelColor,  // Chart.js v2
+                                                color: labelColor,      // Chart.js v3+
                                                 hidden: false,
                                                 index: i
                                             };
@@ -360,6 +365,9 @@
             });
         }
 
+        // Store chart instance globally to destroy before re-creating
+        window.paymentOverviewChartInstance = null;
+
         function initDashboardChart() {
             if (typeof Chart === 'undefined') {
                 setTimeout(initDashboardChart, 50);
@@ -369,6 +377,11 @@
             const ctx = document.getElementById('paymentOverviewChart');
             if (!ctx) return;
 
+            // Destroy existing chart instance if it exists
+            if (window.paymentOverviewChartInstance) {
+                window.paymentOverviewChartInstance.destroy();
+            }
+
             // Get theme colors
             const isDark = document.documentElement.classList.contains('dark');
             const textColor = isDark ? '#d4d4d8' : '#3f3f46';
@@ -376,7 +389,7 @@
 
             const chartData = @json($chartData);
 
-            new Chart(ctx, {
+            window.paymentOverviewChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: chartData.labels,
@@ -551,5 +564,24 @@
 
             console.log('MutationObserver setup complete');
         }
+
+        // Watch for theme changes and reinitialize charts
+        const themeObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    // Reinitialize both charts with new theme colors
+                    setTimeout(function() {
+                        window.initContractorStatusChart();
+                        initDashboardChart();
+                    }, 100);
+                }
+            });
+        });
+
+        // Observe theme changes on <html> element
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
     </script>
 </div>

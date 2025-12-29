@@ -42,7 +42,8 @@
       "Bash(if exist check_december_status.php del check_december_status.php)",
       "Bash(cat:*)",
       "Bash(./vendor/bin/pint:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

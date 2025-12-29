@@ -221,16 +221,11 @@ class Salary extends Component
         // Apply payment status filter
         if ($this->paymentStatusFilter) {
             if ($this->paymentStatusFilter === 'paid') {
-                $query->whereHas('payment', function ($paymentQuery) {
-                    $paymentQuery->where('status', 'completed');
-                });
+                // Check submission status, not just latest payment
+                $query->where('status', 'paid');
             } elseif ($this->paymentStatusFilter === 'awaiting') {
-                $query->where(function ($q) {
-                    $q->whereDoesntHave('payment')
-                        ->orWhereHas('payment', function ($paymentQuery) {
-                            $paymentQuery->where('status', '!=', 'completed');
-                        });
-                });
+                // Check if submission is awaiting payment (approved, pending_payment, overdue)
+                $query->whereIn('status', ['approved', 'pending_payment', 'overdue']);
             }
         }
 
