@@ -174,7 +174,7 @@
                         </flux:table.cell>
 
                         <flux:table.cell>
-                            @if($submission->payment && $submission->payment->status === 'completed')
+                            @if($submission->status === 'paid')
                                 <flux:badge color="green" size="sm" class="w-12 justify-center">Paid</flux:badge>
                             @else
                                 <flux:badge color="red" size="sm" class="w-12 justify-center">No</flux:badge>

@@ -414,14 +414,30 @@ class PaymentController extends Controller
     {
         $submission = PayrollSubmission::with('payment')->findOrFail($submissionId);
 
+        // Get the bill ID from Billplz redirect parameters
+        $billplzBillId = $request->input('billplz')['id'] ?? null;
+
+        // Find the specific payment for this bill (not just latest payment)
+        $payment = null;
+        if ($billplzBillId) {
+            $payment = PayrollPayment::where('payroll_submission_id', $submissionId)
+                ->where('billplz_bill_id', $billplzBillId)
+                ->first();
+        }
+
+        // Fall back to latest payment if bill ID not found in params
+        if (!$payment) {
+            $payment = $submission->payment;
+        }
+
         // Payment still pending, check with Billplz first
         $billPaid = false;
-        if ($submission->payment && $submission->payment->billplz_bill_id && $submission->payment->status === 'pending') {
-            $bill = $this->billplzService->getBill($submission->payment->billplz_bill_id);
+        if ($payment && $payment->billplz_bill_id && $payment->status === 'pending') {
+            $bill = $this->billplzService->getBill($payment->billplz_bill_id);
 
             if ($bill && $bill['paid']) {
                 // Update payment status
-                $submission->payment->markAsCompleted($bill);
+                $payment->markAsCompleted($bill);
                 $submission->refresh();
                 $billPaid = true;
             }
@@ -430,12 +446,15 @@ class PaymentController extends Controller
         // Check if user is authenticated
         if (! auth()->check()) {
             // User session expired, show guest views without requiring login
-            if ($submission->payment && $submission->payment->status === 'completed') {
+            if ($payment && $payment->status === 'completed') {
                 return view('client.payment-success-guest', compact('submission'));
-            } elseif ($submission->payment && $submission->payment->status === 'failed') {
+            } elseif ($payment && $payment->status === 'cancelled') {
+                return redirect()->route('login')
+                    ->with('warning', 'This payment was cancelled. Please login to check details and make a new payment if required.');
+            } elseif ($payment && $payment->status === 'failed') {
                 return redirect()->route('login')
                     ->with('error', 'Payment failed. Please login to try again.');
-            } elseif ($submission->payment && $submission->payment->status === 'pending' && ! $billPaid) {
+            } elseif ($payment && $payment->status === 'pending' && ! $billPaid) {
                 // User returned without paying (cancelled)
                 return redirect()->route('login')
                     ->with('warning', 'Payment was not completed. Please login to try again.');
@@ -446,15 +465,19 @@ class PaymentController extends Controller
         }
 
         // User is authenticated, show the appropriate view
-        if ($submission->payment && $submission->payment->status === 'completed') {
+        if ($payment && $payment->status === 'completed') {
             return view('client.payment-success', compact('submission'));
-        } elseif ($submission->payment && $submission->payment->status === 'failed') {
+        } elseif ($payment && $payment->status === 'cancelled') {
+            // Payment was cancelled by admin, redirect to timesheet with message
+            return redirect()->route('timesheet')
+                ->with('warning', 'This payment was cancelled. The payroll amount may have been updated. Please check and make a new payment if required.');
+        } elseif ($payment && $payment->status === 'failed') {
             return view('client.payment-failed', compact('submission'));
-        } elseif ($submission->payment && $submission->payment->status === 'pending' && ! $billPaid) {
+        } elseif ($payment && $payment->status === 'pending' && ! $billPaid) {
             // User returned without completing payment (cancelled/abandoned)
             // Log this abandonment for admin visibility
             Log::info('Client abandoned payment without completing', [
-                'payment_id' => $submission->payment->id,
+                'payment_id' => $payment->id,
                 'submission_id' => $submission->id,
                 'user_id' => auth()->id(),
             ]);
@@ -463,12 +486,12 @@ class PaymentController extends Controller
             $this->logPaymentActivity(
                 action: 'abandoned',
                 description: "Client returned from payment page without completing payment for payroll {$submission->month_year}",
-                payment: $submission->payment,
+                payment: $payment,
                 properties: [
                     'submission_id' => $submission->id,
-                    'amount' => $submission->payment->amount,
+                    'amount' => $payment->amount,
                     'period' => $submission->month_year,
-                    'billplz_bill_id' => $submission->payment->billplz_bill_id,
+                    'billplz_bill_id' => $payment->billplz_bill_id,
                 ]
             );
 

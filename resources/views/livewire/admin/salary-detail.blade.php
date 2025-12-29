@@ -230,31 +230,42 @@
     </flux:card>
 
     <!-- Payment Information -->
-    @if($submission->payment)
+    @php
+        // Get actual payment (exclude redirect logs)
+        $actualPayment = $submission->payments()
+            ->whereNotIn('status', ['redirected'])
+            ->latest()
+            ->first();
+    @endphp
+    @if($actualPayment)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Payment Information</h2>
         <div class="grid gap-4 md:grid-cols-3">
             <div>
                 <span class="text-sm text-zinc-600 dark:text-zinc-400">Payment Method:</span>
                 <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {{ strtoupper($submission->payment->payment_method ?? 'N/A') }}
+                    {{ strtoupper($actualPayment->payment_method ?? 'N/A') }}
                 </p>
             </div>
             <div>
                 <span class="text-sm text-zinc-600 dark:text-zinc-400">Transaction ID:</span>
                 <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {{ $submission->payment->transaction_id ?? 'N/A' }}
+                    {{ $actualPayment->transaction_id ?? 'N/A' }}
                 </p>
             </div>
             <div>
                 <span class="text-sm text-zinc-600 dark:text-zinc-400">Status:</span>
                 <p class="mt-1">
-                    @if($submission->payment->status === 'completed')
+                    @if($actualPayment->status === 'completed')
                         <flux:badge color="green" size="sm" icon="check">Completed</flux:badge>
-                    @elseif($submission->payment->status === 'pending')
+                    @elseif($actualPayment->status === 'pending')
                         <flux:badge color="yellow" size="sm" icon="clock">Pending</flux:badge>
-                    @else
+                    @elseif($actualPayment->status === 'failed')
                         <flux:badge color="red" size="sm" icon="x-mark">Failed</flux:badge>
+                    @elseif($actualPayment->status === 'cancelled')
+                        <flux:badge color="zinc" size="sm" icon="x-mark">Cancelled</flux:badge>
+                    @else
+                        <flux:badge color="zinc" size="sm">{{ ucfirst($actualPayment->status) }}</flux:badge>
                     @endif
                 </p>
             </div>
