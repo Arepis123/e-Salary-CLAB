@@ -322,9 +322,10 @@ class DashboardController extends Controller
 
     protected function getOverduePayments($clabNo)
     {
+        // Use the overdue scope which correctly handles deadline timing
+        // (overdue only AFTER the deadline day ends, not ON the deadline)
         return PayrollSubmission::byContractor($clabNo)
-            ->whereNotIn('status', ['paid', 'draft']) // Exclude paid and draft
-            ->where('payment_deadline', '<', now())
+            ->overdue()
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
             ->get();
