@@ -900,10 +900,9 @@ class Timesheet extends Component
             ]);
         }
 
-        // 2. Check for overdue payments
+        // 2. Check for overdue payments (using overdue scope for correct deadline timing)
         $overdue = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->whereNotIn('status', ['paid', 'draft'])
-            ->where('payment_deadline', '<', now())
+            ->overdue()
             ->where(function ($query) use ($currentMonth, $currentYear) {
                 $query->where('year', '<', $currentYear)
                     ->orWhere(function ($q) use ($currentMonth, $currentYear) {
@@ -1014,10 +1013,9 @@ class Timesheet extends Component
             ]);
         }
 
-        // 2. Check for overdue payments (unpaid and past deadline, excluding current month)
+        // 2. Check for overdue payments (using overdue scope for correct deadline timing, excluding current month)
         $overdue = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->whereNotIn('status', ['paid', 'draft'])
-            ->where('payment_deadline', '<', now())
+            ->overdue()
             ->where(function ($query) use ($currentMonth, $currentYear) {
                 $query->where('year', '<', $currentYear)
                     ->orWhere(function ($q) use ($currentMonth, $currentYear) {
