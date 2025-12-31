@@ -124,7 +124,7 @@
                 @if($submission->has_penalty || $submission->isOverdue())
                 <div class="flex justify-between mt-2">
                     <span class="text-red-600 dark:text-red-400">Late Payment Penalty (8%):</span>
-                    <span class="font-medium text-red-600 dark:text-red-400">+ RM {{ number_format($submission->penalty_amount ?? ($submission->client_total * 0.08), 2) }}</span>
+                    <span class="font-medium text-red-600 dark:text-red-400">+ RM {{ number_format($submission->penalty_amount ?? $submission->calculatePenalty(), 2) }}</span>
                 </div>
                 <div class="border-t border-red-200 dark:border-red-700 pt-2 mt-2 flex justify-between">
                     <span class="font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>

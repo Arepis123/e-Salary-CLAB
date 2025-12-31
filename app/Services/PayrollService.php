@@ -101,6 +101,9 @@ class PayrollService
             $totalAmount += $payrollWorker->total_payment;
         }
 
+        // Apply all configured deductions for this month
+        $this->applyConfiguredDeductions($submission);
+
         // Calculate service charge, SST, and grand total
         // Only charge service fee for active workers (exclude workers with ended contracts)
         $activeWorkersCount = count(array_filter($workersData, function ($worker) {
@@ -185,6 +188,9 @@ class PayrollService
             // Total amount is what the system collects (Gross + Employer contributions)
             $totalAmount += $payrollWorker->total_payment;
         }
+
+        // Apply all configured deductions for this month
+        $this->applyConfiguredDeductions($submission);
 
         // Calculate service charge, SST, and grand total
         // Only charge service fee for active workers (exclude workers with ended contracts)
@@ -299,5 +305,37 @@ class PayrollService
             'deadline' => $deadline,
             'days_until_deadline' => (int) now()->diffInDays($deadline, false),
         ];
+    }
+
+    /**
+     * Apply all enabled deductions for this contractor and month
+     */
+    protected function applyConfiguredDeductions(PayrollSubmission $submission): void
+    {
+        $configService = app(\App\Services\ContractorConfigurationService::class);
+
+        // Get all deductions that should be applied for this contractor in this month
+        $deductions = $configService->getDeductionsForMonth($submission->contractor_clab_no, $submission->month);
+
+        // Apply each deduction to all workers in this submission
+        foreach ($deductions as $deduction) {
+            foreach ($submission->workers as $worker) {
+                // Check if this deduction already exists for this worker
+                $existingDeduction = $worker->transactions()
+                    ->where('type', 'deduction')
+                    ->where('description', $deduction->name)
+                    ->first();
+
+                // Only create if doesn't exist yet
+                if (!$existingDeduction) {
+                    $worker->transactions()->create([
+                        'type' => 'deduction',
+                        'amount' => $deduction->amount,
+                        'description' => $deduction->name,
+                        'remarks' => 'Auto-applied based on deduction template configuration',
+                    ]);
+                }
+            }
+        }
     }
 }

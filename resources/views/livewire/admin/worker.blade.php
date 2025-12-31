@@ -227,13 +227,39 @@
                             <flux:button variant="ghost" size="sm" disabled>Previous</flux:button>
                         @endif
 
-                        @for($i = 1; $i <= $pagination['last_page']; $i++)
-                            @if($i == $pagination['current_page'])
-                                <flux:button variant="primary" size="xs">{{ $i }}</flux:button>
+                        @php
+                            $currentPage = $pagination['current_page'];
+                            $lastPage = $pagination['last_page'];
+                            $delta = 2; // Number of pages to show on each side of current page
+                            $left = $currentPage - $delta;
+                            $right = $currentPage + $delta + 1;
+                            $pages = [];
+                            $l = 0;
+
+                            for ($i = 1; $i <= $lastPage; $i++) {
+                                if ($i == 1 || $i == $lastPage || ($i >= $left && $i < $right)) {
+                                    if ($l) {
+                                        if ($i - $l === 2) {
+                                            $pages[] = $l + 1;
+                                        } else if ($i - $l !== 1) {
+                                            $pages[] = '...';
+                                        }
+                                    }
+                                    $pages[] = $i;
+                                    $l = $i;
+                                }
+                            }
+                        @endphp
+
+                        @foreach($pages as $page)
+                            @if($page === '...')
+                                <span class="px-2 text-zinc-400">...</span>
+                            @elseif($page == $currentPage)
+                                <flux:button variant="primary" size="xs">{{ $page }}</flux:button>
                             @else
-                                <flux:button variant="ghost" size="xs" wire:click="$set('page', {{ $i }})">{{ $i }}</flux:button>
+                                <flux:button variant="ghost" size="xs" wire:click="$set('page', {{ $page }})">{{ $page }}</flux:button>
                             @endif
-                        @endfor
+                        @endforeach
 
                         @if($pagination['current_page'] < $pagination['last_page'])
                             <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] + 1 }})">Next</flux:button>

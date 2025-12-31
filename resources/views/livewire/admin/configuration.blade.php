@@ -26,6 +26,13 @@
                 <flux:icon.clock class="size-5 inline mr-2" />
                 OT Entry Windows
             </button>
+            <button
+                wire:click="switchTab('contractor-settings')"
+                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'contractor-settings' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+            >
+                <flux:icon.cog class="size-5 inline mr-2" />
+                Contractor Settings
+            </button>
         </nav>
     </div>
 
@@ -36,6 +43,10 @@
 
     @if($activeTab === 'windows')
         @include('livewire.admin.configuration-windows')
+    @endif
+
+    @if($activeTab === 'contractor-settings')
+        @include('livewire.admin.configuration-contractor-settings')
     @endif
 
     <!-- Window Action Modal -->
@@ -92,7 +103,6 @@
                 variant="{{ $windowAction === 'open' ? 'primary' : 'danger' }}"
                 wire:click="confirmWindowAction"
             >
-                <flux:icon.check class="size-4" />
                 Confirm {{ $windowAction === 'open' ? 'Open' : 'Close' }}
             </flux:button>
         </div>

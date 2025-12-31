@@ -43,7 +43,8 @@
       "Bash(cat:*)",
       "Bash(./vendor/bin/pint:*)",
       "Bash(xargs:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

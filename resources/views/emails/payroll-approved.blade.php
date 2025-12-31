@@ -131,11 +131,10 @@
             <strong>Submission Details:</strong><br>
             <strong>Period:</strong> {{ $submission->month_year }}<br>
             <strong>CLAB No:</strong> {{ $submission->contractor_clab_no }}<br>
-            <strong>Total Workers:</strong> {{ $submission->total_workers }}<br>
-            <strong>Submission ID:</strong> #{{ $submission->submission_number }}
+            <strong>Total Workers:</strong> {{ $submission->total_workers }}
         </div>
 
-        <div class="amount-box">
+        <!-- <div class="amount-box">
             <div class="label">Final Approved Amount</div>
             <div class="amount">RM {{ number_format($finalAmount, 2) }}</div>
             @if($submission->has_penalty)
@@ -143,7 +142,7 @@
                 (Including 8% late penalty: RM {{ number_format($submission->penalty_amount, 2) }})
             </div>
             @endif
-        </div>
+        </div> -->
 
         @if($adminNotes)
         <div class="notes-box">
@@ -174,8 +173,8 @@
 
     <div class="footer">
         <p>
-            This is an automated email from the e-Payroll System.<br>
-            © {{ date('Y') }} e-Payroll. All rights reserved.
+            This is an automated email from the e-Salary CLAB System.<br>
+            © {{ date('Y') }} e-Salary CLAB. All rights reserved.
         </p>
     </div>
 </body>

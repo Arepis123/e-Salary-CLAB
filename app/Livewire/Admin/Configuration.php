@@ -68,14 +68,48 @@ class Configuration extends Component
 
     public $windowStats = [];
 
+    // Contractor configuration properties
+    public $contractorConfigs = [];
+
+    public $editingContractorClab = '';
+
+    public $editingContractorName = '';
+
+    public $editServiceChargeExempt = false;
+
+    public $editEnabledDeductions = []; // Array of deduction template IDs
+
+    // Deduction template management
+    public $deductionTemplates = [];
+
+    public $showTemplateModal = false;
+
+    public $editingTemplateId = null;
+
+    public $templateName = '';
+
+    public $templateDescription = '';
+
+    public $templateAmount = '';
+
+    public $templateMonths = [];
+
+    public $templateIsActive = true;
+
     protected WorkerService $workerService;
 
     protected ContractorWindowService $windowService;
 
-    public function boot(WorkerService $workerService, ContractorWindowService $windowService)
-    {
+    protected \App\Services\ContractorConfigurationService $configService;
+
+    public function boot(
+        WorkerService $workerService,
+        ContractorWindowService $windowService,
+        \App\Services\ContractorConfigurationService $configService
+    ) {
         $this->workerService = $workerService;
         $this->windowService = $windowService;
+        $this->configService = $configService;
     }
 
     public function mount()
@@ -87,6 +121,8 @@ class Configuration extends Component
 
         $this->loadStats();
         $this->loadWindowStats();
+        $this->loadContractorConfigs();
+        $this->loadDeductionTemplates();
     }
 
     public function loadStats()
@@ -325,6 +361,201 @@ class Configuration extends Component
         $this->contractorHistory = [];
     }
 
+    // Contractor configuration methods
+    public function loadContractorConfigs()
+    {
+        $this->contractorConfigs = $this->configService->getAllContractorConfigurations();
+    }
+
+    public function loadDeductionTemplates()
+    {
+        $this->deductionTemplates = $this->configService->getAllDeductionTemplates();
+    }
+
+    public function openContractorEditModal(string $clabNo)
+    {
+        $config = $this->configService->getContractorConfiguration($clabNo);
+
+        $this->editingContractorClab = $config->contractor_clab_no;
+        $this->editingContractorName = $config->contractor_name;
+        $this->editServiceChargeExempt = $config->service_charge_exempt;
+
+        // Load currently enabled deduction template IDs
+        $this->editEnabledDeductions = $config->deductions->pluck('id')->toArray();
+
+        $this->showEditModal = true;
+    }
+
+    public function closeContractorEditModal()
+    {
+        $this->showEditModal = false;
+        $this->editingContractorClab = '';
+        $this->editingContractorName = '';
+        $this->editServiceChargeExempt = false;
+        $this->editEnabledDeductions = [];
+    }
+
+    public function saveContractorConfig()
+    {
+        $this->validate([
+            'editEnabledDeductions' => 'array',
+            'editEnabledDeductions.*' => 'integer|exists:deduction_templates,id',
+        ]);
+
+        try {
+            // Update service charge exemption
+            $this->configService->updateConfiguration(
+                $this->editingContractorClab,
+                $this->editServiceChargeExempt
+            );
+
+            // Update enabled deductions
+            $this->configService->enableDeductions(
+                $this->editingContractorClab,
+                $this->editEnabledDeductions
+            );
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Configuration Updated',
+                text: "Settings updated for {$this->editingContractorName}"
+            );
+
+            $this->closeContractorEditModal();
+            $this->loadContractorConfigs();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to update configuration: '.$e->getMessage()
+            );
+        }
+    }
+
+    // Deduction template management methods
+    public function openTemplateModal(?int $templateId = null)
+    {
+        if ($templateId) {
+            $template = \App\Models\DeductionTemplate::find($templateId);
+            if ($template) {
+                $this->editingTemplateId = $template->id;
+                $this->templateName = $template->name;
+                $this->templateDescription = $template->description ?? '';
+                $this->templateAmount = number_format($template->amount, 2, '.', '');
+                $this->templateMonths = $template->apply_months ?? [];
+                $this->templateIsActive = $template->is_active;
+            }
+        } else {
+            $this->resetTemplateForm();
+        }
+
+        $this->showTemplateModal = true;
+    }
+
+    public function closeTemplateModal()
+    {
+        $this->showTemplateModal = false;
+        $this->resetTemplateForm();
+    }
+
+    protected function resetTemplateForm()
+    {
+        $this->editingTemplateId = null;
+        $this->templateName = '';
+        $this->templateDescription = '';
+        $this->templateAmount = '';
+        $this->templateMonths = [];
+        $this->templateIsActive = true;
+    }
+
+    public function saveTemplate()
+    {
+        $this->validate([
+            'templateName' => 'required|string|max:255',
+            'templateDescription' => 'nullable|string|max:500',
+            'templateAmount' => 'required|numeric|min:0|max:9999.99',
+            'templateMonths' => 'required|array|min:1',
+            'templateMonths.*' => 'integer|min:1|max:12',
+        ]);
+
+        try {
+            $data = [
+                'name' => $this->templateName,
+                'description' => $this->templateDescription,
+                'amount' => $this->templateAmount,
+                'apply_months' => $this->templateMonths,
+                'is_active' => $this->templateIsActive,
+            ];
+
+            if ($this->editingTemplateId) {
+                $this->configService->updateDeductionTemplate($this->editingTemplateId, $data);
+                $message = 'Deduction template updated successfully';
+            } else {
+                $this->configService->createDeductionTemplate($data);
+                $message = 'Deduction template created successfully';
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Success',
+                text: $message
+            );
+
+            $this->closeTemplateModal();
+            $this->loadDeductionTemplates();
+            $this->loadContractorConfigs(); // Reload to refresh deduction relationships
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save template: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function deleteTemplate(int $templateId)
+    {
+        try {
+            $this->configService->deleteDeductionTemplate($templateId);
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Template Deleted',
+                text: 'Deduction template deleted successfully'
+            );
+
+            $this->loadDeductionTemplates();
+            $this->loadContractorConfigs();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to delete template: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function toggleTemplate(int $templateId)
+    {
+        try {
+            $template = $this->configService->toggleDeductionTemplate($templateId);
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Status Updated',
+                text: "Template {$template->name} is now ".($template->is_active ? 'active' : 'inactive')
+            );
+
+            $this->loadDeductionTemplates();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to update template status: '.$e->getMessage()
+            );
+        }
+    }
+
     public function render()
     {
         // Get worker IDs that have contracts (only show workers with contracts)
@@ -411,6 +642,14 @@ class Configuration extends Component
             $contractors = $this->windowService->getAllContractorSettings();
         }
 
+        // Get contractor configurations if on contractor-settings tab
+        $contractorConfigs = [];
+        $deductionTemplates = [];
+        if ($this->activeTab === 'contractor-settings') {
+            $contractorConfigs = $this->contractorConfigs;
+            $deductionTemplates = $this->deductionTemplates;
+        }
+
         return view('livewire.admin.configuration', [
             'workers' => $workers,
             'countries' => $countries,
@@ -419,6 +658,8 @@ class Configuration extends Component
             'salaryHistory' => $salaryHistory,
             'contractors' => $contractors,
             'windowStats' => $this->windowStats,
+            'contractorConfigs' => $contractorConfigs,
+            'deductionTemplates' => $deductionTemplates,
         ])->layout('components.layouts.app', ['title' => __('Configuration')]);
     }
 }

@@ -93,10 +93,13 @@ class PayrollSubmission extends Model
 
     /**
      * Check if payment deadline has passed
+     * Penalty applies starting from the NEXT DAY after deadline (1st of new month)
+     * Example: If deadline is Nov 30, penalty applies from Dec 1 onwards
      */
     public function isOverdue(): bool
     {
-        return $this->payment_deadline->isPast() && $this->status !== 'paid';
+        // Check if we're AFTER the end of the deadline day (i.e., next day)
+        return now()->isAfter($this->payment_deadline->endOfDay()) && $this->status !== 'paid';
     }
 
     /**
@@ -152,9 +155,17 @@ class PayrollSubmission extends Model
     /**
      * Calculate service charge (RM 200 per billable worker)
      * Excludes workers with ended contracts who only have OT hours
+     * Returns 0 if contractor is exempt from service charges
      */
     public function getCalculatedServiceChargeAttribute(): float
     {
+        // Check if contractor is exempt from service charges
+        $configService = app(\App\Services\ContractorConfigurationService::class);
+
+        if ($configService->isServiceChargeExempt($this->contractor_clab_no)) {
+            return 0;
+        }
+
         return $this->billable_workers_count * 200;
     }
 
@@ -226,10 +237,12 @@ class PayrollSubmission extends Model
 
     /**
      * Scope to get overdue submissions
+     * Only considers submissions overdue AFTER the end of deadline day (next day)
+     * Example: If deadline is Nov 30, only overdue from Dec 1 onwards
      */
     public function scopeOverdue($query)
     {
-        return $query->where('payment_deadline', '<', now())
+        return $query->whereDate('payment_deadline', '<', now()->startOfDay())
             ->whereNotIn('status', ['paid']);
     }
 

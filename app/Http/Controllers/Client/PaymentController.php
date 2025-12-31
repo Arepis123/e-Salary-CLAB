@@ -144,28 +144,13 @@ class PaymentController extends Controller
             }
         }
 
-        // Check for penalty (overdue)
+        // Check for penalty (overdue) and update if needed
         $submission->updatePenalty();
         $submission->refresh();
 
-        // Calculate total amount to pay (includes payroll + service charge + SST + penalty if overdue)
-        // Use client_total which includes: admin_final_amount + service_charge + SST
-        $baseAmount = $submission->client_total;
-        $totalAmount = $baseAmount;
-
-        if ($submission->isOverdue()) {
-            $penalty = $baseAmount * 0.08; // 8% penalty on the client total
-            $totalAmount += $penalty;
-
-            // Update the submission with penalty info if not already set
-            if (! $submission->has_penalty) {
-                $submission->update([
-                    'has_penalty' => true,
-                    'penalty_amount' => $penalty,
-                    'total_with_penalty' => $totalAmount,
-                ]);
-            }
-        }
+        // Use the model's total_due attribute which handles all penalty logic
+        // This ensures consistency across the application
+        $totalAmount = $submission->total_due;
 
         // Create Billplz bill
         $billData = [
