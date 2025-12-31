@@ -1220,6 +1220,9 @@ class SalaryDetail extends Component
 
     public function render()
     {
+        // Refresh submission from database to get latest payment data
+        $this->submission->refresh();
+
         return view('livewire.admin.salary-detail');
     }
 }
