@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'roles' => \App\Http\Middleware\CheckMultipleRoles::class,
         ]);
 
         // Exclude logout from CSRF verification to prevent 419 errors on session expiration

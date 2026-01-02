@@ -59,52 +59,97 @@ class PaymentController extends Controller
         }
 
         if ($recentPendingPayment) {
-            Log::info('Redirecting to existing pending payment', [
-                'payment_id' => $recentPendingPayment->id,
-                'payment_age_minutes' => $paymentAge,
-                'submission_id' => $submission->id,
-            ]);
+            // Verify the bill still exists on Billplz before redirecting
+            $billExists = false;
 
-            // Log this attempt even though we're redirecting
-            // This helps admin track how many times client attempted payment
-            $attemptLog = PayrollPayment::create([
-                'payroll_submission_id' => $submission->id,
-                'payment_method' => 'billplz',
-                'billplz_bill_id' => $recentPendingPayment->billplz_bill_id,
-                'billplz_url' => $recentPendingPayment->billplz_url,
-                'amount' => $recentPendingPayment->amount,
-                'status' => 'redirected',
-                'payment_response' => json_encode([
-                    'redirected_to_payment_id' => $recentPendingPayment->id,
-                    'reason' => 'Redirected to existing pending payment within 2-hour window',
-                    'payment_age_minutes' => $paymentAge,
-                    'redirected_at' => now()->toDateTimeString(),
-                ]),
-            ]);
+            try {
+                $bill = $this->billplzService->getBill($recentPendingPayment->billplz_bill_id);
 
-            Log::info('Payment attempt logged as redirected', [
-                'attempt_id' => $attemptLog->id,
-                'original_payment_id' => $recentPendingPayment->id,
-                'submission_id' => $submission->id,
-            ]);
+                if ($bill) {
+                    $billExists = true;
 
-            // Log activity
-            $this->logPaymentActivity(
-                action: 'redirected',
-                description: "Client attempted payment but was redirected to existing pending payment for payroll {$submission->month_year}",
-                payment: $attemptLog,
-                properties: [
-                    'submission_id' => $submission->id,
+                    Log::info('Redirecting to existing pending payment', [
+                        'payment_id' => $recentPendingPayment->id,
+                        'payment_age_minutes' => $paymentAge,
+                        'submission_id' => $submission->id,
+                        'bill_verified' => true,
+                    ]);
+                } else {
+                    Log::warning('Bill not found on Billplz, will create new bill', [
+                        'payment_id' => $recentPendingPayment->id,
+                        'bill_id' => $recentPendingPayment->billplz_bill_id,
+                        'submission_id' => $submission->id,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to verify bill existence on Billplz', [
+                    'payment_id' => $recentPendingPayment->id,
+                    'bill_id' => $recentPendingPayment->billplz_bill_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            if ($billExists) {
+                // Bill exists on Billplz, safe to redirect
+
+                // Log this attempt even though we're redirecting
+                // This helps admin track how many times client attempted payment
+                $attemptLog = PayrollPayment::create([
+                    'payroll_submission_id' => $submission->id,
+                    'payment_method' => 'billplz',
+                    'billplz_bill_id' => $recentPendingPayment->billplz_bill_id,
+                    'billplz_url' => $recentPendingPayment->billplz_url,
                     'amount' => $recentPendingPayment->amount,
-                    'period' => $submission->month_year,
+                    'status' => 'redirected',
+                    'payment_response' => json_encode([
+                        'redirected_to_payment_id' => $recentPendingPayment->id,
+                        'reason' => 'Redirected to existing pending payment within 2-hour window',
+                        'payment_age_minutes' => $paymentAge,
+                        'redirected_at' => now()->toDateTimeString(),
+                    ]),
+                ]);
+
+                Log::info('Payment attempt logged as redirected', [
+                    'attempt_id' => $attemptLog->id,
                     'original_payment_id' => $recentPendingPayment->id,
-                    'payment_age_minutes' => $paymentAge,
-                ]
-            );
+                    'submission_id' => $submission->id,
+                ]);
 
-            $url = $this->billplzService->getDirectPaymentUrl($recentPendingPayment->billplz_url);
+                // Log activity
+                $this->logPaymentActivity(
+                    action: 'redirected',
+                    description: "Client attempted payment but was redirected to existing pending payment for payroll {$submission->month_year}",
+                    payment: $attemptLog,
+                    properties: [
+                        'submission_id' => $submission->id,
+                        'amount' => $recentPendingPayment->amount,
+                        'period' => $submission->month_year,
+                        'original_payment_id' => $recentPendingPayment->id,
+                        'payment_age_minutes' => $paymentAge,
+                    ]
+                );
 
-            return redirect($url);
+                $url = $this->billplzService->getDirectPaymentUrl($recentPendingPayment->billplz_url);
+
+                return redirect($url);
+            } else {
+                // Bill was deleted from Billplz, mark payment as cancelled and create new bill
+                $recentPendingPayment->update([
+                    'status' => 'cancelled',
+                    'payment_response' => json_encode([
+                        'reason' => 'Bill deleted from Billplz portal',
+                        'cancelled_at' => now()->toDateTimeString(),
+                        'auto_cancelled' => true,
+                    ]),
+                ]);
+
+                Log::info('Marked payment as cancelled due to deleted bill, creating new bill', [
+                    'cancelled_payment_id' => $recentPendingPayment->id,
+                    'submission_id' => $submission->id,
+                ]);
+
+                // Continue to create a new bill (don't return, let execution continue)
+            }
         }
 
         // If there's an old/expired payment (pending for >2 hours, failed, or cancelled),

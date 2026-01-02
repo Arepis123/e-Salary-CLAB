@@ -50,7 +50,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Dashboard - Unified route that dispatches based on role
     Route::get('dashboard', function (\Illuminate\Http\Request $request) {
-        if (in_array(auth()->user()->role, ['admin', 'super_admin'])) {
+        if (in_array(auth()->user()->role, ['admin', 'super_admin', 'finance'])) {
             return view('admin.dashboard');
         } elseif (auth()->user()->role === 'client') {
             return app(\App\Http\Controllers\Client\DashboardController::class)->index($request);
@@ -122,9 +122,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ADMIN-ONLY ROUTES (No client equivalent)
     // ========================================================================
 
-    Route::middleware('role:admin')->group(function () {
+    // Payroll routes - accessible by admin and finance
+    Route::middleware(['auth', 'verified', 'roles:admin,finance'])->group(function () {
         Route::get('payroll', \App\Livewire\Admin\Salary::class)->name('payroll');
         Route::get('payroll/{id}', \App\Livewire\Admin\SalaryDetail::class)->name('payroll.detail');
+    });
+
+    // Admin-only routes (no finance access)
+    Route::middleware('role:admin')->group(function () {
         Route::get('missing-submissions', \App\Livewire\Admin\MissingSubmissions::class)->name('missing-submissions');
         Route::get('missing-submissions/{clabNo}', \App\Livewire\Admin\MissingSubmissionsDetail::class)->name('missing-submissions.detail');
         Route::get('contractors', \App\Livewire\Admin\Contractors::class)->name('contractors');
@@ -138,10 +143,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // SUPER ADMIN-ONLY ROUTES
     // ========================================================================
 
+    // Report route - accessible by super_admin and finance
+    Route::middleware(['auth', 'verified', 'roles:finance'])->group(function () {
+        Route::get('report', \App\Livewire\Admin\Report::class)->name('report');
+    });
+
+    // Super admin only routes (no finance access)
     Route::middleware('role:super_admin')->group(function () {
         Route::get('configuration', \App\Livewire\Admin\Configuration::class)->name('configuration');
         Route::get('activity-logs', \App\Livewire\Admin\ActivityLogs::class)->name('activity-logs');
-        Route::get('report', \App\Livewire\Admin\Report::class)->name('report');
+        Route::get('users', \App\Livewire\Admin\Users::class)->name('users');
     });
 
     // ========================================================================

@@ -51,14 +51,14 @@ class ThirdPartyUserProvider implements UserProvider
             return null;
         }
 
-        // First, check if user exists locally as admin/super_admin
+        // First, check if user exists locally as admin/super_admin/finance
         $localUser = User::where(function ($query) use ($username) {
             $query->where('username', $username)
                 ->orWhere('email', $username);
         })->first();
 
-        // If local user is admin or super_admin, return immediately
-        if ($localUser && in_array($localUser->role, ['admin', 'super_admin'])) {
+        // If local user is admin, super_admin, or finance, return immediately
+        if ($localUser && in_array($localUser->role, ['admin', 'super_admin', 'finance'])) {
             return $localUser;
         }
 
@@ -105,8 +105,8 @@ class ThirdPartyUserProvider implements UserProvider
             return false;
         }
 
-        // For admin and super_admin, validate against local bcrypt password
-        if (in_array($user->role, ['admin', 'super_admin'])) {
+        // For admin, super_admin, and finance, validate against local bcrypt password
+        if (in_array($user->role, ['admin', 'super_admin', 'finance'])) {
             return \Illuminate\Support\Facades\Hash::check($password, $user->password);
         }
 

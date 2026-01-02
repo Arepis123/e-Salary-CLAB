@@ -15,7 +15,7 @@
             <flux:button variant="filled" size="sm" wire:click="exportWorkerList" icon="arrow-down-tray" icon-variant="outline">
                 Export
             </flux:button>
-            @if($submission->hasAdminReview())
+            @if($submission->hasAdminReview() && (!$submission->payment || $submission->payment->status !== 'completed'))
                 <flux:button variant="filled" size="sm" wire:click="openEditAmountModal" icon="pencil" icon-variant="outline">
                     Edit
                 </flux:button>
@@ -23,12 +23,6 @@
             @if($submission->payment && $submission->payment->status === 'completed')
                 <flux:button variant="filled" size="sm" wire:click="downloadReceipt" icon="document" icon-variant="outline">
                     Receipt
-                </flux:button>
-                <flux:button variant="filled" size="sm" wire:click="printPayslip" icon="printer" icon-variant="outline">
-                    Payslip
-                </flux:button>
-                <flux:button variant="filled" size="sm" wire:click="viewPaymentProof" icon="eye" icon-variant="outline">
-                    Payment Proof
                 </flux:button>
             @endif            
             <flux:button variant="filled" size="sm" href="{{ route('payroll') }}" icon="arrow-left" icon-variant="outline">

@@ -48,6 +48,7 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
         return [
             'No',
             'Submission ID',
+            'Transaction ID',
             'CLAB No',
             'Contractor Name',
             'Period',
@@ -83,14 +84,24 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
             default => ucfirst($submission->status)
         };
 
-        // Payment status
-        $paymentStatus = ($submission->payment && $submission->payment->status === 'completed')
+        // Payment status - check submission status instead of payment status
+        $paymentStatus = ($submission->status === 'paid')
             ? 'Paid'
             : 'Awaiting Payment';
+
+        // Transaction ID from Billplz - find the completed payment
+        $transactionId = '-';
+        if ($submission->payments) {
+            $completedPayment = $submission->payments->firstWhere('status', 'completed');
+            if ($completedPayment && $completedPayment->transaction_id) {
+                $transactionId = $completedPayment->transaction_id;
+            }
+        }
 
         return [
             $rowNumber,
             'PAY'.str_pad($submission->id, 6, '0', STR_PAD_LEFT),
+            $transactionId,
             $submission->contractor_clab_no,
             $submission->user ? $submission->user->name : 'Client '.$submission->contractor_clab_no,
             $submission->month_year,
@@ -134,9 +145,9 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
         // Set row height for header
         $sheet->getRowDimension(1)->setRowHeight(25);
 
-        // Format currency columns (G, H, I, J, K, L)
+        // Format currency columns (H, I, J, K, L, M) - shifted due to Transaction ID column
         $lastRow = $this->submissions->count() + 1;
-        $sheet->getStyle('G2:L'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('H2:M'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
 
         return [];
     }
@@ -149,21 +160,22 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
         return [
             'A' => 6,   // No
             'B' => 15,  // Submission ID
-            'C' => 12,  // CLAB No
-            'D' => 30,  // Contractor Name
-            'E' => 12,  // Period
-            'F' => 12,  // Total Workers
-            'G' => 14,  // Total Amount
-            'H' => 14,  // Service Charge
-            'I' => 10,  // SST
-            'J' => 14,  // Grand Total
-            'K' => 10,  // Penalty
-            'L' => 16,  // Total with Penalty
-            'M' => 16,  // Status
-            'N' => 16,  // Payment Status
-            'O' => 18,  // Submitted Date
-            'P' => 18,  // Paid Date
-            'Q' => 16,  // Payment Deadline
+            'C' => 25,  // Transaction ID
+            'D' => 12,  // CLAB No
+            'E' => 30,  // Contractor Name
+            'F' => 12,  // Period
+            'G' => 12,  // Total Workers
+            'H' => 14,  // Payroll Amount
+            'I' => 14,  // Service Charge
+            'J' => 10,  // SST
+            'K' => 14,  // Total (Payroll + Service + SST)
+            'L' => 10,  // Penalty
+            'M' => 16,  // Total with Penalty
+            'N' => 16,  // Status
+            'O' => 16,  // Payment Status
+            'P' => 18,  // Submitted Date
+            'Q' => 18,  // Paid Date
+            'R' => 16,  // Payment Deadline
         ];
     }
 }

@@ -146,14 +146,30 @@ class SalaryDetail extends Component
 
     public function downloadReceipt()
     {
-        // TODO: Implement download receipt functionality
-        Flux::toast(variant: 'info', text: 'Download receipt functionality coming soon!');
-    }
+        // Only allow receipt download for paid invoices
+        if ($this->submission->status !== 'paid') {
+            Flux::toast(variant: 'warning', text: 'Receipt is only available for paid invoices.');
+            return;
+        }
 
-    public function printPayslip()
-    {
-        // TODO: Implement print payslip functionality
-        Flux::toast(variant: 'info', text: 'Print payslip functionality coming soon!');
+        // Generate tax invoice number if not already generated
+        if (! $this->submission->hasTaxInvoice()) {
+            $this->submission->generateTaxInvoiceNumber();
+            $this->submission->refresh();
+        }
+
+        $contractor = $this->submission->user;
+
+        $pdf = \PDF::loadView('admin.tax-invoice-pdf', [
+            'invoice' => $this->submission,
+            'contractor' => $contractor
+        ])->setPaper('a4', 'landscape');
+
+        $filename = 'Official-Receipt-'.$this->submission->tax_invoice_number.'-'.$this->submission->month_year.'.pdf';
+
+        return response()->streamDownload(function() use ($pdf) {
+            echo $pdf->output();
+        }, $filename);
     }
 
     public function markAsPaid()
@@ -166,12 +182,6 @@ class SalaryDetail extends Component
     {
         // TODO: Implement send reminder functionality
         Flux::toast(variant: 'success', text: 'Payment reminder sent to contractor!');
-    }
-
-    public function viewPaymentProof()
-    {
-        // TODO: Implement view payment proof functionality
-        Flux::toast(variant: 'info', text: 'Payment proof viewing functionality coming soon!');
     }
 
     public function exportWorkerList()
@@ -194,23 +204,33 @@ class SalaryDetail extends Component
             // Submission info
             $sheet->setCellValue('A2', 'Contractor: '.$this->submission->user->name);
             $sheet->setCellValue('A3', 'CLAB No: '.$this->submission->contractor_clab_no);
-            $sheet->setCellValue('A4', 'Status: '.strtoupper($this->submission->status));
-            $sheet->setCellValue('A5', 'Total Workers: '.$this->stats['total_workers']);
+            $sheet->setCellValue('A4', 'Submission ID: #PAY'.str_pad($this->submission->id, 6, '0', STR_PAD_LEFT));
 
-            // Headers (row 7)
+            // Payment Status - show PAID if status is 'paid', otherwise show awaiting payment
+            $paymentStatus = ($this->submission->status === 'paid') ? 'PAID' : 'AWAITING PAYMENT';
+            $sheet->setCellValue('A5', 'Payment Status: '.$paymentStatus);
+
+            // Transaction ID (if payment exists and is completed)
+            if ($this->submission->payment && $this->submission->payment->status === 'completed' && $this->submission->payment->transaction_id) {
+                $sheet->setCellValue('A6', 'Transaction ID: '.$this->submission->payment->transaction_id);
+            }
+
+            $sheet->setCellValue('A7', 'Total Workers: '.$this->stats['total_workers']);
+
+            // Headers (row 9)
             $headers = [
-                'A7' => 'No',
-                'B7' => 'Worker ID',
-                'C7' => 'Worker Name',
-                'D7' => 'Passport',
-                'E7' => 'Basic Salary (RM)',
-                'F7' => 'OT Normal (hrs)',
-                'G7' => 'OT Rest (hrs)',
-                'H7' => 'OT Public (hrs)',
-                'I7' => 'Advance Payment (RM)',
-                'J7' => 'Other Deduction (RM)',
-                'K7' => 'NPL (days)',
-                'L7' => 'Allowance (RM)',
+                'A9' => 'No',
+                'B9' => 'Worker ID',
+                'C9' => 'Worker Name',
+                'D9' => 'Passport',
+                'E9' => 'Basic Salary (RM)',
+                'F9' => 'OT Normal (hrs)',
+                'G9' => 'OT Rest (hrs)',
+                'H9' => 'OT Public (hrs)',
+                'I9' => 'Advance Payment (RM)',
+                'J9' => 'Other Deduction (RM)',
+                'K9' => 'NPL (days)',
+                'L9' => 'Allowance (RM)',
             ];
 
             foreach ($headers as $cell => $value) {
@@ -218,7 +238,7 @@ class SalaryDetail extends Component
             }
 
             // Style headers
-            $sheet->getStyle('A7:L7')->applyFromArray([
+            $sheet->getStyle('A9:L9')->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -231,7 +251,7 @@ class SalaryDetail extends Component
             ]);
 
             // Data rows
-            $row = 8;
+            $row = 10;
             $no = 1;
             foreach ($this->workers as $worker) {
                 $sheet->setCellValue('A'.$row, $no++);
@@ -270,14 +290,14 @@ class SalaryDetail extends Component
             $totalRow = $row;
             $sheet->setCellValue('A'.$totalRow, 'TOTAL');
             $sheet->mergeCells('A'.$totalRow.':D'.$totalRow);
-            $sheet->setCellValue('E'.$totalRow, '=SUM(E8:E'.($totalRow - 1).')');
-            $sheet->setCellValue('F'.$totalRow, '=SUM(F8:F'.($totalRow - 1).')');
-            $sheet->setCellValue('G'.$totalRow, '=SUM(G8:G'.($totalRow - 1).')');
-            $sheet->setCellValue('H'.$totalRow, '=SUM(H8:H'.($totalRow - 1).')');
-            $sheet->setCellValue('I'.$totalRow, '=SUM(I8:I'.($totalRow - 1).')');
-            $sheet->setCellValue('J'.$totalRow, '=SUM(J8:J'.($totalRow - 1).')');
-            $sheet->setCellValue('K'.$totalRow, '=SUM(K8:K'.($totalRow - 1).')');
-            $sheet->setCellValue('L'.$totalRow, '=SUM(L8:L'.($totalRow - 1).')');
+            $sheet->setCellValue('E'.$totalRow, '=SUM(E10:E'.($totalRow - 1).')');
+            $sheet->setCellValue('F'.$totalRow, '=SUM(F10:F'.($totalRow - 1).')');
+            $sheet->setCellValue('G'.$totalRow, '=SUM(G10:G'.($totalRow - 1).')');
+            $sheet->setCellValue('H'.$totalRow, '=SUM(H10:H'.($totalRow - 1).')');
+            $sheet->setCellValue('I'.$totalRow, '=SUM(I10:I'.($totalRow - 1).')');
+            $sheet->setCellValue('J'.$totalRow, '=SUM(J10:J'.($totalRow - 1).')');
+            $sheet->setCellValue('K'.$totalRow, '=SUM(K10:K'.($totalRow - 1).')');
+            $sheet->setCellValue('L'.$totalRow, '=SUM(L10:L'.($totalRow - 1).')');
 
             // Style total row
             $sheet->getStyle('A'.$totalRow.':L'.$totalRow)->applyFromArray([
@@ -313,7 +333,7 @@ class SalaryDetail extends Component
             }
 
             // Freeze panes at header row
-            $sheet->freezePane('A8');
+            $sheet->freezePane('A10');
 
             // Generate filename
             $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));

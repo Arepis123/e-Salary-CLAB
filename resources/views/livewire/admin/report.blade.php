@@ -25,40 +25,37 @@
             <div class="grid gap-4 md:grid-cols-4">
                 <div>
                     <flux:label>Report Type</flux:label>
-                    <flux:select placeholder="Select type">
-                        <flux:select.option>All Reports</flux:select.option>
-                        <flux:select.option>Payment Summary</flux:select.option>
-                        <flux:select.option>Worker Payroll</flux:select.option>
-                        <flux:select.option>Client Summary</flux:select.option>
-                        <flux:select.option>Monthly Analysis</flux:select.option>
-                        <flux:select.option>Tax Report</flux:select.option>
+                    <flux:select wire:model.live="reportType" placeholder="Select type">
+                        <flux:select.option value="">All Reports</flux:select.option>
+                        <flux:select.option value="payment">Payment Summary</flux:select.option>
+                        <flux:select.option value="worker">Worker Payroll</flux:select.option>
+                        <flux:select.option value="client">Client Summary</flux:select.option>
+                        <flux:select.option value="monthly">Monthly Analysis</flux:select.option>
+                        <flux:select.option value="tax">Tax Report</flux:select.option>
                     </flux:select>
                 </div>
 
                 <div>
                     <flux:label>Period</flux:label>
-                    <flux:select placeholder="Select period">
-                        <flux:select.option>January 2025</flux:select.option>
-                        <flux:select.option>December 2024</flux:select.option>
-                        <flux:select.option>November 2024</flux:select.option>
-                        <flux:select.option>October 2024</flux:select.option>
-                        <flux:select.option>Custom Range</flux:select.option>
+                    <flux:select wire:model.live="period" wire:change="filterByMonthYear($event.target.value)" placeholder="Select period">
+                        @foreach($availableMonths as $month)
+                            <flux:select.option value="{{ $month['value'] }}">{{ $month['label'] }}</flux:select.option>
+                        @endforeach
                     </flux:select>
                 </div>
 
                 <div>
                     <flux:label>Client</flux:label>
-                    <flux:select placeholder="Select client">
-                        <flux:select.option>All Clients</flux:select.option>
-                        <flux:select.option>Miqabina Sdn Bhd</flux:select.option>
-                        <flux:select.option>WCT Berhad</flux:select.option>
-                        <flux:select.option>Chuan Luck Piling Sdn Bhd</flux:select.option>
-                        <flux:select.option>Best Stone Sdn Bhd</flux:select.option>
+                    <flux:select wire:model.live="clientFilter" placeholder="All Clients">
+                        <flux:select.option value="">All Clients</flux:select.option>
+                        @foreach($clientPayments as $client)
+                            <flux:select.option value="{{ $client['client'] }}">{{ $client['client'] }}</flux:select.option>
+                        @endforeach
                     </flux:select>
                 </div>
 
                 <div class="flex items-end">
-                    <flux:button variant="primary" class="w-full">
+                    <flux:button variant="primary" class="w-full" wire:click="applyFilters">
                         <flux:icon.funnel class="size-4" />
                         Apply Filters
                     </flux:button>

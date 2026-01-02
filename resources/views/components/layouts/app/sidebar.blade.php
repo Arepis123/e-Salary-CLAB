@@ -27,23 +27,41 @@
                     <flux:sidebar.item icon="clock" :href="route('ot-entry')" :current="request()->routeIs('ot-entry')" wire:navigate>{{ __('OT Entry') }}</flux:sidebar.item>
                 @endif
 
-                <flux:sidebar.item icon="users" :href="route('workers')" :current="request()->routeIs('workers')" wire:navigate>{{ __('Worker') }}</flux:sidebar.item>
-                <flux:sidebar.item icon="building-office" :href="route('contractors')" :current="request()->routeIs('contractors')" wire:navigate>{{ __('Contractors') }}</flux:sidebar.item>
-                {{-- <flux:sidebar.item icon="wallet" :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>{{ __('Payroll') }}</flux:sidebar.item> --}}
-                <flux:sidebar.group expandable icon="wallet" heading="Payroll" class="grid">
-                    <flux:sidebar.item :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>All submissions</flux:sidebar.item>
-                    <flux:sidebar.item :href="route('missing-submissions')" :current="request()->routeIs('missing-submissions')" wire:navigate>No submissions</flux:sidebar.item>
-                </flux:sidebar.group>
-                <flux:sidebar.item icon="document-text" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>{{ __('Invoices') }}</flux:sidebar.item>
-                <flux:sidebar.item icon="bell" :href="route('notifications')" :current="request()->routeIs('notifications')" wire:navigate>{{ __('Reminders') }}</flux:sidebar.item>
-                <flux:sidebar.item icon="newspaper" :href="route('news')" :current="request()->routeIs('news')" wire:navigate>{{ __('News') }}</flux:sidebar.item>
-                @if(auth()->user()->isSuperAdmin())
+                @if(!auth()->user()->isFinance())
+                    <flux:sidebar.item icon="users" :href="route('workers')" :current="request()->routeIs('workers')" wire:navigate>{{ __('Worker') }}</flux:sidebar.item>
+                    <flux:sidebar.item icon="building-office" :href="route('contractors')" :current="request()->routeIs('contractors')" wire:navigate>{{ __('Contractors') }}</flux:sidebar.item>
+                @endif
+
+                @if(in_array(auth()->user()->role, ['admin', 'super_admin', 'finance']))
+                    @if(auth()->user()->isFinance())
+                        {{-- Finance users see simplified payroll menu --}}
+                        <flux:sidebar.item icon="wallet" :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>{{ __('Payroll') }}</flux:sidebar.item>
+                    @else
+                        {{-- Admin/Super admin see expanded payroll menu --}}
+                        <flux:sidebar.group expandable icon="wallet" heading="Payroll" class="grid">
+                            <flux:sidebar.item :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>All submissions</flux:sidebar.item>
+                            <flux:sidebar.item :href="route('missing-submissions')" :current="request()->routeIs('missing-submissions')" wire:navigate>No submissions</flux:sidebar.item>
+                        </flux:sidebar.group>
+                    @endif
+                @endif
+
+                @if(!auth()->user()->isFinance())
+                    <flux:sidebar.item icon="document-text" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>{{ __('Invoices') }}</flux:sidebar.item>
+                    <flux:sidebar.item icon="bell" :href="route('notifications')" :current="request()->routeIs('notifications')" wire:navigate>{{ __('Reminders') }}</flux:sidebar.item>
+                    <flux:sidebar.item icon="newspaper" :href="route('news')" :current="request()->routeIs('news')" wire:navigate>{{ __('News') }}</flux:sidebar.item>
+                @endif
+
+                @if(auth()->user()->isSuperAdmin() || auth()->user()->isFinance())
                     <div class="px-3 py-2 mt-4 in-data-flux-sidebar-collapsed-desktop:hidden">
-                        <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">{{ __('SUPER ADMIN') }}</h3>
+                        <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">{{ auth()->user()->isSuperAdmin() ? __('SUPER ADMIN') : __('REPORTS') }}</h3>
                     </div>
                     <flux:sidebar.item icon="file-text" :href="route('report')" :current="request()->routeIs('report')" wire:navigate>{{ __('Report') }}</flux:sidebar.item>
+                @endif
+
+                @if(auth()->user()->isSuperAdmin())
                     <flux:sidebar.item icon="cog" :href="route('configuration')" :current="request()->routeIs('configuration')" wire:navigate>{{ __('Configuration') }}</flux:sidebar.item>
                     <flux:sidebar.item icon="clipboard-document-list" :href="route('activity-logs')" :current="request()->routeIs('activity-logs')" wire:navigate>{{ __('Activity Logs') }}</flux:sidebar.item>
+                    <flux:sidebar.item icon="users" :href="route('users')" :current="request()->routeIs('users')" wire:navigate>{{ __('Users') }}</flux:sidebar.item>
                 @endif
             </flux:sidebar.nav>
 

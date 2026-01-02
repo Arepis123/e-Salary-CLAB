@@ -81,7 +81,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user has admin privileges (super admin or admin)
+     * Check if user is finance
+     */
+    public function isFinance(): bool
+    {
+        return $this->role === 'finance';
+    }
+
+    /**
+     * Check if user has admin privileges (super admin or admin only)
      */
     public function hasAdminAccess(): bool
     {
