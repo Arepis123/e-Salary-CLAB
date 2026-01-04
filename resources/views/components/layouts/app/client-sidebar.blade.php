@@ -31,7 +31,7 @@
                     {{ __('Timesheet') }}
                 </flux:sidebar.item>
                 <flux:sidebar.item icon="clock" :href="route('ot-entry')" :current="request()->routeIs('ot-entry')" wire:navigate>
-                    {{ __('OT & Transaction Entry') }}
+                    {!! __('OT & Transaction Entry') !!}
                 </flux:sidebar.item>
             </flux:sidebar.nav>
 

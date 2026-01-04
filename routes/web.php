@@ -48,6 +48,13 @@ Route::get('user-manual', \App\Livewire\UserManual::class)->name('user-manual');
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
+    // Tutorial completion route - accepts page parameter
+    Route::post('tutorial/complete', function (\Illuminate\Http\Request $request) {
+        $page = $request->input('page', 'dashboard');
+        auth()->user()->markTutorialCompleted($page);
+        return response()->json(['success' => true, 'page' => $page]);
+    })->name('tutorial.complete');
+
     // Dashboard - Unified route that dispatches based on role
     Route::get('dashboard', function (\Illuminate\Http\Request $request) {
         if (in_array(auth()->user()->role, ['admin', 'super_admin', 'finance'])) {

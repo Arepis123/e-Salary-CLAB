@@ -44,7 +44,8 @@
       "Bash(./vendor/bin/pint:*)",
       "Bash(xargs:*)",
       "Bash(tasklist:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

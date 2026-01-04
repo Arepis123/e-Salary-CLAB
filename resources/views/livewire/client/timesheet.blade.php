@@ -5,6 +5,7 @@
             <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Timesheet Management</h1>
             <p class="text-sm text-zinc-600 dark:text-zinc-400">Submit monthly payroll with overtime hours</p>
         </div>
+        <x-tutorial-button page="timesheet" />
     </div>
 
 
@@ -40,7 +41,7 @@
 
     <!-- Statistics Cards (only show for current month and when not blocked) -->
     @if(!$targetMonth && !$targetYear && !$isBlocked)
-    <div class="grid gap-4 md:grid-cols-4">
+    <div id="timesheet-stats" class="grid gap-4 md:grid-cols-4">
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
@@ -85,7 +86,7 @@
 
     @if(!$errorMessage && !$isBlocked && !$targetMonth && !$targetYear)
     <!-- Current Month Info -->
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+    <flux:card id="current-period-info" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
         <div class="flex items-center justify-between">
             <div>
                 <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} Payroll</h3>
@@ -114,7 +115,7 @@
 
     <!-- Payroll Entry Form -->
     @if(!$errorMessage && !$isBlocked)
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+    <flux:card id="worker-verification-table" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime</h2>
         </div>
@@ -231,11 +232,11 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="mt-6 flex justify-end items-center gap-2">
-                <flux:button wire:click="saveDraft" variant="filled" :disabled="$isBlocked">
+            <div id="submission-actions" class="mt-6 flex justify-end items-center gap-2">
+                <flux:button id="save-draft-btn" wire:click="saveDraft" variant="filled" :disabled="$isBlocked">
                     Save as Draft
                 </flux:button>
-                <flux:button wire:click="submitForPayment" variant="primary" :disabled="$isBlocked">
+                <flux:button id="submit-btn" wire:click="submitForPayment" variant="primary" :disabled="$isBlocked">
                     Submit
                 </flux:button>
             </div>
@@ -252,7 +253,7 @@
     </flux:card>
 
     <!-- Submission History -->
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+    <flux:card id="submission-history" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent Submissions</h2>
             <div class="flex gap-2 hidden">

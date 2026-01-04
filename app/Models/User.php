@@ -28,6 +28,7 @@ class User extends Authenticatable
         'password',
         'role',
         'email_verified_at',
+        'tutorial_completed',
     ];
 
     /**
@@ -50,7 +51,27 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'tutorial_completed' => 'array',
         ];
+    }
+
+    /**
+     * Check if a specific tutorial page has been completed
+     */
+    public function hasTutorialCompleted(string $page): bool
+    {
+        $completed = $this->tutorial_completed ?? [];
+        return isset($completed[$page]) && $completed[$page] === true;
+    }
+
+    /**
+     * Mark a tutorial page as completed
+     */
+    public function markTutorialCompleted(string $page): void
+    {
+        $completed = $this->tutorial_completed ?? [];
+        $completed[$page] = true;
+        $this->update(['tutorial_completed' => $completed]);
     }
 
     /**

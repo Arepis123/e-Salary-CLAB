@@ -5,6 +5,7 @@
                 <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">My Workers</h1>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Manage workers assigned to your company</p>
             </div>
+            <x-tutorial-button page="workers" />
         </div>
 
         <!-- Statistics Cards -->
@@ -57,7 +58,7 @@
         </div>
 
         <!-- Filters and Search (Accordion) -->
-        <div>
+        <div id="filter-section">
             <button type="button" onclick="toggleFilters()" class="w-full flex items-center justify-between p-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                 <div class="flex items-center gap-2 flex-wrap">
                     <div class="flex items-center gap-3">
@@ -165,7 +166,7 @@
         </script>
 
         <!-- Workers List -->
-        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg" id="workers-table-section">
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">All Workers</h2>
                 <div class="flex gap-2">
@@ -187,7 +188,7 @@
                     <flux:table.column sortable :sorted="$sortBy === 'position'" :direction="$sortDirection" wire:click="sortByColumn('position')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Position</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'basic_salary'" :direction="$sortDirection" wire:click="sortByColumn('basic_salary')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'status'" :direction="$sortDirection" wire:click="sortByColumn('status')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
-                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
+                    <flux:table.column><span id="actions-column-header" class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
                 </flux:table.columns>
 
                 <flux:table.rows>

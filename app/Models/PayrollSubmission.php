@@ -264,7 +264,11 @@ class PayrollSubmission extends Model
 
     /**
      * Generate tax invoice number for this submission
-     * Format: TINV-YYYY-NNNN (e.g., TINV-2025-0001)
+     * Format: OR-P-YYMMNNNN (e.g., OR-P-26010001 for January 2026, invoice #1)
+     * - OR-P: Prefix
+     * - YY: Year (last 2 digits)
+     * - MM: Month (2 digits)
+     * - NNNN: Running number (4 digits)
      */
     public function generateTaxInvoiceNumber(): string
     {
@@ -272,23 +276,32 @@ class PayrollSubmission extends Model
             return $this->tax_invoice_number;
         }
 
-        // Get the latest tax invoice number for this year
+        // Get the latest tax invoice number for this year and month
         $year = $this->year;
+        $month = $this->month;
+        $yearShort = substr((string) $year, -2); // Last 2 digits of year
+        $monthPadded = str_pad($month, 2, '0', STR_PAD_LEFT); // 2-digit month
+
+        // Find the latest invoice number for this year-month period
         $latestInvoice = static::whereNotNull('tax_invoice_number')
             ->where('year', $year)
+            ->where('month', $month)
+            ->where('tax_invoice_number', 'LIKE', 'OR-P-' . $yearShort . $monthPadded . '%')
             ->orderBy('tax_invoice_generated_at', 'desc')
             ->first();
 
         if ($latestInvoice && $latestInvoice->tax_invoice_number) {
-            // Extract the number from format TINV-YYYY-NNNN
-            $parts = explode('-', $latestInvoice->tax_invoice_number);
-            $lastNumber = isset($parts[2]) ? (int) $parts[2] : 0;
+            // Extract the running number from format OR-P-YYMMNNNN
+            $invoiceNumber = $latestInvoice->tax_invoice_number;
+            // Get last 4 digits (running number)
+            $lastNumber = (int) substr($invoiceNumber, -4);
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
 
-        $taxInvoiceNumber = sprintf('TINV-%d-%04d', $year, $nextNumber);
+        // Format: OR-P-YYMMNNNN
+        $taxInvoiceNumber = sprintf('OR-P-%s%s%04d', $yearShort, $monthPadded, $nextNumber);
 
         // Save the tax invoice number and generation timestamp
         $this->update([

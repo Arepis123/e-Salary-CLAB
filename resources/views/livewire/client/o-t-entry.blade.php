@@ -7,20 +7,21 @@
                     Enter overtime hours for {{ $period['entry_month_name'] ?? 'previous month' }}
                 </p>
             </div>
-            @if($isWithinWindow && !$hasSubmitted)
-                <div class="flex gap-2">
-                    <flux:button wire:click="downloadTemplate" variant="outline" icon="arrow-down-tray" size="sm">
+            <div class="flex gap-2">
+                <x-tutorial-button page="ot-entry" />
+                @if($isWithinWindow && !$hasSubmitted)
+                    <flux:button id="download-template-btn" wire:click="downloadTemplate" variant="outline" icon="arrow-down-tray" size="sm">
                         Download Template
                     </flux:button>
-                    <flux:button wire:click="openImportModal" variant="filled" icon="arrow-up-tray" size="sm">
+                    <flux:button id="import-file-btn" wire:click="openImportModal" onclick="setTimeout(() => { if (typeof startTutorial === 'function' && !window.importTutorialShown && document.getElementById('import-modal')) { window.importTutorialShown = true; startTutorial('ot-import'); } }, 600)" variant="filled" icon="arrow-up-tray" size="sm">
                         Import from File
                     </flux:button>
-                </div>
-            @endif
+                @endif
+            </div>
         </div>
 
         <!-- Entry Window Status Card -->
-        <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+        <flux:card id="entry-window-status" class="p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     @if($isWithinWindow)
@@ -75,7 +76,7 @@
         @endif
 
         <!-- OT Entry Form -->
-        <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+        <flux:card id="ot-entry-table" class="p-6 dark:bg-zinc-900 rounded-lg">
             <div class="mb-4">
                 <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                     Overtime Hours for {{ $period['entry_month_name'] }}
@@ -251,11 +252,11 @@
 
                 <!-- Bottom Actions -->
                 @if(!$hasSubmitted && $isWithinWindow && count($entries) > 0)
-                    <div class="mt-6 flex justify-end gap-2 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                        <flux:button wire:click="saveDraft" variant="outline" icon="document-text">
+                    <div id="ot-entry-actions" class="mt-6 flex justify-end gap-2 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                        <flux:button id="save-draft-btn" wire:click="saveDraft" variant="outline" icon="document-text">
                             Save Draft
                         </flux:button>
-                        <flux:button wire:click="submitEntries" variant="primary" icon="paper-airplane">
+                        <flux:button id="submit-entries-btn" wire:click="submitEntries" variant="primary" icon="paper-airplane">
                             Submit All Entries
                         </flux:button>
                     </div>
@@ -407,9 +408,9 @@
 
         <!-- Import Modal -->
         @if($showImportModal)
-            <flux:modal wire:model="showImportModal" class="min-w-[800px]">
+            <flux:modal id="import-modal" wire:model="showImportModal" class="min-w-[800px]">
                 <div class="space-y-6">
-                    <div>
+                    <div id="import-modal-header">
                         <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                             Import OT & Transactions
                         </h2>
@@ -422,8 +423,9 @@
                         <!-- Upload Form -->
                         <flux:card class="p-4 bg-zinc-50 dark:bg-zinc-800">
                             <div class="space-y-4">
-                                <div>
+                                <div id="import-file-input-container">
                                     <flux:input
+                                        id="import-file-input"
                                         type="file"
                                         wire:model="importFile"
                                         accept=".xlsx,.xls,.csv"
@@ -437,7 +439,7 @@
 
                                 <flux:separator />
 
-                                <div>
+                                <div id="import-instructions">
                                     <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Instructions</h3>
                                     <ul class="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
                                         <li>Download the template file to see the required format</li>
@@ -449,11 +451,11 @@
                                     </ul>
                                 </div>
 
-                                <div class="flex justify-end gap-2">
+                                <div id="import-modal-actions" class="flex justify-end gap-2">
                                     <flux:button wire:click="closeImportModal" variant="ghost">
                                         Cancel
                                     </flux:button>
-                                    <flux:button wire:click="processImport" variant="primary" :disabled="!$importFile">
+                                    <flux:button id="process-import-btn" wire:click="processImport" variant="primary" :disabled="!$importFile">
                                         Process File
                                     </flux:button>
                                 </div>
@@ -464,7 +466,7 @@
                         <div class="space-y-4">
                             <!-- Error Summary -->
                             @if(count($importErrors) > 0)
-                                <flux:card class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                                <flux:card id="import-errors" class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                                     <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-2">
                                         Errors Found ({{ count($importErrors) }})
                                     </h3>
@@ -480,7 +482,7 @@
 
                             <!-- Success Summary -->
                             @if(count($importData) > 0)
-                                <flux:card class="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                                <flux:card id="import-success-summary" class="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                                     <h3 class="text-sm font-semibold text-green-900 dark:text-green-100">
                                         Valid Records: {{ count($importData) }}
                                     </h3>
@@ -490,7 +492,7 @@
                                 </flux:card>
 
                                 <!-- Data Preview Table -->
-                                <div class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+                                <div id="import-preview-table" class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
                                     <div class="max-h-96 overflow-y-auto">
                                         <table class="w-full text-sm">
                                             <thead class="bg-zinc-100 dark:bg-zinc-800 sticky top-0">

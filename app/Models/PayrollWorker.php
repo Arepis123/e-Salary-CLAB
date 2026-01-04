@@ -101,6 +101,14 @@ class PayrollWorker extends Model
     }
 
     /**
+     * Automatically trim worker_id to prevent spaces causing matching issues
+     */
+    public function setWorkerIdAttribute($value)
+    {
+        $this->attributes['worker_id'] = trim($value);
+    }
+
+    /**
      * Get total advance payment from all transactions
      */
     public function getTotalAdvancePaymentAttribute(): float

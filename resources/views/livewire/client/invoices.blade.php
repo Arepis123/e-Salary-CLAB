@@ -5,6 +5,7 @@
             <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Invoices</h1>
             <p class="text-sm text-zinc-600 dark:text-zinc-400">View and manage your payroll invoices</p>
         </div>
+        <x-tutorial-button page="invoices" />
     </div>
 
     @if(session('success'))

@@ -92,8 +92,11 @@
                 <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Dashboard</h1>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Welcome back, {{ auth()->user()->name }}</p>
             </div>
-            <div class="text-sm text-zinc-600 dark:text-zinc-400">
-                {{ now()->format('l, F j, Y') }}
+            <div class="flex items-center gap-3">
+                <x-tutorial-button page="dashboard" />
+                <div class="text-sm text-zinc-600 dark:text-zinc-400">
+                    {{ now()->format('l, F j, Y') }}
+                </div>
             </div>
         </div>
 
@@ -295,7 +298,7 @@
         @endif
 
         <!-- Statistics Cards -->
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div id="dashboard-stats" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <!-- Active Workers -->
             <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
                 <div class="flex items-center justify-between">
