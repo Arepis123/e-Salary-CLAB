@@ -180,7 +180,7 @@
                                         </p>
                                     </div>
                                 </div>
-                                <flux:button variant="primary" size="sm" href="{{ route('invoices.show', $draft['id']) }}" wire:navigate onclick="event.stopPropagation()">
+                                <flux:button variant="primary" size="sm" href="{{ route('timesheet.edit', $draft['id']) }}" wire:navigate onclick="event.stopPropagation()">
                                     Complete & Submit
                                 </flux:button>
                             </div>

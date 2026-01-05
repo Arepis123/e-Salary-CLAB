@@ -235,7 +235,7 @@
                             <flux:dropdown>
                                 <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" inset="top bottom" />
                                 <flux:menu>
-                                    @if($invoice->hasAdminReview())
+                                    @if($invoice->hasAdminReview() && $invoice->status !== 'draft')
                                         <flux:menu.item icon="eye" href="{{ route('invoices.show', $invoice->id) }}">View Invoice</flux:menu.item>
                                         <flux:menu.item icon="document-arrow-down" href="{{ route('invoices.download', $invoice->id) }}">Download Invoice</flux:menu.item>
                                     @endif

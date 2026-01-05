@@ -64,6 +64,12 @@ class InvoiceController extends Controller
             ->where('contractor_clab_no', $clabNo)
             ->firstOrFail();
 
+        // Block access to draft submissions - they should be edited, not viewed as invoices
+        if ($invoice->status === 'draft') {
+            return redirect()->route('timesheet.edit', $invoice->id)
+                ->with('error', 'Draft submissions cannot be viewed as invoices. Please complete the draft first.');
+        }
+
         // Update penalty if invoice is overdue
         $invoice->updatePenalty();
         $invoice->refresh();
@@ -86,6 +92,12 @@ class InvoiceController extends Controller
             ->where('id', $id)
             ->where('contractor_clab_no', $clabNo)
             ->firstOrFail();
+
+        // Block download for draft submissions
+        if ($invoice->status === 'draft') {
+            return redirect()->route('timesheet.edit', $invoice->id)
+                ->with('error', 'Draft submissions cannot be downloaded as invoices. Please complete the draft first.');
+        }
 
         $pdf = \PDF::loadView('client.invoice-pdf', compact('invoice', 'contractor'))
             ->setPaper('a4', 'landscape');

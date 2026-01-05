@@ -231,12 +231,27 @@
                 </table>
             </div>
 
+            <!-- Submission Window Notice -->
+            @if(!$canSubmitPayroll && $submissionWindowMessage)
+                <div class="mt-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-4 border border-amber-200 dark:border-amber-800">
+                    <div class="flex gap-3">
+                        <flux:icon.information-circle class="size-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div>
+                            <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-100">Submission Window Restriction</h3>
+                            <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                {{ $submissionWindowMessage }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Action Buttons -->
             <div id="submission-actions" class="mt-6 flex justify-end items-center gap-2">
-                <flux:button id="save-draft-btn" wire:click="saveDraft" variant="filled" :disabled="$isBlocked">
+                <flux:button id="save-draft-btn" wire:click="saveDraft" variant="filled" :disabled="$isBlocked || !$canSubmitPayroll">
                     Save as Draft
                 </flux:button>
-                <flux:button id="submit-btn" wire:click="submitForPayment" variant="primary" :disabled="$isBlocked">
+                <flux:button id="submit-btn" wire:click="submitForPayment" variant="primary" :disabled="$isBlocked || !$canSubmitPayroll">
                     Submit
                 </flux:button>
             </div>
@@ -330,7 +345,7 @@
                                     @if($submission->status !== 'draft')
                                         <flux:menu.item icon="eye" icon:variant="outline" href="{{ route('timesheet.show', $submission->id) }}">View Details</flux:menu.item>
                                     @endif
-                                    @if($submission->hasAdminReview())
+                                    @if($submission->hasAdminReview() && $submission->status !== 'draft')
                                         <flux:menu.item icon="document-text" icon:variant="outline" href="{{ route('invoices.show', $submission->id) }}">View Invoice</flux:menu.item>
                                     @endif
 

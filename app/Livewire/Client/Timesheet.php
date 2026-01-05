@@ -49,6 +49,11 @@ class Timesheet extends Component
 
     public $totalOutstandingCount = 0;
 
+    // Submission window restriction (16th to end of month)
+    public $canSubmitPayroll = false;
+
+    public $submissionWindowMessage = '';
+
     // Transaction management
     public $showTransactionModal = false;
 
@@ -110,6 +115,9 @@ class Timesheet extends Component
 
             return;
         }
+
+        // Check if we're in the payroll submission window (16th to end of month)
+        $this->checkSubmissionWindow();
 
         // SECURITY: Validate access to requested month/year
         if ($this->targetMonth && $this->targetYear) {
@@ -1123,6 +1131,32 @@ class Timesheet extends Component
                     'action_text' => $actionText,
                 ];
             }
+        }
+    }
+
+    protected function checkSubmissionWindow()
+    {
+        $today = now();
+        $currentDay = $today->day;
+
+        // Determine if we're viewing current month or a past month
+        $isViewingCurrentMonth = ! $this->targetMonth || ! $this->targetYear ||
+                                 ($this->targetMonth == now()->month && $this->targetYear == now()->year);
+
+        if ($isViewingCurrentMonth) {
+            // For current month: only allow submissions from 16th to end of month
+            if ($currentDay >= 16) {
+                $this->canSubmitPayroll = true;
+                $this->submissionWindowMessage = '';
+            } else {
+                $this->canSubmitPayroll = false;
+                $endDate = now()->endOfMonth()->format('F j, Y');
+                $this->submissionWindowMessage = "Payroll submission is only available from the 16th to {$endDate}. You can submit OT entries and transactions from 1st-15th.";
+            }
+        } else {
+            // For past months: always allow submission (they're catching up)
+            $this->canSubmitPayroll = true;
+            $this->submissionWindowMessage = '';
         }
     }
 
