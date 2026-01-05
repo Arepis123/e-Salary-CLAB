@@ -28,7 +28,7 @@
 
     @if(!isset($error))
     <!-- Statistics Cards -->
-    <div class="grid gap-4 md:grid-cols-3">
+    <div id="invoice-stats" class="grid gap-4 md:grid-cols-3">
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
@@ -67,92 +67,46 @@
     </div>
 
     <!-- Search and Filters -->
-    <div>
-        <button type="button" onclick="toggleInvoiceFilters()" class="w-full flex items-center justify-between p-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-            <div class="flex items-center gap-2 flex-wrap">
-                <div class="flex items-center gap-3">
-                    <flux:icon.funnel class="size-5 text-zinc-600 dark:text-zinc-400" />
-                    <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Search & Filters</h3>
+    <div class="p-0" id="invoice-filters-section">
+
+        <!-- Filters Row -->
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <flux:input
+                        wire:model.live.debounce.500ms="search"
+                        placeholder="Search by invoice # or period"
+                        icon="magnifying-glass"
+                        size="sm"
+                        label="Search bar"
+                    />
                 </div>
-                @if($search)
-                    <flux:badge color="zinc" size="sm">Search: "{{ Str::limit($search, 20) }}"</flux:badge>
-                @endif
-                @if($statusFilter !== 'all')
-                    <flux:badge color="zinc" size="sm">{{ ucfirst($statusFilter) }}</flux:badge>
-                @endif
+                <div>
+                    <flux:select variant="listbox" wire:model.live="statusFilter" size="sm" label="Status">
+                        <flux:select.option value="all">All Status</flux:select.option>
+                        <flux:select.option value="pending_payment">Pending</flux:select.option>
+                        <flux:select.option value="paid">Paid</flux:select.option>
+                    </flux:select>
+                </div>
+                <div>
+                    <flux:select variant="listbox" wire:model.live="year" size="sm" label="Year">
+                        @foreach($availableYears as $yearOption)
+                            <flux:select.option value="{{ $yearOption }}">{{ $yearOption }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
             </div>
-            <flux:icon.chevron-down id="invoice-filter-chevron" class="size-5 text-zinc-600 dark:text-zinc-400 transition-transform duration-200" />
-        </button>
 
-        <div id="invoice-filter-content" class="border-t border-zinc-200 dark:border-zinc-700 mt-2" style="display: none;">
-            <div class="p-6">
-
-                <!-- Filters Row -->
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
-                    <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                            <flux:input
-                                wire:model.live.debounce.500ms="search"
-                                placeholder="Search by invoice # or period"
-                                icon="magnifying-glass"
-                                size="sm"
-                                label="Search bar"
-                            />
-                        </div>
-                        <div>
-                            <flux:select variant="listbox" wire:model.live="statusFilter" size="sm" label="Status">
-                                <flux:select.option value="all">All Status</flux:select.option>
-                                <flux:select.option value="draft">Draft</flux:select.option>
-                                <flux:select.option value="pending_payment">Pending</flux:select.option>
-                                <flux:select.option value="paid">Paid</flux:select.option>
-                                <flux:select.option value="overdue">Overdue</flux:select.option>
-                            </flux:select>
-                        </div>
-                        <div>
-                            <flux:select variant="listbox" wire:model.live="year" size="sm" label="Year">
-                                @foreach($availableYears as $yearOption)
-                                    <flux:select.option value="{{ $yearOption }}">{{ $yearOption }}</flux:select.option>
-                                @endforeach
-                            </flux:select>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-2 sm:flex-shrink-0">
-                        <flux:button wire:click="resetFilters" type="button" variant="filled" size="sm">
-                            Clear
-                        </flux:button>
-                    </div>
-                </div>
+            <div class="flex gap-2 sm:flex-shrink-0">
+                <flux:button wire:click="resetFilters" type="button" variant="filled" size="sm">
+                    Clear
+                </flux:button>
             </div>
         </div>
     </div>
 
-    <script>
-        function toggleInvoiceFilters() {
-            const content = document.getElementById('invoice-filter-content');
-            const chevron = document.getElementById('invoice-filter-chevron');
-
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                chevron.style.transform = 'rotate(180deg)';
-            } else {
-                content.style.display = 'none';
-                chevron.style.transform = 'rotate(0deg)';
-            }
-        }
-
-        // Auto-expand if filters are active
-        document.addEventListener('DOMContentLoaded', function() {
-            const hasActiveFilters = {{ ($search || $statusFilter !== 'all') ? 'true' : 'false' }};
-
-            if (hasActiveFilters) {
-                toggleInvoiceFilters();
-            }
-        });
-    </script>
-
     <!-- Invoices Table -->
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+    <flux:card id="all-invoices-table" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">All Invoices</h2>
             <!-- <div class="flex gap-2">

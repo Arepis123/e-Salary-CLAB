@@ -102,14 +102,23 @@ class Configuration extends Component
 
     protected \App\Services\ContractorConfigurationService $configService;
 
+    protected \App\Services\BillplzService $billplzService;
+
+    // Payment sync properties
+    public $isSyncingPayments = false;
+
+    public $syncResults = [];
+
     public function boot(
         WorkerService $workerService,
         ContractorWindowService $windowService,
-        \App\Services\ContractorConfigurationService $configService
+        \App\Services\ContractorConfigurationService $configService,
+        \App\Services\BillplzService $billplzService
     ) {
         $this->workerService = $workerService;
         $this->windowService = $windowService;
         $this->configService = $configService;
+        $this->billplzService = $billplzService;
     }
 
     public function mount()
@@ -553,6 +562,142 @@ class Configuration extends Component
                 heading: 'Error',
                 text: 'Failed to update template status: '.$e->getMessage()
             );
+        }
+    }
+
+    public function syncAllPendingPayments()
+    {
+        // Check if user is super admin
+        if (! auth()->user()->isSuperAdmin()) {
+            Flux::toast(variant: 'danger', text: 'Unauthorized access.');
+
+            return;
+        }
+
+        $this->isSyncingPayments = true;
+        $this->syncResults = [];
+
+        try {
+            // Find all pending payments with Billplz bill IDs
+            $pendingPayments = \App\Models\PayrollPayment::where('status', 'pending')
+                ->whereNotNull('billplz_bill_id')
+                ->with('payrollSubmission')
+                ->get();
+
+            if ($pendingPayments->isEmpty()) {
+                Flux::toast(
+                    variant: 'info',
+                    heading: 'No Pending Payments',
+                    text: 'There are no pending payments to sync.'
+                );
+                $this->isSyncingPayments = false;
+
+                return;
+            }
+
+            $totalPending = $pendingPayments->count();
+            $updated = 0;
+            $failed = 0;
+            $stillPending = 0;
+
+            foreach ($pendingPayments as $payment) {
+                try {
+                    // Fetch bill status from Billplz
+                    $bill = $this->billplzService->getBill($payment->billplz_bill_id);
+
+                    if (! $bill) {
+                        $this->syncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'status' => 'error',
+                            'message' => 'Failed to retrieve bill from Billplz API',
+                        ];
+                        $failed++;
+
+                        continue;
+                    }
+
+                    // Check if bill is paid
+                    if ($bill['paid']) {
+                        // Update payment status in a transaction
+                        DB::beginTransaction();
+
+                        $payment->update([
+                            'status' => 'completed',
+                            'completed_at' => $bill['paid_at'] ?? now(),
+                            'payment_response' => json_encode($bill),
+                            'transaction_id' => $bill['id'],
+                        ]);
+
+                        // Update submission status
+                        $submission = $payment->payrollSubmission;
+                        $submission->update([
+                            'status' => 'paid',
+                            'paid_at' => $bill['paid_at'] ?? now(),
+                        ]);
+
+                        DB::commit();
+
+                        $this->syncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'submission_id' => $submission->id,
+                            'status' => 'success',
+                            'message' => "Payment completed for submission {$submission->month_year}",
+                        ];
+                        $updated++;
+
+                        \Log::info('Payment auto-synced from Configuration page', [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'submission_id' => $submission->id,
+                            'synced_by' => auth()->user()->name,
+                        ]);
+                    } else {
+                        $this->syncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'status' => 'pending',
+                            'message' => 'Payment still pending on Billplz',
+                        ];
+                        $stillPending++;
+                    }
+                } catch (\Exception $e) {
+                    $this->syncResults[] = [
+                        'payment_id' => $payment->id,
+                        'bill_id' => $payment->billplz_bill_id,
+                        'status' => 'error',
+                        'message' => $e->getMessage(),
+                    ];
+                    $failed++;
+
+                    \Log::error('Failed to sync payment', [
+                        'payment_id' => $payment->id,
+                        'bill_id' => $payment->billplz_bill_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Show summary toast
+            Flux::toast(
+                variant: $updated > 0 ? 'success' : 'warning',
+                heading: 'Sync Complete',
+                text: "Synced {$totalPending} payments: {$updated} updated, {$stillPending} still pending, {$failed} failed"
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Sync Failed',
+                text: 'Failed to sync payments: '.$e->getMessage()
+            );
+
+            \Log::error('Bulk payment sync failed', [
+                'error' => $e->getMessage(),
+                'synced_by' => auth()->user()->name,
+            ]);
+        } finally {
+            $this->isSyncingPayments = false;
         }
     }
 

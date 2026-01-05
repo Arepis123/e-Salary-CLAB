@@ -75,3 +75,13 @@ select:focus[data-flux-control] {
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
+
+/* Driver.js Tutorial Custom Styles */
+.driver-popover,
+.driver-popover *,
+.driver-popover-title,
+.driver-popover-description,
+.driver-popover-progress-text,
+button[data-driver-popover-btn] {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji' !important;
+}

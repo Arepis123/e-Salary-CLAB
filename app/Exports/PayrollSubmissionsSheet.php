@@ -52,18 +52,19 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
             'CLAB No',
             'Contractor Name',
             'Period',
-            'Total Workers',
+            'FCL No',
             'Payroll Amount',
-            'Service Charge',
+            'Admin Fee',
             'SST',
-            'Total (Payroll + Service + SST)',
+            'Total',
             'Penalty',
-            'Total with Penalty',
+            'Grandtotal',
             'Status',
             'Payment Status',
             'Submitted Date',
             'Paid Date',
             'Payment Deadline',
+            'OR No'
         ];
     }
 
@@ -117,6 +118,7 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
             $submission->submitted_at ? $submission->submitted_at->format('d M Y H:i') : 'Not submitted',
             $submission->paid_at ? $submission->paid_at->format('d M Y H:i') : '-',
             $submission->payment_deadline ? $submission->payment_deadline->format('d M Y') : '-',
+            $submission->tax_invoice_number ? $submission->tax_invoice_number : '-',
         ];
     }
 
@@ -164,18 +166,19 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
             'D' => 12,  // CLAB No
             'E' => 30,  // Contractor Name
             'F' => 12,  // Period
-            'G' => 12,  // Total Workers
+            'G' => 12,  // Total Workers / FCL
             'H' => 14,  // Payroll Amount
-            'I' => 14,  // Service Charge
+            'I' => 14,  // Service Charge / Admin Fee
             'J' => 10,  // SST
             'K' => 14,  // Total (Payroll + Service + SST)
             'L' => 10,  // Penalty
-            'M' => 16,  // Total with Penalty
+            'M' => 16,  // Total with Penalty / Grandtotal
             'N' => 16,  // Status
             'O' => 16,  // Payment Status
             'P' => 18,  // Submitted Date
             'Q' => 18,  // Paid Date
             'R' => 16,  // Payment Deadline
+            'S' => 16,  // OR No
         ];
     }
 }

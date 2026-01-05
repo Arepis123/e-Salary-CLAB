@@ -601,49 +601,124 @@ const tutorialConfigs = {
             {
                 element: 'body',
                 popover: {
-                    title: 'Invoices & Payments Tutorial',
-                    description: 'Manage your invoices and make payments here.',
+                    title: 'Invoices & Payments Tutorial 💳',
+                    description: 'Welcome! Learn how to view your invoices, track payment status, and make payments securely. Let\'s explore!',
                     side: 'center',
                     align: 'center'
                 }
             },
             {
-                element: '#invoice-filters',
+                element: '#invoice-stats',
                 popover: {
-                    title: 'Filter Invoices',
-                    description: 'Filter invoices by status (Paid, Pending, Overdue) or search by month/year.',
+                    title: 'Invoice Statistics Overview',
+                    description: 'Quick summary of your invoices: Pending Invoices (awaiting payment), Paid Invoices (completed), and Total Invoiced amount. These stats update in real-time!',
                     side: 'bottom'
                 }
             },
             {
-                element: '#invoice-list',
+                element: '#invoice-filters-section',
                 popover: {
-                    title: 'Invoice List',
-                    description: 'View all your invoices with payment status, amounts, and deadlines. Red badges indicate overdue payments.',
+                    title: 'Search & Filters Section',
+                    description: 'Click "Search & Filters" to expand this section. You can search by invoice number or period, filter by status (All, Draft, Pending, Paid, Overdue), and select which year to view. Very powerful for managing large invoice lists!',
+                    side: 'bottom',
+                    onHighlightStarted: () => {
+                        // Auto-expand filters if collapsed
+                        const filterContent = document.getElementById('invoice-filter-content');
+                        const filterChevron = document.getElementById('invoice-filter-chevron');
+                        if (filterContent && filterContent.style.display === 'none') {
+                            filterContent.style.display = 'block';
+                            if (filterChevron) {
+                                filterChevron.style.transform = 'rotate(180deg)';
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                element: '[wire\\:model\\.live\\.debounce\\.500ms="search"]',
+                popover: {
+                    title: 'Smart Search',
+                    description: 'Search invoices by invoice number (e.g., "INV-0001") or by period (e.g., "December 2025"). Results update automatically as you type!',
+                    side: 'bottom'
+                }
+            },
+            {
+                element: '[wire\\:model\\.live="statusFilter"]',
+                popover: {
+                    title: 'Status Filter',
+                    description: 'Filter by invoice status: Draft (incomplete), Pending Payment (awaiting payment), Paid (completed), or Overdue (past deadline with 8% penalty applied).',
+                    side: 'bottom'
+                }
+            },
+            {
+                element: '[wire\\:model\\.live="year"]',
+                popover: {
+                    title: 'Year Filter',
+                    description: 'View invoices from different years. The dropdown shows all years where you have invoice records.',
+                    side: 'bottom'
+                }
+            },
+            {
+                element: '[wire\\:click="resetFilters"]',
+                popover: {
+                    title: 'Clear Filters',
+                    description: 'Click "Clear" to reset all search and filter options back to default. Active filters are shown as badges above this section.',
+                    side: 'left'
+                }
+            },
+            {
+                element: '#all-invoices-table',
+                popover: {
+                    title: 'All Invoices Table',
+                    description: 'This table displays all your invoices with complete information: Invoice Number, Period, Workers count, Grand Total, Issue Date, Due Date, Status badges, and Action buttons. All columns are sortable!',
                     side: 'top'
                 }
             },
             {
-                element: '#payment-deadline',
+                element: '#all-invoices-table',
                 popover: {
-                    title: 'Payment Deadlines',
-                    description: 'Pay attention to payment deadlines! Late payments incur an 8% penalty automatically.',
-                    side: 'left'
+                    title: 'Sortable Columns',
+                    description: 'Click any column header (Invoice #, Period, Workers, Amount, Issue Date, Due Date, Status) to sort by that column. Click again to reverse the sort order.',
+                    side: 'top'
                 }
             },
             {
-                element: '#download-receipt',
+                element: '#all-invoices-table',
                 popover: {
-                    title: 'Download Receipts',
-                    description: 'After payment, download your official tax invoice/receipt for your records.',
-                    side: 'left'
+                    title: '⚠️ Payment Deadlines',
+                    description: 'Pay close attention to the Due Date column! Overdue invoices show in red with an "Overdue" badge. Late payments automatically incur an 8% penalty on top of the original amount.',
+                    side: 'top'
+                }
+            },
+            {
+                element: '#all-invoices-table',
+                popover: {
+                    title: 'Invoice Actions Menu',
+                    description: 'Each invoice row has an actions menu (three dots) in the last column. Available actions depend on status: View Invoice, Download Invoice, Download Breakdown, or Pay Now for unpaid invoices.',
+                    side: 'top'
+                }
+            },
+            {
+                element: '#all-invoices-table',
+                popover: {
+                    title: 'Payment Process',
+                    description: 'For approved/pending invoices, click the actions menu and select "Pay Now". You\'ll be redirected to Billplz payment gateway where you can pay securely using Online Banking (FPX).',
+                    side: 'top'
+                }
+            },
+            {
+                element: '#all-invoices-table',
+                popover: {
+                    title: 'Download Options',
+                    description: 'After payment, you can download: Pro Forma Invoice (before payment) and Tax Invoice/Receipt (after payment). Both documents are official and can be used for accounting purposes.',
+                    side: 'top'
                 }
             },
             {
                 element: '#tutorial-button',
                 popover: {
-                    title: 'Replay Tutorial',
-                    description: 'Click here anytime to replay this tutorial.',
+                    title: 'Quick Tips Recap',
+                    description: 'Remember: Check invoices regularly, pay before the deadline to avoid 8% penalty, download receipts for records. Click tutorial button anytime to replay! 💡',
                     side: 'bottom'
                 }
             }
