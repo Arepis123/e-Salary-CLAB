@@ -1105,8 +1105,8 @@ class Timesheet extends Component
                 $actionText = 'Go to '.$oldest['month_year'].' Payroll';
 
                 if ($oldest['type'] === 'overdue') {
-                    // For overdue payments, redirect to invoices page
-                    $redirectUrl = route('invoices.client');
+                    // For overdue payments, redirect to invoices page with correct year filter
+                    $redirectUrl = route('invoices.client', ['year' => $oldest['year']]);
                     $actionText = 'Pay '.$oldest['month_year'].' Invoice';
                 } elseif ($oldest['type'] === 'draft' && isset($oldest['data'])) {
                     // For drafts, redirect to edit page

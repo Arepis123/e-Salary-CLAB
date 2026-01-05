@@ -340,17 +340,22 @@
                                 <span class="total-label">SST (8%):</span>
                                 <span class="total-value">{{ number_format($invoice->calculated_sst, 2) }}</span>
                             </div>
+                            @if($invoice->has_penalty)
+                            <div class="total-row" style="border-top: 1px solid #ddd; padding-top: 5px; margin-top: 3px;">
+                                <span class="total-label">Subtotal:</span>
+                                <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
+                            </div>
+                            <div class="total-row" style="color: #dc3545;">
+                                <span class="total-label">Late Payment Penalty (8%):</span>
+                                <span class="total-value">{{ number_format($invoice->penalty_amount, 2) }}</span>
+                            </div>
+                            @endif
                         </div>
                         @endif
                         <div class="grand-total">
-                            <span class="total-label">TOTAL AMOUNT (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
+                            <span class="total-label">TOTAL AMOUNT DUE (RM):</span>
+                            <span class="total-value">{{ number_format($invoice->total_due, 2) }}</span>
                         </div>
-                        @if($invoice->has_penalty)
-                        <div class="total-row" style="color: #dc3545; margin-top: 10px; font-size: 7px;">
-                            <span class="total-label">* Includes 8% late payment penalty</span>
-                        </div>
-                        @endif
                     </div>
                 </td>
             </tr>

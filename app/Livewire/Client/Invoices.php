@@ -31,7 +31,15 @@ class Invoices extends Component
     public function mount($highlight = null)
     {
         if (! $this->year) {
-            $this->year = now()->year;
+            // Default to the most recent year with submissions, or current year if none
+            $clabNo = auth()->user()->contractor_clab_no;
+            if ($clabNo) {
+                $latestYear = PayrollSubmission::where('contractor_clab_no', $clabNo)
+                    ->max('year');
+                $this->year = $latestYear ?? now()->year;
+            } else {
+                $this->year = now()->year;
+            }
         }
 
         // Store the highlight ID if provided
