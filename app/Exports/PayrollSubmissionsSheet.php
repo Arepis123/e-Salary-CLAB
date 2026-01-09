@@ -64,7 +64,7 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
             'Submitted Date',
             'Paid Date',
             'Payment Deadline',
-            'OR No'
+            'OR No',
         ];
     }
 

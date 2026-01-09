@@ -1,10 +1,8 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 use App\Models\PayrollSubmission;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -23,14 +21,15 @@ return new class extends Migration
 
         if ($submissions->isEmpty()) {
             echo "No existing tax invoice numbers to update.\n";
+
             return;
         }
 
-        echo "Found " . $submissions->count() . " tax invoice(s) to update.\n";
+        echo 'Found '.$submissions->count()." tax invoice(s) to update.\n";
 
         // Group by year-month to maintain sequential numbering
         $groupedSubmissions = $submissions->groupBy(function ($submission) {
-            return $submission->year . '-' . str_pad($submission->month, 2, '0', STR_PAD_LEFT);
+            return $submission->year.'-'.str_pad($submission->month, 2, '0', STR_PAD_LEFT);
         });
 
         $totalUpdated = 0;
@@ -67,7 +66,7 @@ return new class extends Migration
             }
         }
 
-        echo "Successfully updated " . $totalUpdated . " tax invoice number(s) to new format.\n";
+        echo 'Successfully updated '.$totalUpdated." tax invoice number(s) to new format.\n";
     }
 
     /**
@@ -86,10 +85,11 @@ return new class extends Migration
 
         if ($submissions->isEmpty()) {
             echo "No tax invoice numbers to revert.\n";
+
             return;
         }
 
-        echo "Found " . $submissions->count() . " tax invoice(s) to revert.\n";
+        echo 'Found '.$submissions->count()." tax invoice(s) to revert.\n";
 
         // Group by year to maintain sequential numbering
         $groupedSubmissions = $submissions->groupBy('year');
@@ -123,6 +123,6 @@ return new class extends Migration
             }
         }
 
-        echo "Successfully reverted " . $totalReverted . " tax invoice number(s) to old format.\n";
+        echo 'Successfully reverted '.$totalReverted." tax invoice number(s) to old format.\n";
     }
 };

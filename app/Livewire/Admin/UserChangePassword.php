@@ -10,8 +10,11 @@ use Livewire\Component;
 class UserChangePassword extends Component
 {
     public $userId;
+
     public $userName;
+
     public $password = '';
+
     public $password_confirmation = '';
 
     public function render()

@@ -113,6 +113,84 @@
     </flux:card>
     @endif
 
+    <!-- Deduction Preview Section -->
+    @if(!$errorMessage && !$isBlocked && count($applicableDeductions) > 0)
+    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+        <div class="flex items-start gap-3">
+            <flux:icon.currency-dollar class="size-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+            <div class="flex-1">
+                <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Configured Deductions</h3>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                    Deductions assigned to your workers. Active deductions will be applied this month, pending ones apply in future periods.
+                </p>
+
+                <div class="space-y-2">
+                    @foreach($applicableDeductions as $deduction)
+                    <div class="flex items-start justify-between p-3 {{ $deduction['status'] === 'active' ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800' : 'bg-zinc-50 dark:bg-zinc-800' }} rounded-lg">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $deduction['name'] }}</span>
+
+                                @if($deduction['status'] === 'active')
+                                    <flux:badge color="green" size="sm">Will Apply This Month</flux:badge>
+                                @else
+                                    <flux:badge color="zinc" size="sm">Pending</flux:badge>
+                                @endif
+
+                                @if($deduction['type'] === 'contractor')
+                                    <flux:badge color="blue" size="sm">All Workers</flux:badge>
+                                @else
+                                    <flux:badge color="purple" size="sm">
+                                        {{ $deduction['worker_count'] }} {{ $deduction['worker_count'] === 1 ? 'Worker' : 'Workers' }}
+                                    </flux:badge>
+                                    @if($deduction['status'] === 'active' && isset($deduction['active_worker_count']))
+                                        <span class="text-xs text-green-700 dark:text-green-300">
+                                            ({{ $deduction['active_worker_count'] }} active, {{ $deduction['pending_worker_count'] }} pending)
+                                        </span>
+                                    @endif
+                                @endif
+                            </div>
+                            @if($deduction['description'])
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{{ $deduction['description'] }}</p>
+                            @endif
+                            <div class="flex items-center gap-3 mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                @if($deduction['type'] === 'worker' && !empty($deduction['target_periods']))
+                                    <span>
+                                        Target Periods: {{ implode(', ', array_map(fn($p) => "#$p", $deduction['target_periods'])) }}
+                                    </span>
+                                @endif
+                                @if(!empty($deduction['apply_months']))
+                                    <span>
+                                        Months: {{ implode(', ', array_map(fn($m) => date('M', mktime(0, 0, 0, $m, 1)), $deduction['apply_months'])) }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="text-right ml-4">
+                            <span class="text-sm font-bold {{ $deduction['status'] === 'active' ? 'text-green-700 dark:text-green-400' : 'text-zinc-600 dark:text-zinc-400' }}">
+                                -RM {{ number_format($deduction['amount'], 2) }}
+                            </span>
+                            @if($deduction['type'] === 'contractor')
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                    per worker
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+
+                <div class="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <p class="text-xs text-blue-800 dark:text-blue-200">
+                        <flux:icon.information-circle class="size-4 inline mr-1" />
+                        Active deductions will be automatically applied when you submit payroll. Pending deductions will apply when workers reach target periods.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </flux:card>
+    @endif
+
     <!-- Payroll Entry Form -->
     @if(!$errorMessage && !$isBlocked)
     <flux:card id="worker-verification-table" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
@@ -165,8 +243,15 @@
                             <td class="py-3 pr-4">
                                 <div class="flex items-center gap-2">
                                     <flux:avatar size="sm" name="{{ $worker['worker_name'] }}" />
-                                    <div class="min-w-0">
-                                        <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{{ $worker['worker_name'] }}</div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{{ $worker['worker_name'] }}</div>
+                                            @if($this->workerHasDeductions($worker['worker_id']))
+                                                <flux:badge color="purple" size="sm" title="Has configured deductions">
+                                                    <flux:icon.currency-dollar class="size-3" />
+                                                </flux:badge>
+                                            @endif
+                                        </div>
                                         <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $worker['worker_id'] }} · {{ $worker['worker_passport'] }}</div>
                                         @if($worker['contract_ended'] ?? false)
                                             <div class="text-xs text-orange-600 dark:text-orange-400">Contract Ended</div>

@@ -10,6 +10,7 @@ use Livewire\Component;
 class Users extends Component
 {
     public $users;
+
     public $userIdToDelete;
 
     public function mount()

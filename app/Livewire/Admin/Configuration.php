@@ -92,9 +92,32 @@ class Configuration extends Component
 
     public $templateAmount = '';
 
+    public $templateType = 'contractor'; // 'contractor' or 'worker'
+
     public $templateMonths = [];
 
+    public $templatePeriods = []; // Target payroll periods for worker-level deductions
+
     public $templateIsActive = true;
+
+    // Worker assignment modal properties
+    public $showWorkerAssignmentModal = false;
+
+    public $selectedTemplateId = null;
+
+    public $selectedTemplateName = '';
+
+    public $workerFilterContractor = '';
+
+    public $workerFilterPeriods = [];
+
+    public $availableWorkers = [];
+
+    public $assignedWorkers = [];
+
+    public $selectedWorkerIds = [];
+
+    public $assignmentNotes = '';
 
     protected WorkerService $workerService;
 
@@ -451,7 +474,9 @@ class Configuration extends Component
                 $this->templateName = $template->name;
                 $this->templateDescription = $template->description ?? '';
                 $this->templateAmount = number_format($template->amount, 2, '.', '');
+                $this->templateType = $template->type ?? 'contractor';
                 $this->templateMonths = $template->apply_months ?? [];
+                $this->templatePeriods = $template->apply_periods ?? [];
                 $this->templateIsActive = $template->is_active;
             }
         } else {
@@ -473,26 +498,55 @@ class Configuration extends Component
         $this->templateName = '';
         $this->templateDescription = '';
         $this->templateAmount = '';
+        $this->templateType = 'contractor';
         $this->templateMonths = [];
+        $this->templatePeriods = [];
         $this->templateIsActive = true;
     }
 
     public function saveTemplate()
     {
-        $this->validate([
+        $rules = [
             'templateName' => 'required|string|max:255',
             'templateDescription' => 'nullable|string|max:500',
             'templateAmount' => 'required|numeric|min:0|max:9999.99',
-            'templateMonths' => 'required|array|min:1',
+            'templateType' => 'required|in:contractor,worker',
+            'templateMonths' => 'nullable|array',
             'templateMonths.*' => 'integer|min:1|max:12',
-        ]);
+        ];
+
+        // Add validation for worker-level templates
+        if ($this->templateType === 'worker') {
+            $rules['templatePeriods'] = 'nullable|array';
+            $rules['templatePeriods.*'] = 'integer|min:1|max:100';
+        }
+
+        // Ensure at least one criteria is specified (months or periods for worker-level)
+        $this->validate($rules);
+
+        // Custom validation: at least months or periods must be specified
+        if ($this->templateType === 'worker') {
+            if (empty($this->templateMonths) && empty($this->templatePeriods)) {
+                $this->addError('templateMonths', 'Please select at least one month or one target period.');
+                $this->addError('templatePeriods', 'Please select at least one month or one target period.');
+
+                return;
+            }
+        } elseif (empty($this->templateMonths)) {
+            // Contractor-level must have months
+            $this->addError('templateMonths', 'Please select at least one month.');
+
+            return;
+        }
 
         try {
             $data = [
                 'name' => $this->templateName,
                 'description' => $this->templateDescription,
                 'amount' => $this->templateAmount,
+                'type' => $this->templateType,
                 'apply_months' => $this->templateMonths,
+                'apply_periods' => $this->templateType === 'worker' ? $this->templatePeriods : null,
                 'is_active' => $this->templateIsActive,
             ];
 
@@ -561,6 +615,138 @@ class Configuration extends Component
                 variant: 'danger',
                 heading: 'Error',
                 text: 'Failed to update template status: '.$e->getMessage()
+            );
+        }
+    }
+
+    // Worker assignment modal methods
+    public function openWorkerAssignmentModal(int $templateId)
+    {
+        $template = \App\Models\DeductionTemplate::find($templateId);
+
+        if (! $template || ! $template->isWorkerLevel()) {
+            Flux::toast(variant: 'danger', text: 'Invalid template or not a worker-level template');
+
+            return;
+        }
+
+        $this->selectedTemplateId = $templateId;
+        $this->selectedTemplateName = $template->name;
+        $this->workerFilterContractor = '';
+        $this->workerFilterPeriods = $template->apply_periods ?? [];
+        $this->availableWorkers = [];
+        $this->assignedWorkers = [];
+        $this->selectedWorkerIds = [];
+        $this->assignmentNotes = '';
+        $this->showWorkerAssignmentModal = true;
+    }
+
+    public function closeWorkerAssignmentModal()
+    {
+        $this->showWorkerAssignmentModal = false;
+        $this->selectedTemplateId = null;
+        $this->selectedTemplateName = '';
+        $this->workerFilterContractor = '';
+        $this->workerFilterPeriods = [];
+        $this->availableWorkers = [];
+        $this->assignedWorkers = [];
+        $this->selectedWorkerIds = [];
+        $this->assignmentNotes = '';
+    }
+
+    public function loadAvailableWorkers()
+    {
+        if (empty($this->workerFilterContractor)) {
+            Flux::toast(variant: 'warning', text: 'Please select a contractor');
+
+            return;
+        }
+
+        try {
+            $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
+
+            // Load ALL workers under contractor (no period filtering)
+            // Deduction will apply when they REACH the target periods in the future
+            $this->availableWorkers = $workerDeductionService->filterWorkersByPeriods(
+                $this->workerFilterContractor,
+                [] // Empty array = show all workers regardless of current period
+            )->toArray();
+
+            // Load currently assigned workers for this template
+            $this->assignedWorkers = $workerDeductionService->getAssignedWorkers(
+                $this->selectedTemplateId,
+                $this->workerFilterContractor
+            )->toArray();
+
+            // Pre-select already assigned workers
+            $this->selectedWorkerIds = collect($this->assignedWorkers)
+                ->pluck('worker_id')
+                ->toArray();
+
+            if (empty($this->availableWorkers)) {
+                Flux::toast(
+                    variant: 'info',
+                    text: 'No workers found under this contractor'
+                );
+            }
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to load workers: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function saveWorkerAssignments()
+    {
+        $this->validate([
+            'selectedWorkerIds' => 'required|array|min:1',
+            'assignmentNotes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
+
+            // Get currently assigned worker IDs
+            $currentlyAssigned = collect($this->assignedWorkers)->pluck('worker_id')->toArray();
+
+            // Determine adds and removes
+            $toAdd = array_diff($this->selectedWorkerIds, $currentlyAssigned);
+            $toRemove = array_diff($currentlyAssigned, $this->selectedWorkerIds);
+
+            // Add new assignments
+            if (! empty($toAdd)) {
+                $workerDeductionService->assignDeductionToWorkers(
+                    $this->selectedTemplateId,
+                    $toAdd,
+                    $this->workerFilterContractor,
+                    $this->assignmentNotes
+                );
+            }
+
+            // Remove unselected assignments
+            if (! empty($toRemove)) {
+                $workerDeductionService->removeDeductionFromWorkers(
+                    $this->selectedTemplateId,
+                    $toRemove,
+                    $this->workerFilterContractor
+                );
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Workers Updated',
+                text: 'Deduction template assignments saved successfully'
+            );
+
+            $this->closeWorkerAssignmentModal();
+            $this->loadDeductionTemplates();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save assignments: '.$e->getMessage()
             );
         }
     }
@@ -790,9 +976,12 @@ class Configuration extends Component
         // Get contractor configurations if on contractor-settings tab
         $contractorConfigs = [];
         $deductionTemplates = [];
+        $allContractors = []; // For worker assignment modal
         if ($this->activeTab === 'contractor-settings') {
             $contractorConfigs = $this->contractorConfigs;
             $deductionTemplates = $this->deductionTemplates;
+            // Get all contractors for dropdown in worker assignment modal
+            $allContractors = \App\Models\User::where('role', 'client')->orderBy('name')->get();
         }
 
         return view('livewire.admin.configuration', [
@@ -805,6 +994,7 @@ class Configuration extends Component
             'windowStats' => $this->windowStats,
             'contractorConfigs' => $contractorConfigs,
             'deductionTemplates' => $deductionTemplates,
+            'allContractors' => $allContractors,
         ])->layout('components.layouts.app', ['title' => __('Configuration')]);
     }
 }

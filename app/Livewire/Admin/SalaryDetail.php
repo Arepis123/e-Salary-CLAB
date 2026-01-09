@@ -149,6 +149,7 @@ class SalaryDetail extends Component
         // Only allow receipt download for paid invoices
         if ($this->submission->status !== 'paid') {
             Flux::toast(variant: 'warning', text: 'Receipt is only available for paid invoices.');
+
             return;
         }
 
@@ -162,12 +163,12 @@ class SalaryDetail extends Component
 
         $pdf = \PDF::loadView('admin.tax-invoice-pdf', [
             'invoice' => $this->submission,
-            'contractor' => $contractor
+            'contractor' => $contractor,
         ])->setPaper('a4', 'landscape');
 
         $filename = 'Official-Receipt-'.$this->submission->tax_invoice_number.'-'.$this->submission->month_year.'.pdf';
 
-        return response()->streamDownload(function() use ($pdf) {
+        return response()->streamDownload(function () use ($pdf) {
             echo $pdf->output();
         }, $filename);
     }
@@ -488,7 +489,7 @@ class SalaryDetail extends Component
                 Flux::toast(
                     variant: 'danger',
                     heading: 'Invalid Excel Format',
-                    text: "Missing required columns: ".implode(', ', $missingColumns).". Found columns: ".$foundColumnsList
+                    text: 'Missing required columns: '.implode(', ', $missingColumns).'. Found columns: '.$foundColumnsList
                 );
 
                 \Log::warning('Excel parsing failed - missing columns', [
@@ -980,7 +981,7 @@ class SalaryDetail extends Component
                 Flux::toast(
                     variant: 'danger',
                     heading: 'Invalid Excel Format',
-                    text: "Missing required columns: ".implode(', ', $missingColumns).". Found columns: ".$foundColumnsList
+                    text: 'Missing required columns: '.implode(', ', $missingColumns).'. Found columns: '.$foundColumnsList
                 );
 
                 \Log::warning('Excel parsing failed - missing columns', [
@@ -1150,7 +1151,7 @@ class SalaryDetail extends Component
                 $newAmount = $this->editPayrollAmount;
 
                 $updateData['admin_final_amount'] = $newAmount;
-                $changes[] = "Amount: RM ".number_format($oldAmount, 2)." → RM ".number_format($newAmount, 2);
+                $changes[] = 'Amount: RM '.number_format($oldAmount, 2).' → RM '.number_format($newAmount, 2);
             }
 
             // Handle file upload
@@ -1184,12 +1185,12 @@ class SalaryDetail extends Component
                 $updateData['breakdown_file_path'] = $filePath;
                 $updateData['breakdown_file_name'] = $customFileName;
 
-                $changes[] = "File: ".$customFileName;
+                $changes[] = 'File: '.$customFileName;
             }
 
             // Append update notes
             $existingNotes = $this->submission->admin_notes ?? '';
-            $updateNote = "\n\n[".now()->format('Y-m-d H:i:s')."] Updated by ".auth()->user()->name.":\n".implode("\n", $changes)."\nReason: ".$this->editAmountNotes;
+            $updateNote = "\n\n[".now()->format('Y-m-d H:i:s').'] Updated by '.auth()->user()->name.":\n".implode("\n", $changes)."\nReason: ".$this->editAmountNotes;
             $updateData['admin_notes'] = $existingNotes.$updateNote;
 
             // Update submission

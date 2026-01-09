@@ -286,7 +286,7 @@ class PayrollSubmission extends Model
         $latestInvoice = static::whereNotNull('tax_invoice_number')
             ->where('year', $year)
             ->where('month', $month)
-            ->where('tax_invoice_number', 'LIKE', 'OR-P-' . $yearShort . $monthPadded . '%')
+            ->where('tax_invoice_number', 'LIKE', 'OR-P-'.$yearShort.$monthPadded.'%')
             ->orderBy('tax_invoice_generated_at', 'desc')
             ->first();
 

@@ -31,6 +31,9 @@ class Timesheet extends Component
 
     public $errorMessage = '';
 
+    // Deduction preview
+    public $applicableDeductions = [];
+
     // Allow viewing specific month/year from query parameters
     public $targetMonth;
 
@@ -273,6 +276,9 @@ class Timesheet extends Component
             ->whereIn('status', ['submitted', 'locked'])
             ->get()
             ->keyBy('worker_id');
+
+        // Get applicable deductions for this month
+        $this->loadApplicableDeductions($clabNo, $currentMonth, $currentYear, $remainingWorkers);
 
         // Prepare workers data
         $this->workers = $remainingWorkers->map(function ($worker, $index) use ($currentMonth, $currentYear, $monthlyOTEntries, $isAfterOTWindow) {
@@ -1157,6 +1163,124 @@ class Timesheet extends Component
             // For past months: always allow submission (they're catching up)
             $this->canSubmitPayroll = true;
             $this->submissionWindowMessage = '';
+        }
+    }
+
+    /**
+     * Check if a worker has any configured deductions
+     */
+    public function workerHasDeductions($workerId): bool
+    {
+        foreach ($this->applicableDeductions as $deduction) {
+            if (in_array($workerId, $deduction['worker_ids'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get deductions for a specific worker
+     */
+    public function getWorkerDeductions($workerId): array
+    {
+        $deductions = [];
+        foreach ($this->applicableDeductions as $deduction) {
+            if (in_array($workerId, $deduction['worker_ids'])) {
+                $deductions[] = $deduction;
+            }
+        }
+
+        return $deductions;
+    }
+
+    /**
+     * Load ALL deductions (both active and pending) for preview
+     */
+    protected function loadApplicableDeductions($clabNo, $month, $year, $remainingWorkers)
+    {
+        $configService = app(\App\Services\ContractorConfigurationService::class);
+        $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
+
+        $this->applicableDeductions = [];
+
+        // 1. Get ALL active CONTRACTOR-LEVEL deductions (not just for this month)
+        $allContractorDeductions = \App\Models\DeductionTemplate::active()
+            ->contractorLevel()
+            ->get();
+
+        foreach ($allContractorDeductions as $deduction) {
+            // Check if deduction applies this month
+            $willApplyThisMonth = $deduction->shouldApplyInMonth($month);
+
+            $this->applicableDeductions[] = [
+                'type' => 'contractor',
+                'template_id' => $deduction->id,
+                'name' => $deduction->name,
+                'amount' => $deduction->amount,
+                'description' => $deduction->description,
+                'worker_count' => $remainingWorkers->count(),
+                'worker_ids' => $remainingWorkers->pluck('wkr_id')->toArray(),
+                'status' => $willApplyThisMonth ? 'active' : 'pending',
+                'apply_months' => $deduction->apply_months ?? [],
+            ];
+        }
+
+        // 2. Get ALL WORKER-LEVEL deductions for this contractor (show all assignments)
+        $workerDeductions = \App\Models\WorkerDeduction::where('contractor_clab_no', $clabNo)
+            ->with('deductionTemplate')
+            ->get();
+
+        // Group by template
+        $deductionGroups = $workerDeductions->groupBy('deduction_template_id');
+
+        foreach ($deductionGroups as $templateId => $assignments) {
+            $template = $assignments->first()->deductionTemplate;
+
+            if (! $template || ! $template->is_active) {
+                continue;
+            }
+
+            $assignedWorkerIds = $assignments->pluck('worker_id')->toArray();
+            $workerData = [];
+            $activeCount = 0;
+            $pendingCount = 0;
+
+            // Check each assigned worker's status
+            foreach ($assignedWorkerIds as $workerId) {
+                $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo);
+
+                $willApply = $template->shouldApplyInMonth($month) &&
+                             $template->shouldApplyInPeriod($currentPeriod);
+
+                $workerData[$workerId] = [
+                    'current_period' => $currentPeriod,
+                    'will_apply' => $willApply,
+                ];
+
+                if ($willApply) {
+                    $activeCount++;
+                } else {
+                    $pendingCount++;
+                }
+            }
+
+            $this->applicableDeductions[] = [
+                'type' => 'worker',
+                'template_id' => $template->id,
+                'name' => $template->name,
+                'amount' => $template->amount,
+                'description' => $template->description,
+                'worker_count' => count($assignedWorkerIds),
+                'worker_ids' => $assignedWorkerIds,
+                'target_periods' => $template->apply_periods ?? [],
+                'apply_months' => $template->apply_months ?? [],
+                'status' => $activeCount > 0 ? 'active' : 'pending',
+                'active_worker_count' => $activeCount,
+                'pending_worker_count' => $pendingCount,
+                'worker_details' => $workerData,
+            ];
         }
     }
 

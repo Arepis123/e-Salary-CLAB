@@ -16,7 +16,7 @@ class CheckMultipleRoles
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return redirect()->route('login');
         }
 
@@ -28,7 +28,7 @@ class CheckMultipleRoles
         }
 
         // Check if user has any of the allowed roles
-        if (!in_array($userRole, $roles)) {
+        if (! in_array($userRole, $roles)) {
             abort(403, 'Unauthorized access.');
         }
 

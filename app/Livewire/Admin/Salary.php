@@ -170,7 +170,7 @@ class Salary extends Component
             ->count();
 
         // Pending submissions (submitted + approved, waiting for action)
-        $pending = PayrollSubmission::whereIn('status', ['submitted', 'approved','pending_payment'])
+        $pending = PayrollSubmission::whereIn('status', ['submitted', 'approved', 'pending_payment'])
             ->count();
 
         $this->stats = [

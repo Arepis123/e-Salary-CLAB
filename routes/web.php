@@ -52,6 +52,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('tutorial/complete', function (\Illuminate\Http\Request $request) {
         $page = $request->input('page', 'dashboard');
         auth()->user()->markTutorialCompleted($page);
+
         return response()->json(['success' => true, 'page' => $page]);
     })->name('tutorial.complete');
 

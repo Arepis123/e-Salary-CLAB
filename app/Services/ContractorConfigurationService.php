@@ -125,6 +125,22 @@ class ContractorConfigurationService
     }
 
     /**
+     * Get contractor-level templates only
+     */
+    public function getContractorLevelTemplates(): Collection
+    {
+        return DeductionTemplate::contractorLevel()->orderBy('name')->get();
+    }
+
+    /**
+     * Get worker-level templates only
+     */
+    public function getWorkerLevelTemplates(): Collection
+    {
+        return DeductionTemplate::workerLevel()->orderBy('name')->get();
+    }
+
+    /**
      * Create a new deduction template
      */
     public function createDeductionTemplate(array $data): DeductionTemplate
@@ -133,7 +149,9 @@ class ContractorConfigurationService
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'amount' => $data['amount'],
+            'type' => $data['type'] ?? 'contractor', // 'contractor' or 'worker'
             'apply_months' => $data['apply_months'],
+            'apply_periods' => $data['apply_periods'] ?? null, // Target payroll periods for worker-level
             'is_active' => $data['is_active'] ?? true,
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
@@ -151,7 +169,9 @@ class ContractorConfigurationService
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'amount' => $data['amount'],
+            'type' => $data['type'] ?? $template->type, // Preserve existing type if not provided
             'apply_months' => $data['apply_months'],
+            'apply_periods' => $data['apply_periods'] ?? null, // Target payroll periods for worker-level
             'is_active' => $data['is_active'] ?? true,
             'updated_by' => auth()->id(),
         ]);
@@ -176,7 +196,7 @@ class ContractorConfigurationService
         $template = DeductionTemplate::findOrFail($id);
 
         $template->update([
-            'is_active' => !$template->is_active,
+            'is_active' => ! $template->is_active,
             'updated_by' => auth()->id(),
         ]);
 

@@ -61,6 +61,7 @@ class User extends Authenticatable
     public function hasTutorialCompleted(string $page): bool
     {
         $completed = $this->tutorial_completed ?? [];
+
         return isset($completed[$page]) && $completed[$page] === true;
     }
 

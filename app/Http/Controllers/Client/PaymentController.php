@@ -456,7 +456,7 @@ class PaymentController extends Controller
         }
 
         // Fall back to latest payment if bill ID not found in params
-        if (!$payment) {
+        if (! $payment) {
             $payment = $submission->payment;
         }
 

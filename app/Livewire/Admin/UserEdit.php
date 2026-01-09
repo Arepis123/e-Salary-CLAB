@@ -11,11 +11,17 @@ use Livewire\Component;
 class UserEdit extends Component
 {
     public $userId;
+
     public $username;
+
     public $name;
+
     public $email;
+
     public $phone;
+
     public $person_in_charge;
+
     public $role;
 
     public function render()

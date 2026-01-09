@@ -9,12 +9,19 @@ use Livewire\Component;
 class UserCreate extends Component
 {
     public $username = '';
+
     public $name = '';
+
     public $email = '';
+
     public $phone = '';
+
     public $person_in_charge = '';
+
     public $role = '';
+
     public $password = '';
+
     public $password_confirmation = '';
 
     public function render()

@@ -8,7 +8,6 @@ use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use Flux\Flux;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
 

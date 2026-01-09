@@ -32,44 +32,47 @@ class SyncPaymentStatus extends Command
         // Find payment in database
         $payment = PayrollPayment::where('billplz_bill_id', $billId)->first();
 
-        if (!$payment) {
+        if (! $payment) {
             $this->error("Payment not found in database with bill ID: {$billId}");
+
             return self::FAILURE;
         }
 
-        $this->info("Payment found:");
+        $this->info('Payment found:');
         $this->line("  ID: {$payment->id}");
         $this->line("  Current Status: {$payment->status}");
-        $this->line("  Amount: RM " . number_format($payment->amount, 2));
+        $this->line('  Amount: RM '.number_format($payment->amount, 2));
         $this->line("  Created: {$payment->created_at}");
         $this->newLine();
 
         // Check if already completed
         if ($payment->status === 'completed') {
-            $this->warn("Payment is already marked as completed!");
+            $this->warn('Payment is already marked as completed!');
             $this->line("  Completed At: {$payment->completed_at}");
+
             return self::SUCCESS;
         }
 
         // Fetch bill status from Billplz
-        $this->info("Fetching bill status from Billplz API...");
+        $this->info('Fetching bill status from Billplz API...');
         $bill = $this->billplzService->getBill($billId);
 
-        if (!$bill) {
-            $this->error("Failed to retrieve bill from Billplz API!");
-            $this->error("Please check:");
-            $this->line("  - API credentials are correct");
-            $this->line("  - Bill ID is valid");
-            $this->line("  - Network connection");
+        if (! $bill) {
+            $this->error('Failed to retrieve bill from Billplz API!');
+            $this->error('Please check:');
+            $this->line('  - API credentials are correct');
+            $this->line('  - Bill ID is valid');
+            $this->line('  - Network connection');
+
             return self::FAILURE;
         }
 
         $this->newLine();
-        $this->info("Billplz API Response:");
+        $this->info('Billplz API Response:');
         $this->line("  Bill ID: {$bill['id']}");
-        $this->line("  Paid: " . ($bill['paid'] ? 'YES' : 'NO'));
+        $this->line('  Paid: '.($bill['paid'] ? 'YES' : 'NO'));
         $this->line("  State: {$bill['state']}");
-        $this->line("  Amount: RM " . number_format($bill['amount'] / 100, 2));
+        $this->line('  Amount: RM '.number_format($bill['amount'] / 100, 2));
 
         if (isset($bill['paid_at'])) {
             $this->line("  Paid At: {$bill['paid_at']}");
@@ -79,14 +82,15 @@ class SyncPaymentStatus extends Command
 
         // Check if bill is paid
         // Billplz returns state='paid' for successful payments, state='due' for pending
-        if (!$bill['paid']) {
-            $this->warn("Bill is NOT paid according to Billplz!");
-            $this->line("  Paid: false");
+        if (! $bill['paid']) {
+            $this->warn('Bill is NOT paid according to Billplz!');
+            $this->line('  Paid: false');
             $this->line("  State: {$bill['state']}");
             $this->newLine();
 
-            if (!$this->confirm('Payment is not successful on Billplz. Mark as failed?', false)) {
-                $this->info("No changes made.");
+            if (! $this->confirm('Payment is not successful on Billplz. Mark as failed?', false)) {
+                $this->info('No changes made.');
+
                 return self::SUCCESS;
             }
 
@@ -95,21 +99,23 @@ class SyncPaymentStatus extends Command
                 'payment_response' => json_encode($bill),
             ]);
 
-            $this->warn("Payment marked as failed.");
+            $this->warn('Payment marked as failed.');
+
             return self::SUCCESS;
         }
 
         // Payment is successful, confirm before updating
         $this->newLine();
-        $this->warn("⚠ You are about to update LIVE payment data!");
-        $this->line("This will:");
+        $this->warn('⚠ You are about to update LIVE payment data!');
+        $this->line('This will:');
         $this->line("  1. Mark payment #{$payment->id} as COMPLETED");
-        $this->line("  2. Update submission status to PAID");
-        $this->line("  3. Set paid_at timestamp");
+        $this->line('  2. Update submission status to PAID');
+        $this->line('  3. Set paid_at timestamp');
         $this->newLine();
 
-        if (!$this->confirm('Proceed with updating payment status?', false)) {
-            $this->info("Operation cancelled. No changes made.");
+        if (! $this->confirm('Proceed with updating payment status?', false)) {
+            $this->info('Operation cancelled. No changes made.');
+
             return self::SUCCESS;
         }
 
@@ -134,13 +140,13 @@ class SyncPaymentStatus extends Command
             DB::commit();
 
             $this->newLine();
-            $this->info("✓ Payment status synced successfully!");
+            $this->info('✓ Payment status synced successfully!');
             $this->line("  Payment ID: {$payment->id}");
-            $this->line("  Status: completed");
+            $this->line('  Status: completed');
             $this->line("  Submission: {$submission->unique_id} → paid");
             $this->newLine();
 
-            Log::info("Payment status manually synced from Billplz", [
+            Log::info('Payment status manually synced from Billplz', [
                 'payment_id' => $payment->id,
                 'bill_id' => $billId,
                 'submission_id' => $submission->id,
@@ -152,10 +158,10 @@ class SyncPaymentStatus extends Command
         } catch (\Exception $e) {
             DB::rollBack();
 
-            $this->error("Failed to update payment status!");
+            $this->error('Failed to update payment status!');
             $this->error("Error: {$e->getMessage()}");
 
-            Log::error("Failed to sync payment status", [
+            Log::error('Failed to sync payment status', [
                 'payment_id' => $payment->id,
                 'bill_id' => $billId,
                 'error' => $e->getMessage(),

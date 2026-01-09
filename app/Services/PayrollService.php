@@ -309,33 +309,71 @@ class PayrollService
 
     /**
      * Apply all enabled deductions for this contractor and month
+     * Applies both contractor-level (all workers) and worker-level (specific workers) deductions
      */
     protected function applyConfiguredDeductions(PayrollSubmission $submission): void
     {
         $configService = app(\App\Services\ContractorConfigurationService::class);
+        $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
 
-        // Get all deductions that should be applied for this contractor in this month
+        // 1. Apply CONTRACTOR-LEVEL deductions (existing logic with filter)
         $deductions = $configService->getDeductionsForMonth($submission->contractor_clab_no, $submission->month);
+        $contractorDeductions = $deductions->filter(fn ($d) => $d->isContractorLevel());
 
-        // Apply each deduction to all workers in this submission
-        foreach ($deductions as $deduction) {
+        foreach ($contractorDeductions as $deduction) {
             foreach ($submission->workers as $worker) {
-                // Check if this deduction already exists for this worker
-                $existingDeduction = $worker->transactions()
-                    ->where('type', 'deduction')
-                    ->where('description', $deduction->name)
-                    ->first();
-
-                // Only create if doesn't exist yet
-                if (!$existingDeduction) {
-                    $worker->transactions()->create([
-                        'type' => 'deduction',
-                        'amount' => $deduction->amount,
-                        'description' => $deduction->name,
-                        'remarks' => 'Auto-applied based on deduction template configuration',
-                    ]);
-                }
+                $this->createDeductionTransaction($worker, $deduction, 'Contractor-level deduction');
             }
+        }
+
+        // 2. Apply WORKER-LEVEL deductions (NEW)
+        foreach ($submission->workers as $worker) {
+            // Calculate current payroll period for this worker
+            $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount(
+                $worker->worker_id,
+                $submission->contractor_clab_no
+            );
+
+            // Get applicable worker-level deductions for this specific worker
+            $workerDeductions = $workerDeductionService->getApplicableDeductionsForWorker(
+                $worker->worker_id,
+                $submission->contractor_clab_no,
+                $submission->month,
+                $currentPeriod
+            );
+
+            foreach ($workerDeductions as $deduction) {
+                $this->createDeductionTransaction(
+                    $worker,
+                    $deduction,
+                    "Worker-level deduction (Period: {$currentPeriod})"
+                );
+            }
+        }
+    }
+
+    /**
+     * Helper method to create deduction transaction (avoids duplicates)
+     */
+    protected function createDeductionTransaction(
+        $worker,
+        $deduction,
+        string $context
+    ): void {
+        // Check if this deduction already exists for this worker
+        $existingDeduction = $worker->transactions()
+            ->where('type', 'deduction')
+            ->where('description', $deduction->name)
+            ->first();
+
+        // Only create if doesn't exist yet
+        if (! $existingDeduction) {
+            $worker->transactions()->create([
+                'type' => 'deduction',
+                'amount' => $deduction->amount,
+                'description' => $deduction->name,
+                'remarks' => "Auto-applied: {$context}",
+            ]);
         }
     }
 }
