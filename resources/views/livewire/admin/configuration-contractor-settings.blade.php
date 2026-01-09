@@ -95,16 +95,12 @@
                             </flux:table.cell>
 
                             <flux:table.cell variant="strong">
-                                @if($template->type === 'worker')
-                                    @if($template->apply_periods && count($template->apply_periods) > 0)
-                                        <span class="text-sm text-zinc-900 dark:text-zinc-100">
-                                            {{ collect($template->apply_periods)->sort()->join(', ') }}
-                                        </span>
-                                    @else
-                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">All periods</span>
-                                    @endif
+                                @if($template->apply_periods && count($template->apply_periods) > 0)
+                                    <span class="text-sm text-zinc-900 dark:text-zinc-100">
+                                        {{ collect($template->apply_periods)->sort()->join(', ') }}
+                                    </span>
                                 @else
-                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">N/A</span>
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">All periods</span>
                                 @endif
                             </flux:table.cell>
 
@@ -129,7 +125,16 @@
                                         <span class="text-xs text-amber-600 dark:text-amber-400">No workers assigned</span>
                                     @endif
                                 @else
-                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">N/A</span>
+                                    @php
+                                        $contractorCount = $template->contractors->count();
+                                    @endphp
+                                    @if($contractorCount > 0)
+                                        <flux:badge color="blue" size="sm">
+                                            {{ $contractorCount }} {{ $contractorCount === 1 ? 'contractor' : 'contractors' }}
+                                        </flux:badge>
+                                    @else
+                                        <span class="text-xs text-amber-600 dark:text-amber-400">No contractors assigned</span>
+                                    @endif
                                 @endif
                             </flux:table.cell>
 
@@ -160,6 +165,16 @@
                                             icon-variant="outline"
                                         >
                                             Manage Workers
+                                        </flux:button>
+                                    @else
+                                        <flux:button
+                                            size="sm"
+                                            variant="filled"
+                                            wire:click="openContractorAssignmentModal({{ $template->id }})"
+                                            icon="building-office"
+                                            icon-variant="outline"
+                                        >
+                                            Manage Contractors
                                         </flux:button>
                                     @endif
 
@@ -425,13 +440,9 @@
 
         <!-- Months Selection -->
         <div>
-            <flux:label>Apply in Months @if($templateType === 'worker')<span class="text-zinc-500 dark:text-zinc-400">(Optional)</span>@endif</flux:label>
+            <flux:label>Apply in Months <span class="text-zinc-500 dark:text-zinc-400">(Optional)</span></flux:label>
             <flux:description>
-                @if($templateType === 'worker')
-                    Select specific months or leave empty to apply in all months. Must specify either months or target periods.
-                @else
-                    Select one or more months when this deduction should be automatically applied
-                @endif
+                Select specific months or leave empty to apply in all months. Must specify either months or target periods.
             </flux:description>
 
             <div class="grid grid-cols-4 gap-2 mt-3">
@@ -453,35 +464,39 @@
             @enderror
         </div>
 
-        <!-- Payroll Periods Selection (Worker-level only) -->
-        @if($templateType === 'worker')
-            <div>
-                <flux:label>Target Payroll Periods (Optional)</flux:label>
-                <flux:description>
-                    Select which payroll submission counts this deduction should apply to.
+        <!-- Payroll Periods Selection (Both contractor and worker level) -->
+        <div>
+            <flux:label>Target Payroll Periods <span class="text-zinc-500 dark:text-zinc-400">(Optional)</span></flux:label>
+            <flux:description>
+                @if($templateType === 'contractor')
+                    Select which payroll submission counts this deduction should apply to (applies to ALL workers).
                     For example, select "2" to apply when workers reach their 2nd payroll submission.
                     Leave empty to apply in all periods.
-                </flux:description>
+                @else
+                    Select which payroll submission counts this deduction should apply to (applies to assigned workers only).
+                    For example, select "2" to apply when workers reach their 2nd payroll submission.
+                    Leave empty to apply in all periods.
+                @endif
+            </flux:description>
 
-                <div class="grid grid-cols-6 gap-2 mt-3">
-                    @foreach(range(1, 18) as $period)
-                        <label class="flex items-center space-x-2 p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                wire:model="templatePeriods"
-                                value="{{ $period }}"
-                                class="rounded border-zinc-300 dark:border-zinc-600"
-                            >
-                            <span class="text-sm">{{ $period }}</span>
-                        </label>
-                    @endforeach
-                </div>
-
-                @error('templatePeriods')
-                    <flux:error>{{ $message }}</flux:error>
-                @enderror
+            <div class="grid grid-cols-6 gap-2 mt-3">
+                @foreach(range(1, 18) as $period)
+                    <label class="flex items-center space-x-2 p-2 rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            wire:model="templatePeriods"
+                            value="{{ $period }}"
+                            class="rounded border-zinc-300 dark:border-zinc-600"
+                        >
+                        <span class="text-sm">{{ $period }}</span>
+                    </label>
+                @endforeach
             </div>
-        @endif
+
+            @error('templatePeriods')
+                <flux:error>{{ $message }}</flux:error>
+            @enderror
+        </div>
 
         <!-- Active Status -->
         <flux:checkbox
@@ -616,5 +631,82 @@
                 Save Assignments
             </flux:button>
         @endif
+    </div>
+</flux:modal>
+
+<!-- Contractor Assignment Modal -->
+<flux:modal name="contractor-assignment-modal" wire:model="showContractorAssignmentModal" class="md:w-3xl space-y-6">
+    <div>
+        <flux:heading size="lg">Assign Contractors</flux:heading>
+        <flux:subheading>{{ $selectedTemplateName }}</flux:subheading>
+    </div>
+
+    <div class="space-y-4">
+        <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p class="text-sm text-blue-800 dark:text-blue-200">
+                <flux:icon.information-circle class="size-4 inline mr-1" />
+                Select contractors that should have this deduction applied to all their workers.
+                You can enable or disable for multiple contractors at once.
+            </p>
+        </div>
+
+        <!-- Contractors List with Checkboxes -->
+        @if(count($allContractors) > 0)
+            <div class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+                <div class="max-h-[400px] overflow-y-auto">
+                    <table class="w-full">
+                        <thead class="bg-zinc-50 dark:bg-zinc-800 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="selectAllContractors"
+                                        class="rounded border-zinc-300 dark:border-zinc-600"
+                                    >
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                            @foreach($allContractors as $contractor)
+                                <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                                    <td class="px-4 py-3">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="selectedContractorIds"
+                                            value="{{ $contractor->id }}"
+                                            class="rounded border-zinc-300 dark:border-zinc-600"
+                                        >
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        {{ $contractor->contractor_name }}
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                        {{ $contractor->contractor_clab_no }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-sm text-zinc-600 dark:text-zinc-400">
+                {{ count($selectedContractorIds) }} of {{ count($allContractors) }} contractors selected
+            </div>
+        @else
+            <p class="text-sm text-zinc-600 dark:text-zinc-400 text-center py-4">
+                No contractors found in the system.
+            </p>
+        @endif
+    </div>
+
+    <div class="flex gap-2 justify-end">
+        <flux:button variant="ghost" wire:click="closeContractorAssignmentModal">Cancel</flux:button>
+        <flux:button variant="primary" wire:click="saveContractorAssignments">
+            <flux:icon.check class="size-4" />
+            Save Assignments ({{ count($selectedContractorIds) }})
+        </flux:button>
     </div>
 </flux:modal>

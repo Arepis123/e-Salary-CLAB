@@ -119,6 +119,13 @@ class Configuration extends Component
 
     public $assignmentNotes = '';
 
+    // Contractor assignment modal properties
+    public $showContractorAssignmentModal = false;
+
+    public $selectedContractorIds = [];
+
+    public $selectAllContractors = false;
+
     protected WorkerService $workerService;
 
     protected ContractorWindowService $windowService;
@@ -401,7 +408,10 @@ class Configuration extends Component
 
     public function loadDeductionTemplates()
     {
-        $this->deductionTemplates = $this->configService->getAllDeductionTemplates();
+        // Eager load relationships for template table display
+        $this->deductionTemplates = \App\Models\DeductionTemplate::with(['contractors', 'workerAssignments'])
+            ->orderBy('name')
+            ->get();
     }
 
     public function openContractorEditModal(string $clabNo)
@@ -513,28 +523,17 @@ class Configuration extends Component
             'templateType' => 'required|in:contractor,worker',
             'templateMonths' => 'nullable|array',
             'templateMonths.*' => 'integer|min:1|max:12',
+            'templatePeriods' => 'nullable|array',
+            'templatePeriods.*' => 'integer|min:1|max:100',
         ];
 
-        // Add validation for worker-level templates
-        if ($this->templateType === 'worker') {
-            $rules['templatePeriods'] = 'nullable|array';
-            $rules['templatePeriods.*'] = 'integer|min:1|max:100';
-        }
-
-        // Ensure at least one criteria is specified (months or periods for worker-level)
+        // Ensure at least one criteria is specified (months or periods)
         $this->validate($rules);
 
-        // Custom validation: at least months or periods must be specified
-        if ($this->templateType === 'worker') {
-            if (empty($this->templateMonths) && empty($this->templatePeriods)) {
-                $this->addError('templateMonths', 'Please select at least one month or one target period.');
-                $this->addError('templatePeriods', 'Please select at least one month or one target period.');
-
-                return;
-            }
-        } elseif (empty($this->templateMonths)) {
-            // Contractor-level must have months
-            $this->addError('templateMonths', 'Please select at least one month.');
+        // Custom validation: at least months or periods must be specified (both types)
+        if (empty($this->templateMonths) && empty($this->templatePeriods)) {
+            $this->addError('templateMonths', 'Please select at least one month or one target period.');
+            $this->addError('templatePeriods', 'Please select at least one month or one target period.');
 
             return;
         }
@@ -546,7 +545,7 @@ class Configuration extends Component
                 'amount' => $this->templateAmount,
                 'type' => $this->templateType,
                 'apply_months' => $this->templateMonths,
-                'apply_periods' => $this->templateType === 'worker' ? $this->templatePeriods : null,
+                'apply_periods' => $this->templatePeriods, // Save for both contractor and worker level
                 'is_active' => $this->templateIsActive,
             ];
 
@@ -747,6 +746,100 @@ class Configuration extends Component
                 variant: 'danger',
                 heading: 'Error',
                 text: 'Failed to save assignments: '.$e->getMessage()
+            );
+        }
+    }
+
+    // Contractor assignment modal methods
+    public function openContractorAssignmentModal(int $templateId)
+    {
+        $template = \App\Models\DeductionTemplate::find($templateId);
+
+        if (! $template || ! $template->isContractorLevel()) {
+            Flux::toast(variant: 'danger', text: 'Invalid template or not a contractor-level template');
+
+            return;
+        }
+
+        $this->selectedTemplateId = $templateId;
+        $this->selectedTemplateName = $template->name;
+
+        // Get contractors that have this template enabled
+        $enabledContractors = $this->configService->getContractorsWithDeduction($templateId);
+        $this->selectedContractorIds = $enabledContractors->pluck('id')->toArray();
+
+        $this->selectAllContractors = false;
+        $this->showContractorAssignmentModal = true;
+    }
+
+    public function closeContractorAssignmentModal()
+    {
+        $this->showContractorAssignmentModal = false;
+        $this->selectedTemplateId = null;
+        $this->selectedTemplateName = '';
+        $this->selectedContractorIds = [];
+        $this->selectAllContractors = false;
+    }
+
+    public function updatedSelectAllContractors($value)
+    {
+        if ($value) {
+            // Select all contractors
+            $allContractors = $this->configService->getAllContractorConfigurations();
+            $this->selectedContractorIds = $allContractors->pluck('id')->toArray();
+        } else {
+            // Deselect all
+            $this->selectedContractorIds = [];
+        }
+    }
+
+    public function updatedSelectedContractorIds()
+    {
+        // Update selectAllContractors checkbox state based on selection
+        $allContractors = $this->configService->getAllContractorConfigurations();
+        $this->selectAllContractors = count($this->selectedContractorIds) === $allContractors->count() && $allContractors->count() > 0;
+    }
+
+    public function saveContractorAssignments()
+    {
+        $this->validate([
+            'selectedContractorIds' => 'nullable|array',
+        ]);
+
+        try {
+            // Get current contractors with this template
+            $currentlyEnabled = $this->configService->getContractorsWithDeduction($this->selectedTemplateId)
+                ->pluck('id')
+                ->toArray();
+
+            // Determine adds and removes
+            $toEnable = array_diff($this->selectedContractorIds, $currentlyEnabled);
+            $toDisable = array_diff($currentlyEnabled, $this->selectedContractorIds);
+
+            // Enable for new contractors
+            foreach ($toEnable as $contractorId) {
+                $this->configService->enableDeductionForContractor($contractorId, $this->selectedTemplateId);
+            }
+
+            // Disable for removed contractors
+            foreach ($toDisable as $contractorId) {
+                $this->configService->disableDeductionForContractor($contractorId, $this->selectedTemplateId);
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Contractors Updated',
+                text: 'Deduction template applied to '.count($this->selectedContractorIds).' contractor(s)'
+            );
+
+            $this->closeContractorAssignmentModal();
+            $this->loadContractorConfigs();
+            $this->loadDeductionTemplates();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save contractor assignments: '.$e->getMessage()
             );
         }
     }
@@ -976,12 +1069,12 @@ class Configuration extends Component
         // Get contractor configurations if on contractor-settings tab
         $contractorConfigs = [];
         $deductionTemplates = [];
-        $allContractors = []; // For worker assignment modal
+        $allContractors = []; // For worker assignment modal and contractor assignment modal
         if ($this->activeTab === 'contractor-settings') {
             $contractorConfigs = $this->contractorConfigs;
             $deductionTemplates = $this->deductionTemplates;
-            // Get all contractors for dropdown in worker assignment modal
-            $allContractors = \App\Models\User::where('role', 'client')->orderBy('name')->get();
+            // Get all contractor configurations (needed for both modals)
+            $allContractors = $this->configService->getAllContractorConfigurations();
         }
 
         return view('livewire.admin.configuration', [

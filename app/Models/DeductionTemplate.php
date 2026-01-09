@@ -95,18 +95,18 @@ class DeductionTemplate extends Model
 
     /**
      * Check if this deduction should be applied for a given payroll period
-     * Contractor-level deductions always return true (no period restriction)
-     * Worker-level deductions check if the period is in apply_periods array
+     * Both contractor-level and worker-level deductions check apply_periods
+     * Empty array means all periods (no restriction)
      */
     public function shouldApplyInPeriod(int $periodCount): bool
     {
-        // Contractor-level deductions don't have period requirements
-        if ($this->isContractorLevel()) {
+        // If no periods specified, apply in all periods (both contractor and worker level)
+        if (empty($this->apply_periods)) {
             return true;
         }
 
-        // Worker-level: check if period count matches (empty array means all periods)
-        return empty($this->apply_periods) || in_array($periodCount, $this->apply_periods ?? []);
+        // Check if period count matches the target periods
+        return in_array($periodCount, $this->apply_periods ?? []);
     }
 
     /**

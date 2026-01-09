@@ -316,17 +316,11 @@ class PayrollService
         $configService = app(\App\Services\ContractorConfigurationService::class);
         $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
 
-        // 1. Apply CONTRACTOR-LEVEL deductions (existing logic with filter)
+        // Get all deductions for this month
         $deductions = $configService->getDeductionsForMonth($submission->contractor_clab_no, $submission->month);
         $contractorDeductions = $deductions->filter(fn ($d) => $d->isContractorLevel());
 
-        foreach ($contractorDeductions as $deduction) {
-            foreach ($submission->workers as $worker) {
-                $this->createDeductionTransaction($worker, $deduction, 'Contractor-level deduction');
-            }
-        }
-
-        // 2. Apply WORKER-LEVEL deductions (NEW)
+        // Process each worker
         foreach ($submission->workers as $worker) {
             // Calculate current payroll period for this worker
             $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount(
@@ -334,7 +328,19 @@ class PayrollService
                 $submission->contractor_clab_no
             );
 
-            // Get applicable worker-level deductions for this specific worker
+            // 1. Apply CONTRACTOR-LEVEL deductions (check period for each worker)
+            foreach ($contractorDeductions as $deduction) {
+                // Check if deduction applies to this worker's current period
+                if ($deduction->shouldApplyInPeriod($currentPeriod)) {
+                    $this->createDeductionTransaction(
+                        $worker,
+                        $deduction,
+                        "Contractor-level deduction (Period: {$currentPeriod})"
+                    );
+                }
+            }
+
+            // 2. Apply WORKER-LEVEL deductions for this specific worker
             $workerDeductions = $workerDeductionService->getApplicableDeductionsForWorker(
                 $worker->worker_id,
                 $submission->contractor_clab_no,

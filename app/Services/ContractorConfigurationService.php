@@ -79,6 +79,41 @@ class ContractorConfigurationService
     }
 
     /**
+     * Enable a specific deduction for a contractor
+     */
+    public function enableDeductionForContractor(int $contractorConfigId, int $deductionTemplateId): void
+    {
+        $config = ContractorConfiguration::findOrFail($contractorConfigId);
+
+        // Attach if not already attached
+        if (! $config->deductions()->where('deduction_template_id', $deductionTemplateId)->exists()) {
+            $config->deductions()->attach($deductionTemplateId, [
+                'enabled_by' => auth()->id(),
+                'enabled_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Disable a specific deduction for a contractor
+     */
+    public function disableDeductionForContractor(int $contractorConfigId, int $deductionTemplateId): void
+    {
+        $config = ContractorConfiguration::findOrFail($contractorConfigId);
+        $config->deductions()->detach($deductionTemplateId);
+    }
+
+    /**
+     * Get all contractors that have a specific deduction template enabled
+     */
+    public function getContractorsWithDeduction(int $deductionTemplateId): Collection
+    {
+        return ContractorConfiguration::whereHas('deductions', function ($query) use ($deductionTemplateId) {
+            $query->where('deduction_template_id', $deductionTemplateId);
+        })->with('deductions')->get();
+    }
+
+    /**
      * Get deductions that should be applied for a contractor in a given month
      */
     public function getDeductionsForMonth(string $clabNo, int $month): Collection
