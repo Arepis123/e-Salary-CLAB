@@ -113,8 +113,8 @@
     </flux:card>
     @endif
 
-    <!-- Deduction Preview Section -->
-    @if(!$errorMessage && !$isBlocked && count($applicableDeductions) > 0)
+    <!-- Deduction Preview Section (only show for current month, not overdue months) -->
+    @if(!$errorMessage && !$isBlocked && count($applicableDeductions) > 0 && !$targetMonth && !$targetYear)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-2 border-purple-200 dark:border-purple-800">
         <div class="flex items-start gap-3">
             <flux:icon.currency-dollar class="size-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
