@@ -1205,26 +1205,30 @@ class Timesheet extends Component
 
         $this->applicableDeductions = [];
 
-        // 1. Get ALL active CONTRACTOR-LEVEL deductions (not just for this month)
-        $allContractorDeductions = \App\Models\DeductionTemplate::active()
-            ->contractorLevel()
-            ->get();
+        // 1. Get CONTRACTOR-LEVEL deductions ENABLED for THIS contractor only
+        $contractorConfig = \App\Models\ContractorConfiguration::where('contractor_clab_no', $clabNo)
+            ->with(['deductions' => function ($query) {
+                $query->where('type', 'contractor')->where('is_active', true);
+            }])
+            ->first();
 
-        foreach ($allContractorDeductions as $deduction) {
-            // Check if deduction applies this month
-            $willApplyThisMonth = $deduction->shouldApplyInMonth($month);
+        if ($contractorConfig && $contractorConfig->deductions) {
+            foreach ($contractorConfig->deductions as $deduction) {
+                // Check if deduction applies this month
+                $willApplyThisMonth = $deduction->shouldApplyInMonth($month);
 
-            $this->applicableDeductions[] = [
-                'type' => 'contractor',
-                'template_id' => $deduction->id,
-                'name' => $deduction->name,
-                'amount' => $deduction->amount,
-                'description' => $deduction->description,
-                'worker_count' => $remainingWorkers->count(),
-                'worker_ids' => $remainingWorkers->pluck('wkr_id')->toArray(),
-                'status' => $willApplyThisMonth ? 'active' : 'pending',
-                'apply_months' => $deduction->apply_months ?? [],
-            ];
+                $this->applicableDeductions[] = [
+                    'type' => 'contractor',
+                    'template_id' => $deduction->id,
+                    'name' => $deduction->name,
+                    'amount' => $deduction->amount,
+                    'description' => $deduction->description,
+                    'worker_count' => $remainingWorkers->count(),
+                    'worker_ids' => $remainingWorkers->pluck('wkr_id')->toArray(),
+                    'status' => $willApplyThisMonth ? 'active' : 'pending',
+                    'apply_months' => $deduction->apply_months ?? [],
+                ];
+            }
         }
 
         // 2. Get ALL WORKER-LEVEL deductions for this contractor (show all assignments)
