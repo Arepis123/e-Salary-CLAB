@@ -13,7 +13,7 @@
                     <flux:button id="download-template-btn" wire:click="downloadTemplate" variant="outline" icon="arrow-down-tray" size="sm">
                         Download Template
                     </flux:button>
-                    <flux:button id="import-file-btn" wire:click="openImportModal" onclick="setTimeout(() => { if (typeof startTutorial === 'function' && !window.importTutorialShown && document.getElementById('import-modal')) { window.importTutorialShown = true; startTutorial('ot-import'); } }, 600)" variant="filled" icon="arrow-up-tray" size="sm">
+                    <flux:button id="import-file-btn" wire:click="openImportModal" variant="filled" icon="arrow-up-tray" size="sm">
                         Import from File
                     </flux:button>
                 @endif
