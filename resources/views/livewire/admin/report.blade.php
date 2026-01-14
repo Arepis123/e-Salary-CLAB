@@ -561,4 +561,57 @@
         }
     </script>
     @endif
+
+    <script>
+        // Handle receipt download event from Livewire
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('download-receipts', (data) => {
+                const params = data[0]; // Get first element which contains our parameters
+
+                // Create a temporary form to submit the download request
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{{ route('report.download-receipts') }}';
+                form.style.display = 'none';
+
+                // Add CSRF token
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_token';
+                csrfInput.value = '{{ csrf_token() }}';
+                form.appendChild(csrfInput);
+
+                // Add invoice IDs
+                params.invoices.forEach((id) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'invoices[]';
+                    input.value = id;
+                    form.appendChild(input);
+                });
+
+                // Add month and year
+                const monthInput = document.createElement('input');
+                monthInput.type = 'hidden';
+                monthInput.name = 'month';
+                monthInput.value = params.month;
+                form.appendChild(monthInput);
+
+                const yearInput = document.createElement('input');
+                yearInput.type = 'hidden';
+                yearInput.name = 'year';
+                yearInput.value = params.year;
+                form.appendChild(yearInput);
+
+                // Append form to body and submit
+                document.body.appendChild(form);
+                form.submit();
+
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(form);
+                }, 100);
+            });
+        });
+    </script>
 </div>

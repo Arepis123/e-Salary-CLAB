@@ -158,6 +158,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Report route - accessible by super_admin and finance
     Route::middleware(['auth', 'verified', 'roles:finance'])->group(function () {
         Route::get('report', \App\Livewire\Admin\Report::class)->name('report');
+        Route::post('report/download-receipts', [\App\Http\Controllers\TaxInvoiceController::class, 'downloadReceipts'])->name('report.download-receipts');
     });
 
     // Super admin only routes (no finance access)
