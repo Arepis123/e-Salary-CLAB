@@ -165,13 +165,9 @@ class Contractors extends Component
 
         // Enhance contractors with statistics
         $allContractors->transform(function ($contractor) {
-            $contractor->total_submissions = PayrollSubmission::where('contractor_clab_no', $contractor->contractor_clab_no)->count();
             $contractor->pending_payments = PayrollSubmission::where('contractor_clab_no', $contractor->contractor_clab_no)
                 ->whereIn('status', ['pending_payment', 'overdue'])
                 ->count();
-            $contractor->total_paid = PayrollSubmission::where('contractor_clab_no', $contractor->contractor_clab_no)
-                ->where('status', 'paid')
-                ->sum('total_with_penalty');
             $contractor->total_outstanding = PayrollSubmission::where('contractor_clab_no', $contractor->contractor_clab_no)
                 ->whereIn('status', ['pending_payment', 'overdue'])
                 ->sum('total_with_penalty');

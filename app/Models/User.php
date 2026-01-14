@@ -72,7 +72,8 @@ class User extends Authenticatable
     {
         $completed = $this->tutorial_completed ?? [];
         $completed[$page] = true;
-        $this->update(['tutorial_completed' => $completed]);
+        $this->tutorial_completed = $completed;
+        $this->save();
     }
 
     /**

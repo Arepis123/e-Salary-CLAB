@@ -31,6 +31,8 @@ class PayrollSubmission extends Model
         'admin_notes',
         'breakdown_file_path',
         'breakdown_file_name',
+        'payslip_file_path',
+        'payslip_file_name',
         'is_legacy_submission',
     ];
 
@@ -344,7 +346,9 @@ class PayrollSubmission extends Model
      */
     public function hasAdminReview(): bool
     {
-        return ! is_null($this->admin_final_amount);
+        // Check for actual admin review indicators, not just admin_final_amount
+        // because admin_final_amount is set automatically during client submission
+        return ! is_null($this->admin_reviewed_at) || ! is_null($this->admin_reviewed_by);
     }
 
     /**
@@ -388,6 +392,26 @@ class PayrollSubmission extends Model
         }
 
         return route('payroll.breakdown.download', $this->id);
+    }
+
+    /**
+     * Check if submission has a payslip file attached
+     */
+    public function hasPayslipFile(): bool
+    {
+        return ! is_null($this->payslip_file_path);
+    }
+
+    /**
+     * Get the URL for downloading the payslip file
+     */
+    public function getPayslipFileUrl(): ?string
+    {
+        if (! $this->hasPayslipFile()) {
+            return null;
+        }
+
+        return route('payroll.payslip.download', $this->id);
     }
 
     /**

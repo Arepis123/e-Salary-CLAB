@@ -74,14 +74,14 @@
             Admin Review Completed
             <flux:icon.check-circle class="inline size-5" />
         </h3>
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="grid gap-4 md:grid-cols-3">
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Reviewed By:</p>
-                <p class="font-medium">{{ $submission->adminReviewer->name ?? 'Unknown' }}</p>
+                <p class="font-medium">{{ $submission->adminReviewer ? $submission->adminReviewer->name : 'N/A' }}</p>
             </div>
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Reviewed At:</p>
-                <p class="font-medium">{{ $submission->admin_reviewed_at->format('d M Y, H:i') }}</p>
+                <p class="font-medium">{{ $submission->admin_reviewed_at ? $submission->admin_reviewed_at->format('d M Y, H:i') : 'N/A' }}</p>
             </div>
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Breakdown File:</p>
@@ -91,6 +91,18 @@
                     </flux:button>
                 @else
                     <p class="text-sm text-zinc-500">No file uploaded</p>
+                @endif
+            </div>
+            <div>
+                <p class="text-sm text-green-700 dark:text-green-300">Payslip File (ZIP):</p>
+                @if($submission->hasPayslipFile())
+                    <flux:button size="sm" variant="ghost" wire:click="downloadPayslip" icon="arrow-down-tray">
+                        {{ $submission->payslip_file_name }}
+                    </flux:button>
+                @else
+                    <flux:button size="sm" variant="filled" wire:click="openUploadPayslipModal" icon="arrow-up-tray">
+                        Upload Payslip
+                    </flux:button>
                 @endif
             </div>
         </div>
@@ -113,7 +125,7 @@
                 </div>
                 <div class="border-t border-green-200 dark:border-green-700 pt-2 mt-2 flex justify-between">
                     <span class="font-bold text-zinc-900 dark:text-zinc-100">Client Total:</span>
-                    <span class="text-lg font-bold text-green-600">RM {{ number_format($submission->client_total, 2) }}</span>
+                    <span class="font-bold text-base text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
                 </div>
                 @if($submission->has_penalty || $submission->isOverdue())
                 <div class="flex justify-between mt-2">
@@ -122,7 +134,7 @@
                 </div>
                 <div class="border-t border-red-200 dark:border-red-700 pt-2 mt-2 flex justify-between">
                     <span class="font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
-                    <span class="text-xl font-bold text-red-600 dark:text-red-400">RM {{ number_format($submission->total_due, 2) }}</span>
+                    <span class="font-bold text-base text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</span>
                 </div>
                 @endif
             </div>
@@ -643,6 +655,52 @@
                     </span>
                 </flux:button>
                 <flux:button type="button" wire:click="closeEditAmountModal" variant="ghost">
+                    Cancel
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <!-- Upload Payslip Modal -->
+    <flux:modal wire:model="showUploadPayslipModal" size="lg">
+        <form wire:submit.prevent="uploadPayslip">
+            <flux:heading size="lg">Upload Payslip File</flux:heading>
+            <flux:subheading class="mb-4">
+                Upload a ZIP file containing all workers' payslip PDFs for {{ $submission->month_year }}
+            </flux:subheading>
+
+            <flux:field>
+                <flux:label>Payslip ZIP File</flux:label>
+                <flux:description>Maximum file size: 10MB. Must be a ZIP file containing individual worker payslip PDFs.</flux:description>
+                <input
+                    type="file"
+                    wire:model="payslipFile"
+                    accept=".zip"
+                    class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600"
+                />
+                <flux:error name="payslipFile" />
+
+                <div wire:loading wire:target="payslipFile" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    <flux:icon.arrow-path class="size-3 inline animate-spin" /> Uploading file...
+                </div>
+
+                @if($payslipFile)
+                <div class="text-xs text-green-600 dark:text-green-400 mt-1">
+                    <flux:icon.check-circle class="size-3 inline" /> File selected: {{ $payslipFile->getClientOriginalName() }} ({{ number_format($payslipFile->getSize() / 1024, 2) }} KB)
+                </div>
+                @endif
+            </flux:field>
+
+            <div class="flex gap-2 mt-6">
+                <flux:button type="submit" variant="filled" icon="arrow-up-tray" :disabled="!$payslipFile" wire:loading.attr="disabled" wire:target="payslipFile, uploadPayslip">
+                    <span wire:loading.remove wire:target="uploadPayslip">
+                        Upload Payslip
+                    </span>
+                    <span wire:loading wire:target="uploadPayslip">
+                        Uploading...
+                    </span>
+                </flux:button>
+                <flux:button type="button" wire:click="closeUploadPayslipModal" variant="ghost">
                     Cancel
                 </flux:button>
             </div>

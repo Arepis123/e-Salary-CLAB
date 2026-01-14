@@ -90,6 +90,7 @@
                 </div>
                 <div>
                     <flux:select variant="listbox" wire:model.live="year" size="sm" label="Year">
+                        <flux:select.option value="all">All Years</flux:select.option>
                         @foreach($availableYears as $yearOption)
                             <flux:select.option value="{{ $yearOption }}">{{ $yearOption }}</flux:select.option>
                         @endforeach
@@ -195,6 +196,9 @@
                                     @endif
                                     @if($invoice->hasBreakdownFile())
                                         <flux:menu.item icon="document-arrow-down" wire:click="downloadBreakdown({{ $invoice->id }})">Download Breakdown</flux:menu.item>
+                                    @endif
+                                    @if($invoice->hasPayslipFile())
+                                        <flux:menu.item icon="document-arrow-down" href="{{ route('payroll.payslip.download', $invoice->id) }}">Download Payslip</flux:menu.item>
                                     @endif
                                     @if($invoice->status === 'draft')
                                         <flux:menu.separator />

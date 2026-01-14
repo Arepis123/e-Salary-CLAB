@@ -115,7 +115,7 @@
 
     <!-- Deduction Preview Section (only show for current month, not overdue months) -->
     @if(!$errorMessage && !$isBlocked && count($applicableDeductions) > 0 && !$targetMonth && !$targetYear)
-    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="flex items-start gap-3">
             <flux:icon.currency-dollar class="size-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
             <div class="flex-1">
@@ -126,7 +126,7 @@
 
                 <div class="space-y-2">
                     @foreach($applicableDeductions as $deduction)
-                    <div class="flex items-start justify-between p-3 {{ $deduction['status'] === 'active' ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800' : 'bg-zinc-50 dark:bg-zinc-800' }} rounded-lg">
+                    <div class="flex items-start justify-between p-3 {{ $deduction['status'] === 'active' ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800' : 'bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-600' }} rounded-lg">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $deduction['name'] }}</span>
@@ -143,11 +143,11 @@
                                     <flux:badge color="purple" size="sm">
                                         {{ $deduction['worker_count'] }} {{ $deduction['worker_count'] === 1 ? 'Worker' : 'Workers' }}
                                     </flux:badge>
-                                    @if($deduction['status'] === 'active' && isset($deduction['active_worker_count']))
+                                    {{-- @if($deduction['status'] === 'active' && isset($deduction['active_worker_count']))
                                         <span class="text-xs text-green-700 dark:text-green-300">
                                             ({{ $deduction['active_worker_count'] }} active, {{ $deduction['pending_worker_count'] }} pending)
                                         </span>
-                                    @endif
+                                    @endif --}}
                                 @endif
                             </div>
                             @if($deduction['description'])
@@ -167,7 +167,7 @@
                             </div>
                         </div>
                         <div class="text-right ml-4">
-                            <span class="text-sm font-bold {{ $deduction['status'] === 'active' ? 'text-green-700 dark:text-green-400' : 'text-zinc-600 dark:text-zinc-400' }}">
+                            <span class="text-sm font-bold">
                                 -RM {{ number_format($deduction['amount'], 2) }}
                             </span>
                             @if($deduction['type'] === 'contractor')

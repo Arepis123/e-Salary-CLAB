@@ -3,9 +3,6 @@
     <div class="flex items-center justify-between">
         <div>
             <div class="flex items-center gap-3">
-                <flux:button variant="ghost" size="sm" icon="arrow-left" href="{{ route('contractors') }}">
-                    Back
-                </flux:button>
                 <div>
                     <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $contractor->name }}</h1>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ $contractor->contractor_clab_no }}</p>
@@ -18,6 +15,9 @@
             </flux:button>
             <flux:button variant="outline" size="sm" icon="document" href="{{ route('invoices') }}?contractor={{ $contractor->contractor_clab_no }}">
                 View Invoices
+            </flux:button>
+            <flux:button variant="outline" size="sm" icon="arrow-left" href="{{ route('contractors') }}">
+                Back to Contractor
             </flux:button>
         </div>
     </div>

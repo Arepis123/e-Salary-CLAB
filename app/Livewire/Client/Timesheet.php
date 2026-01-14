@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Client;
 
+use App\Mail\TimesheetSubmitted;
 use App\Models\MonthlyOTEntry;
 use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
 use App\Services\PayrollService;
 use App\Traits\LogsActivity;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 
 class Timesheet extends Component
@@ -708,6 +710,9 @@ class Timesheet extends Component
                 'submitted_at' => now(),
             ]);
 
+            // Send email notification to admin
+            Mail::to('esalary@clab.com.my')->send(new TimesheetSubmitted($submission));
+
             \Flux::toast(
                 variant: 'success',
                 heading: 'Draft Submitted',
@@ -849,6 +854,9 @@ class Timesheet extends Component
                 $workerCount = count($selectedWorkersData);
 
                 \Log::info('Submission saved', ['submission_id' => $submission->id]);
+
+                // Send email notification to admin
+                Mail::to('esalary@clab.com.my')->send(new TimesheetSubmitted($submission));
 
                 // Log activity
                 $this->logTimesheetActivity(
@@ -1142,6 +1150,14 @@ class Timesheet extends Component
 
     protected function checkSubmissionWindow()
     {
+        // TESTING MODE: Skip submission window restriction
+        if (config('payroll.disable_submission_window', false)) {
+            $this->canSubmitPayroll = true;
+            $this->submissionWindowMessage = '';
+
+            return;
+        }
+
         $today = now();
         $currentDay = $today->day;
 
@@ -1286,6 +1302,19 @@ class Timesheet extends Component
                 'worker_details' => $workerData,
             ];
         }
+
+        // Sort deductions: active first, then pending
+        usort($this->applicableDeductions, function ($a, $b) {
+            // Active status comes before pending
+            if ($a['status'] === 'active' && $b['status'] !== 'active') {
+                return -1;
+            }
+            if ($a['status'] !== 'active' && $b['status'] === 'active') {
+                return 1;
+            }
+            // If both have same status, sort by name alphabetically
+            return strcmp($a['name'], $b['name']);
+        });
     }
 
     public function render()

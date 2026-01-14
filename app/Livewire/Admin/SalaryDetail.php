@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Mail\PayrollApproved;
+use App\Mail\PayslipReady;
 use App\Models\PayrollSubmission;
 use Flux\Flux;
 use Illuminate\Support\Facades\Mail;
@@ -57,6 +58,11 @@ class SalaryDetail extends Component
 
     public $editAmountNotes = '';
 
+    // Payslip upload properties
+    public $showUploadPayslipModal = false;
+
+    public $payslipFile;
+
     public $isUpdatingAmount = false;
 
     public function mount($id)
@@ -72,7 +78,7 @@ class SalaryDetail extends Component
     protected function loadWorkers()
     {
         $this->workers = $this->submission->workers()
-            ->with('worker')
+            ->with(['worker', 'transactions'])
             ->get();
     }
 
@@ -198,7 +204,7 @@ class SalaryDetail extends Component
 
             // Title row
             $sheet->setCellValue('A1', 'PAYROLL SUBMISSION - '.strtoupper($this->submission->month_year));
-            $sheet->mergeCells('A1:L1');
+            $sheet->mergeCells('A1:M1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -232,6 +238,7 @@ class SalaryDetail extends Component
                 'J9' => 'Other Deduction (RM)',
                 'K9' => 'NPL (days)',
                 'L9' => 'Allowance (RM)',
+                'M9' => 'Transaction Details',
             ];
 
             foreach ($headers as $cell => $value) {
@@ -239,7 +246,7 @@ class SalaryDetail extends Component
             }
 
             // Style headers
-            $sheet->getStyle('A9:L9')->applyFromArray([
+            $sheet->getStyle('A9:M9')->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -267,6 +274,25 @@ class SalaryDetail extends Component
                 $sheet->setCellValue('J'.$row, $worker->other_deduction ?? 0);
                 $sheet->setCellValue('K'.$row, $worker->npl_days ?? 0);
                 $sheet->setCellValue('L'.$row, $worker->allowance ?? 0);
+
+                // Add transaction details
+                $transactionDetails = [];
+                foreach ($worker->transactions as $txn) {
+                    if ($txn->type === 'allowance') {
+                        $transactionDetails[] = "+RM {$txn->amount} (Allowance".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'npl') {
+                        $transactionDetails[] = "{$txn->amount} days (NPL".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'advance_payment') {
+                        $transactionDetails[] = "-RM {$txn->amount} (Advance".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'deduction') {
+                        // For configured deductions, show the description if available
+                        $label = $txn->description ?? 'Deduction';
+                        $transactionDetails[] = "-RM {$txn->amount} ({$label}".($txn->remarks ? ' - '.$txn->remarks : '').')';
+                    }
+                }
+                $sheet->setCellValue('M'.$row, implode("\n", $transactionDetails));
+                $sheet->getStyle('M'.$row)->getAlignment()->setWrapText(true);
+                $sheet->getStyle('M'.$row)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
 
                 // Format currency columns
                 foreach (['E', 'I', 'J', 'L'] as $col) {
@@ -299,9 +325,10 @@ class SalaryDetail extends Component
             $sheet->setCellValue('J'.$totalRow, '=SUM(J10:J'.($totalRow - 1).')');
             $sheet->setCellValue('K'.$totalRow, '=SUM(K10:K'.($totalRow - 1).')');
             $sheet->setCellValue('L'.$totalRow, '=SUM(L10:L'.($totalRow - 1).')');
+            $sheet->setCellValue('M'.$totalRow, ''); // No total for transaction details
 
             // Style total row
-            $sheet->getStyle('A'.$totalRow.':L'.$totalRow)->applyFromArray([
+            $sheet->getStyle('A'.$totalRow.':M'.$totalRow)->applyFromArray([
                 'font' => ['bold' => true],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -329,9 +356,12 @@ class SalaryDetail extends Component
                 ->setFormatCode('0.0');
 
             // Auto-size columns
-            foreach (range('A', 'L') as $col) {
+            foreach (range('A', 'M') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
+
+            // Set a minimum width for Transaction Details column to show wrapped text properly
+            $sheet->getColumnDimension('M')->setWidth(50);
 
             // Freeze panes at header row
             $sheet->freezePane('A10');
@@ -721,6 +751,104 @@ class SalaryDetail extends Component
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            return;
+        }
+    }
+
+    public function openUploadPayslipModal()
+    {
+        $this->payslipFile = null;
+        $this->showUploadPayslipModal = true;
+    }
+
+    public function closeUploadPayslipModal()
+    {
+        $this->showUploadPayslipModal = false;
+        $this->payslipFile = null;
+    }
+
+    public function uploadPayslip()
+    {
+        $this->validate([
+            'payslipFile' => 'required|file|mimes:zip|max:10240', // 10MB max
+        ]);
+
+        try {
+            // Store the file in private storage
+            $fileName = 'payslip_'.$this->submission->id.'_'.now()->format('YmdHis').'.zip';
+            $filePath = $this->payslipFile->storeAs('payslips', $fileName, 'local');
+
+            // Update submission with file info
+            $this->submission->update([
+                'payslip_file_path' => $filePath,
+                'payslip_file_name' => $this->payslipFile->getClientOriginalName(),
+            ]);
+
+            $this->closeUploadPayslipModal();
+
+            // Send email notification to contractor
+            if ($this->submission->user && $this->submission->user->email) {
+                Mail::to($this->submission->user->email)->send(new PayslipReady($this->submission));
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Success',
+                text: 'Payslip file uploaded successfully. Email notification sent to contractor.'
+            );
+
+            // Refresh submission to reflect changes
+            $this->submission->refresh();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Upload Failed',
+                text: 'Failed to upload payslip file: '.$e->getMessage()
+            );
+
+            \Log::error('Payslip upload failed', [
+                'submission_id' => $this->submission->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function downloadPayslip()
+    {
+        $this->submission->refresh();
+
+        if (! $this->submission->hasPayslipFile()) {
+            Flux::toast(variant: 'warning', text: 'No payslip file available.');
+
+            return;
+        }
+
+        $filePath = \Storage::disk('local')->path($this->submission->payslip_file_path);
+
+        if (! file_exists($filePath)) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'File Not Found',
+                text: 'The payslip file is missing from storage.'
+            );
+
+            \Log::warning('Payslip file missing from storage', [
+                'submission_id' => $this->submission->id,
+                'db_file_path' => $this->submission->payslip_file_path,
+            ]);
+
+            return;
+        }
+
+        try {
+            return response()->download($filePath, $this->submission->payslip_file_name);
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Download Failed',
+                text: 'Unable to download the file: '.$e->getMessage()
+            );
 
             return;
         }

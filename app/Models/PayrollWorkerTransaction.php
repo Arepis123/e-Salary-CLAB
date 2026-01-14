@@ -9,6 +9,7 @@ class PayrollWorkerTransaction extends Model
     protected $fillable = [
         'payroll_worker_id',
         'type',
+        'description',
         'amount',
         'remarks',
     ];

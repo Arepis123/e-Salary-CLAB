@@ -25,6 +25,15 @@
                         Download Pro Forma Invoice
                     </flux:button>
                 @endif
+
+                @if($invoice->hasPayslipFile())
+                    <!-- Payslip Download (if available) -->
+                    <flux:button variant="outline" href="{{ route('payroll.payslip.download', $invoice->id) }}">
+                        <flux:icon.arrow-down-tray class="size-4" />
+                        Download Payslip
+                    </flux:button>
+                @endif
+
                 <flux:button variant="outline" href="{{ route('invoices') }}">
                     <flux:icon.arrow-left class="size-4" />
                     Back to Invoices

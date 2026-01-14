@@ -31,15 +31,8 @@ class Invoices extends Component
     public function mount($highlight = null)
     {
         if (! $this->year) {
-            // Default to the most recent year with submissions, or current year if none
-            $clabNo = auth()->user()->contractor_clab_no;
-            if ($clabNo) {
-                $latestYear = PayrollSubmission::where('contractor_clab_no', $clabNo)
-                    ->max('year');
-                $this->year = $latestYear ?? now()->year;
-            } else {
-                $this->year = now()->year;
-            }
+            // Default to "all" to show all years
+            $this->year = 'all';
         }
 
         // Store the highlight ID if provided
@@ -141,10 +134,14 @@ class Invoices extends Component
         }
 
         // Get all invoices for this contractor
-        $allInvoices = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->where('year', $this->year)
-            ->with(['payment'])
-            ->get();
+        $query = PayrollSubmission::where('contractor_clab_no', $clabNo);
+
+        // Apply year filter only if not "all"
+        if ($this->year && $this->year !== 'all') {
+            $query->where('year', $this->year);
+        }
+
+        $allInvoices = $query->with(['payment'])->get();
 
         // Apply search filter
         if ($this->search) {
@@ -219,10 +216,17 @@ class Invoices extends Component
 
         $pendingInvoices = $allSubmissions->whereIn('status', ['draft', 'pending_payment', 'overdue'])->count();
         $paidInvoices = $allSubmissions->where('status', 'paid')->count();
-        // Use total_due accessor to include dynamic penalty calculation
-        $totalInvoiced = $allSubmissions->sum(function ($submission) {
-            return $submission->total_due;
-        });
+
+        // Total Invoiced: Only include submissions that have been reviewed (have admin_final_amount)
+        // Exclude drafts and submitted (under review) submissions
+        $totalInvoiced = $allSubmissions
+            ->filter(function ($submission) {
+                // Only include if admin has reviewed (has admin_final_amount set)
+                return $submission->hasAdminReview();
+            })
+            ->sum(function ($submission) {
+                return $submission->total_due;
+            });
 
         // Available years for filter
         $availableYears = PayrollSubmission::where('contractor_clab_no', $clabNo)

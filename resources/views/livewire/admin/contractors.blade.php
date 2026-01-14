@@ -112,10 +112,8 @@
                     <flux:table.column sortable :sorted="$sortBy === 'contractor_clab_no'" :direction="$sortDirection" wire:click="sortByColumn('contractor_clab_no')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">CLAB No</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" wire:click="sortByColumn('name')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Company Name</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Contact Info</span></flux:table.column>
-                    <flux:table.column sortable :sorted="$sortBy === 'person_in_charge'" :direction="$sortDirection" wire:click="sortByColumn('person_in_charge')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Person in Charge</span></flux:table.column>
-                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Submissions</span></flux:table.column>
+                    <flux:table.column sortable :sorted="$sortBy === 'person_in_charge'" :direction="$sortDirection" wire:click="sortByColumn('person_in_charge')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Person in Charge</span></flux:table.column>                    
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Pending</span></flux:table.column>
-                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Total Paid</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">Outstanding</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
                 </flux:table.columns>
@@ -130,7 +128,7 @@
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <div class="max-w-[200px] truncate">{{ $contractor->name }}</div>
+                            <div class="max-w-[350px] truncate">{{ $contractor->name }}</div>
                         </flux:table.cell>
 
                         <flux:table.cell class="min-w-[200px]">
@@ -153,21 +151,11 @@
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <div class="max-w-[150px] truncate">{{ $contractor->person_in_charge ?? '-' }}</div>
-                        </flux:table.cell>
-
-                        <flux:table.cell variant="strong" class="whitespace-nowrap">
-                            {{ $contractor->total_submissions }}
+                            <div class="max-w-[250px] truncate">{{ $contractor->person_in_charge ?? '-' }}</div>
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong" class="whitespace-nowrap">
                             {{ $contractor->pending_payments }}
-                        </flux:table.cell>
-
-                        <flux:table.cell variant="strong" class="whitespace-nowrap">
-                            <span class="{{ $contractor->total_paid > 0 ? 'text-red-600 dark:text-green-400' : 'text-zinc-600 dark:text-zinc-400' }}">
-                                RM {{ number_format($contractor->total_paid, 2) }}
-                            </span>
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong" class="whitespace-nowrap">

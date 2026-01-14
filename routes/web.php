@@ -126,6 +126,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('payroll/breakdown/{submission}', [\App\Http\Controllers\PayrollBreakdownController::class, 'download'])
         ->name('payroll.breakdown.download');
 
+    // Payroll Payslip File Download - Unified route (Admin-uploaded payslip ZIP file)
+    Route::get('payroll/payslip/{submission}', [\App\Http\Controllers\PayrollPayslipController::class, 'download'])
+        ->name('payroll.payslip.download');
+
     // ========================================================================
     // ADMIN-ONLY ROUTES (No client equivalent)
     // ========================================================================

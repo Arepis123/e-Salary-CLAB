@@ -207,7 +207,7 @@
                 <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Salary Breakdown</h2>
 
                 @if($submission->hasBreakdownFile())
-                    <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800 mb-6">
+                    <div class="rounded-lg bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800 mb-4">
                         <div class="flex items-center justify-between">
                             <div class="flex gap-3">
                                 <flux:icon.document-check class="size-5 flex-shrink-0 text-green-600 dark:text-green-400" />
@@ -234,6 +234,26 @@
                                     The admin has not uploaded a detailed breakdown file yet.
                                 </p>
                             </div>
+                        </div>
+                    </div>
+                @endif
+
+                @if($submission->hasPayslipFile())
+                    <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex gap-3">
+                                <flux:icon.document-text class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                                <div class="text-sm text-blue-900 dark:text-blue-100">
+                                    <p class="font-medium">Worker payslips are available</p>
+                                    <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                        Download the ZIP file containing individual payslip PDFs for all workers.
+                                    </p>
+                                </div>
+                            </div>
+                            <flux:button size="sm" href="{{ route('payroll.payslip.download', $submission->id) }}">
+                                <flux:icon.arrow-down-tray class="size-4 inline me-1" />
+                                Download Payslip
+                            </flux:button>
                         </div>
                     </div>
                 @endif
