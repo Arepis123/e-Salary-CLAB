@@ -1,4 +1,44 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6">
+        <!-- Download Progress Overlay -->
+        @if($downloadingReceipts)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" wire:loading.class="opacity-100" wire:loading.class.remove="opacity-0">
+            <div class="bg-white dark:bg-zinc-800 rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+                <div class="flex flex-col items-center text-center">
+                    <!-- Spinner -->
+                    {{-- <svg class="animate-spin h-16 w-16 text-lime-600 dark:text-lime-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg> --}}
+                    <flux:icon.loading />
+
+                    <!-- Message -->
+                    <h3 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+                        Generating Receipts
+                    </h3>
+                    <p class="text-zinc-600 dark:text-zinc-400 mb-1">
+                        Preparing {{ $downloadCount }} {{ Str::plural('receipt', $downloadCount) }}...
+                    </p>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-500">
+                        This may take a moment. Please don't close this page.
+                    </p>
+
+                    <!-- Estimated time -->
+                    @php
+                        $estimatedSeconds = $downloadCount * 3;
+                        $estimatedTime = $estimatedSeconds < 60
+                            ? "{$estimatedSeconds} seconds"
+                            : round($estimatedSeconds / 60, 1) . " minutes";
+                    @endphp
+                    <div class="mt-4 px-4 py-2 bg-lime-50 dark:bg-lime-900/20 rounded-lg">
+                        <p class="text-xs text-lime-700 dark:text-lime-400">
+                            Estimated time: ~{{ $estimatedTime }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
         <!-- Page Header -->
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -607,10 +647,17 @@
                 document.body.appendChild(form);
                 form.submit();
 
-                // Clean up
+                // Clean up form
                 setTimeout(() => {
                     document.body.removeChild(form);
                 }, 100);
+
+                // Hide loading indicator after download starts
+                // Estimate: give it time based on number of receipts (3 seconds per receipt + 5 second buffer)
+                const estimatedTime = (params.invoices.length * 3 + 5) * 1000;
+                setTimeout(() => {
+                    @this.set('downloadingReceipts', false);
+                }, estimatedTime);
             });
         });
     </script>

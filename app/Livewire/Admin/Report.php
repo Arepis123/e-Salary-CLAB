@@ -41,6 +41,10 @@ class Report extends Component
 
     public $selectAll = false;
 
+    public $downloadingReceipts = false;
+
+    public $downloadCount = 0;
+
     public function updatedSelectAll($value)
     {
         if ($value) {
@@ -603,6 +607,10 @@ class Report extends Component
 
     protected function downloadReceipts($invoiceIds)
     {
+        // Set loading state
+        $this->downloadingReceipts = true;
+        $this->downloadCount = count($invoiceIds);
+
         // Redirect to controller route with invoice IDs as form data
         $this->dispatch('download-receipts', [
             'invoices' => $invoiceIds,

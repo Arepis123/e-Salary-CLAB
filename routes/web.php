@@ -138,6 +138,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['auth', 'verified', 'roles:admin,finance'])->group(function () {
         Route::get('payroll', \App\Livewire\Admin\Salary::class)->name('payroll');
         Route::get('payroll/{id}', \App\Livewire\Admin\SalaryDetail::class)->name('payroll.detail');
+        Route::get('ot-transactions', \App\Livewire\Admin\OtTransactions::class)->name('ot-transactions');
     });
 
     // Admin-only routes (no finance access)

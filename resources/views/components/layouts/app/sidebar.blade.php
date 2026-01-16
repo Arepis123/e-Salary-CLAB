@@ -40,6 +40,7 @@
                         {{-- Admin/Super admin see expanded payroll menu --}}
                         <flux:sidebar.group expandable icon="wallet" heading="Payroll" class="grid">
                             <flux:sidebar.item :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>All submissions</flux:sidebar.item>
+                            <flux:sidebar.item :href="route('ot-transactions')" :current="request()->routeIs('ot-transactions')" wire:navigate>OT & Transactions</flux:sidebar.item>
                             <flux:sidebar.item :href="route('missing-submissions')" :current="request()->routeIs('missing-submissions')" wire:navigate>No submissions</flux:sidebar.item>
                         </flux:sidebar.group>
                     @endif

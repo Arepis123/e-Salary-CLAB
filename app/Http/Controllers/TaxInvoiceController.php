@@ -64,22 +64,14 @@ class TaxInvoiceController extends Controller
         }
 
         if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
-            // Generate all tax invoice numbers first if needed
+            // Generate all tax invoice numbers first if needed (without reloading)
             foreach ($invoices as $invoice) {
                 if (! $invoice->hasTaxInvoice()) {
                     $invoice->generateTaxInvoiceNumber();
+                    // Refresh just this invoice to get the generated number
+                    $invoice->refresh();
                 }
             }
-
-            // Refresh invoices after generating numbers
-            $invoices = PayrollSubmission::with([
-                'workers.transactions',
-                'workers.worker',
-                'payment',
-                'user',
-            ])
-                ->whereIn('id', $invoiceIds)
-                ->get();
 
             // Generate PDFs and add to ZIP
             foreach ($invoices as $invoice) {
