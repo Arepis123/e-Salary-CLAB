@@ -58,7 +58,7 @@
                         <flux:select.option value="payment">Payment Summary</flux:select.option>
                         <flux:select.option value="worker">Worker Payroll</flux:select.option>
                         <flux:select.option value="client">Client Summary</flux:select.option>
-                        <!-- <flux:select.option value="monthly">Monthly Analysis</flux:select.option> -->
+                        <flux:select.option value="timesheet">Timesheet Report</flux:select.option>
                         <flux:select.option value="tax">Official Receipt Report</flux:select.option>
                     </flux:select>
                 </flux:field>
@@ -96,7 +96,7 @@
             <!-- Empty State -->
             <flux:card class="p-12 text-center dark:bg-zinc-900 rounded-lg">
                 <div class="mx-auto max-w-md">
-                    <flux:icon.document-chart-bar class="mx-auto size-16 text-zinc-400 dark:text-zinc-600 mb-4" />
+                    <flux:icon.document-chart-bar class="mx-auto size-14 text-zinc-400 dark:text-zinc-600 mb-4" />
                     <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">No Report Generated</h3>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
                         Select your report criteria above and click "Generate" to view the report data, statistics, and charts.
@@ -354,6 +354,114 @@
                     <span wire:loading wire:target="exportAllReports">Generating Excel...</span>
                 </flux:button>
             </div>
+            @endif
+
+            @if($reportType === 'timesheet')
+            <!-- Export Button for Timesheet Report -->
+            <div class="flex justify-end">
+                <flux:button variant="primary" size="sm" wire:click="exportTimesheetReport" wire:loading.attr="disabled" wire:loading.class="opacity-50">
+                    <flux:icon.arrow-down-tray class="size-4 inline" wire:loading.remove wire:target="exportTimesheetReport" />
+                    <svg wire:loading wire:target="exportTimesheetReport" class="animate-spin size-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="exportTimesheetReport">Export Timesheet (Excel)</span>
+                    <span wire:loading wire:target="exportTimesheetReport">Generating Excel...</span>
+                </flux:button>
+            </div>
+
+            <!-- Timesheet Report Data -->
+            <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Timesheet Report - {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</h2>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Data from OT & Transaction submissions</p>
+                </div>
+
+                @if(count($timesheetData) > 0)
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Employee ID</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Employee Name</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Department</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Salary</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">General Allowance</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance Salary</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Normal OT</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                                @foreach($timesheetData as $entry)
+                                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                        <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $entry['worker_id'] }}</td>
+                                        <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $entry['worker_name'] }}</td>
+                                        <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $entry['contractor_name'] }}</td>
+                                        <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">
+                                            @if($entry['salary'])
+                                                RM {{ number_format($entry['salary'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-green-600 dark:text-green-400">
+                                            @if($entry['allowance'] > 0)
+                                                RM {{ number_format($entry['allowance'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                            @if($entry['advance_salary'] > 0)
+                                                RM {{ number_format($entry['advance_salary'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-blue-600 dark:text-blue-400">
+                                            @if($entry['ot_normal'] > 0)
+                                                {{ number_format($entry['ot_normal'], 1) }} hrs
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-orange-600 dark:text-orange-400">
+                                            @if($entry['ot_public'] > 0)
+                                                {{ number_format($entry['ot_public'], 1) }} hrs
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3">
+                                            <flux:badge color="{{ $entry['status'] === 'locked' ? 'green' : 'blue' }}" size="sm">
+                                                {{ ucfirst($entry['status']) }}
+                                            </flux:badge>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-4 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
+                        <div>
+                            Total: {{ count($timesheetData) }} {{ Str::plural('entry', count($timesheetData)) }}
+                        </div>
+                        <div class="flex gap-4">
+                            <span>Total Allowances: RM {{ number_format(collect($timesheetData)->sum('allowance'), 2) }}</span>
+                            <span>Total Advances: RM {{ number_format(collect($timesheetData)->sum('advance_salary'), 2) }}</span>
+                        </div>
+                    </div>
+                @else
+                    <div class="text-center py-12">
+                        <flux:icon.document-text class="mx-auto size-12 text-zinc-400 dark:text-zinc-600 mb-4" />
+                        <p class="text-zinc-600 dark:text-zinc-400">No timesheet data available for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-500 mt-1">Make sure clients have submitted their OT entries for this period.</p>
+                    </div>
+                @endif
+            </flux:card>
             @endif
 
             @if($reportType === 'tax' || $reportType === '')

@@ -4,9 +4,12 @@ namespace App\Livewire\Admin;
 
 use App\Exports\PaymentSummaryExport;
 use App\Exports\PayrollSubmissionsExport;
+use App\Exports\TimesheetExport;
+use App\Models\MonthlyOTEntry;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
+use App\Models\User;
 use Flux\Flux;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
@@ -44,6 +47,8 @@ class Report extends Component
     public $downloadingReceipts = false;
 
     public $downloadCount = 0;
+
+    public $timesheetData = [];
 
     public function updatedSelectAll($value)
     {
@@ -98,6 +103,7 @@ class Report extends Component
         $this->taxInvoices = [];
         $this->selectedInvoices = [];
         $this->selectAll = false;
+        $this->timesheetData = [];
     }
 
     protected function generateAvailableMonths()
@@ -382,6 +388,9 @@ class Report extends Component
             case 'tax':
                 $this->loadTaxInvoices();
                 break;
+            case 'timesheet':
+                $this->loadTimesheetData();
+                break;
             default: // All Reports
                 $this->loadStats();
                 $this->loadClientPayments();
@@ -617,6 +626,120 @@ class Report extends Component
             'month' => $this->selectedMonth,
             'year' => $this->selectedYear,
         ]);
+    }
+
+    protected function loadTimesheetData()
+    {
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        // Get all submitted/locked OT entries for the selected period
+        $entries = MonthlyOTEntry::with('transactions')
+            ->where('entry_month', $selectedMonth)
+            ->where('entry_year', $selectedYear)
+            ->whereIn('status', ['submitted', 'locked'])
+            ->orderBy('contractor_clab_no')
+            ->orderBy('worker_name')
+            ->get();
+
+        // Get contractor information
+        $clabNos = $entries->pluck('contractor_clab_no')->unique()->toArray();
+        $contractors = User::whereIn('contractor_clab_no', $clabNos)
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        // Get worker salary information from PayrollWorker (if available)
+        $workerSalaries = PayrollWorker::whereHas('payrollSubmission', function ($q) use ($selectedMonth, $selectedYear) {
+            $q->where('month', $selectedMonth)
+                ->where('year', $selectedYear);
+        })
+            ->get()
+            ->keyBy('worker_id');
+
+        // Map entries with additional data
+        $this->timesheetData = $entries->map(function ($entry) use ($contractors, $workerSalaries) {
+            $contractor = $contractors[$entry->contractor_clab_no] ?? null;
+            $workerPayroll = $workerSalaries[$entry->worker_id] ?? null;
+
+            // Get allowance and advance from transactions
+            $allowance = 0;
+            $advanceSalary = 0;
+            foreach ($entry->transactions as $transaction) {
+                if ($transaction->type === 'allowance') {
+                    $allowance += $transaction->amount;
+                } elseif ($transaction->type === 'advance_payment') {
+                    $advanceSalary += $transaction->amount;
+                }
+            }
+
+            return [
+                'worker_id' => $entry->worker_id,
+                'worker_name' => $entry->worker_name,
+                'contractor_name' => $contractor ? $contractor->name : 'Unknown',
+                'contractor_state' => $contractor->state ?? '',
+                'salary' => $workerPayroll ? $workerPayroll->basic_salary : '',
+                'allowance' => $allowance,
+                'advance_salary' => $advanceSalary,
+                'ot_normal' => $entry->ot_normal_hours,
+                'ot_public' => $entry->ot_public_hours,
+                'status' => $entry->status,
+            ];
+        })->toArray();
+    }
+
+    public function exportTimesheetReport()
+    {
+        if (empty($this->timesheetData)) {
+            Flux::toast(variant: 'error', text: 'No data to export. Please generate the Timesheet Report first.');
+
+            return;
+        }
+
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        // Get all submitted/locked OT entries for the selected period
+        $entries = MonthlyOTEntry::with('transactions')
+            ->where('entry_month', $selectedMonth)
+            ->where('entry_year', $selectedYear)
+            ->whereIn('status', ['submitted', 'locked'])
+            ->orderBy('contractor_clab_no')
+            ->orderBy('worker_name')
+            ->get();
+
+        // Get contractor information
+        $clabNos = $entries->pluck('contractor_clab_no')->unique()->toArray();
+        $contractors = User::whereIn('contractor_clab_no', $clabNos)
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        // Get worker salary information from PayrollWorker (if available)
+        $workerSalaries = PayrollWorker::whereHas('payrollSubmission', function ($q) use ($selectedMonth, $selectedYear) {
+            $q->where('month', $selectedMonth)
+                ->where('year', $selectedYear);
+        })
+            ->get()
+            ->keyBy('worker_id');
+
+        // Add contractor name, state, and salary to entries
+        $entries = $entries->map(function ($entry) use ($contractors, $workerSalaries) {
+            $contractor = $contractors[$entry->contractor_clab_no] ?? null;
+            $workerPayroll = $workerSalaries[$entry->worker_id] ?? null;
+
+            $entry->contractor_name = $contractor ? $contractor->name : 'Unknown';
+            $entry->contractor_state = $contractor->state ?? '';
+            $entry->worker_salary = $workerPayroll ? $workerPayroll->basic_salary : '';
+
+            return $entry;
+        });
+
+        $period = \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('Y_m');
+        $filename = 'timesheet_report_'.$period.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(
+            new TimesheetExport($entries, ['month' => $selectedMonth, 'year' => $selectedYear]),
+            $filename
+        );
     }
 
     public function render()
