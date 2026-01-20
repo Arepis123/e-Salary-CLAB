@@ -35,6 +35,7 @@ class Worker extends Model
     protected $fillable = [
         'wkr_passno',
         'wkr_name',
+        'wkr_email',
         'wkr_dob',
         'wkr_wtrade',
         'wkr_salary',
@@ -190,6 +191,14 @@ class Worker extends Model
     public function getPhoneAttribute()
     {
         return $this->wkr_tel;
+    }
+
+    /**
+     * Accessor for email
+     */
+    public function getEmailAttribute()
+    {
+        return $this->wkr_email;
     }
 
     /**

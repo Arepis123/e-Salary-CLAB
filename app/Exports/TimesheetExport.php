@@ -69,11 +69,15 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'Location',
             'Department',
             'Salary',
+            'Amount this cycle',
             'Salary Type',
+            'Worked For (month/day/hour)',
             'General Allowance',
+            'BACKPAY',
             'ADVANCE SALARY',
+            'ACCOMODATION',
             'Normal',
-            'Rest',
+            'Rest Day',
             'Public holiday',
         ];
 
@@ -103,14 +107,18 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
 
         $row = [
             $entry->worker_id, // Employee ID
-            '', // Employee Email - blank
+            $entry->worker_email ?? '', // Employee Email from worker_db
             $entry->worker_name, // Employee Name
             $entry->contractor_state ?? '', // Location - contractor's state
             $entry->contractor_name ?? '', // Department - contractor name
             $entry->worker_salary ?? '', // Salary
+            '',
             'monthly', // Salary Type
+            '',
             $allowance > 0 ? $allowance : '', // General Allowance
+            '',
             $advanceSalary > 0 ? $advanceSalary : '', // ADVANCE SALARY
+            '',
             $entry->ot_normal_hours > 0 ? $entry->ot_normal_hours : '', // Normal OT
             $entry->ot_rest_hours > 0 ? $entry->ot_rest_hours : '', // Rest OT
             $entry->ot_public_hours > 0 ? $entry->ot_public_hours : '', // Public holiday OT
@@ -146,7 +154,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
     public function styles(Worksheet $sheet)
     {
         return [
-            1 => ['font' => ['bold' => true, 'size' => 11]],
+            1 => ['font' => ['bold' => false, 'size' => 11]],
         ];
     }
 
@@ -159,12 +167,15 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'D' => 20, // Location
             'E' => 30, // Department
             'F' => 15, // Salary
-            'G' => 15, // Salary Type
-            'H' => 18, // General Allowance
-            'I' => 18, // ADVANCE SALARY
-            'J' => 12, // Normal
-            'K' => 12, // Rest
-            'L' => 15, // Public holiday
+            'G' => 10, // Worked For (month/day/hour)
+            'H' => 15, // Salary Type
+            'I' => 18, // General Allowance
+            'J' => 10, // BACKPAY
+            'K' => 12, // ADVANCE SALARY
+            'L' => 10, // ACCOMODATION
+            'M' => 15, // Normal
+            'N' => 15, // Rest Day
+            'O' => 15, // Public holiday
         ];
 
         // Add column widths for deduction templates (starting from column M)

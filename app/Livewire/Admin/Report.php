@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Exports\OTTransactionExport;
 use App\Exports\PaymentSummaryExport;
 use App\Exports\PayrollSubmissionsExport;
 use App\Exports\TimesheetExport;
@@ -9,7 +10,6 @@ use App\Models\MonthlyOTEntry;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
-use App\Models\User;
 use Flux\Flux;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
@@ -49,6 +49,8 @@ class Report extends Component
     public $downloadCount = 0;
 
     public $timesheetData = [];
+
+    public $otTransactionData = [];
 
     public function updatedSelectAll($value)
     {
@@ -104,6 +106,7 @@ class Report extends Component
         $this->selectedInvoices = [];
         $this->selectAll = false;
         $this->timesheetData = [];
+        $this->otTransactionData = [];
     }
 
     protected function generateAvailableMonths()
@@ -391,6 +394,9 @@ class Report extends Component
             case 'timesheet':
                 $this->loadTimesheetData();
                 break;
+            case 'ot_transaction':
+                $this->loadOTTransactionData();
+                break;
             default: // All Reports
                 $this->loadStats();
                 $this->loadClientPayments();
@@ -633,28 +639,33 @@ class Report extends Component
         $selectedMonth = $this->selectedMonth ?? now()->month;
         $selectedYear = $this->selectedYear ?? now()->year;
 
-        // Get all submitted/locked OT entries for the selected period
-        $entries = MonthlyOTEntry::with('transactions')
-            ->where('entry_month', $selectedMonth)
-            ->where('entry_year', $selectedYear)
-            ->whereIn('status', ['submitted', 'locked'])
+        // Get all payroll submissions for the period with workers
+        $submissions = PayrollSubmission::where('month', $selectedMonth)
+            ->where('year', $selectedYear)
+            ->with(['user', 'workers'])
             ->orderBy('contractor_clab_no')
-            ->orderBy('worker_name')
             ->get();
 
-        // Get contractor information
-        $clabNos = $entries->pluck('contractor_clab_no')->unique()->toArray();
-        $contractors = User::whereIn('contractor_clab_no', $clabNos)
-            ->get()
-            ->keyBy('contractor_clab_no');
+        if ($submissions->isEmpty()) {
+            $this->timesheetData = [];
 
-        // Get worker salary information from PayrollWorker (if available)
-        $workerSalaries = PayrollWorker::whereHas('payrollSubmission', function ($q) use ($selectedMonth, $selectedYear) {
-            $q->where('month', $selectedMonth)
-                ->where('year', $selectedYear);
-        })
+            return;
+        }
+
+        // Get contractor information
+        $clabNos = $submissions->pluck('contractor_clab_no')->unique()->toArray();
+
+        // Get OT entries with transactions for this submission period (previous month's OT)
+        // e.g., for Jan 2026 payroll, get OT entries submitted in Jan 2026 (which are Dec 2025 OT)
+        $otEntries = MonthlyOTEntry::with('transactions')
+            ->where('submission_month', $selectedMonth)
+            ->where('submission_year', $selectedYear)
+            ->whereIn('contractor_clab_no', $clabNos)
+            ->whereIn('status', ['submitted', 'locked'])
             ->get()
-            ->keyBy('worker_id');
+            ->groupBy(function ($entry) {
+                return $entry->contractor_clab_no.'_'.$entry->worker_id;
+            });
 
         // Get all active deduction templates
         $deductionTemplates = \App\Models\DeductionTemplate::active()
@@ -668,76 +679,108 @@ class Report extends Component
             ->keyBy('contractor_clab_no');
 
         // Get worker deductions (for worker-level deductions)
-        $workerIds = $entries->pluck('worker_id')->unique()->toArray();
+        $workerIds = $submissions->flatMap(fn ($s) => $s->workers->pluck('worker_id'))->unique()->toArray();
         $workerDeductions = \App\Models\WorkerDeduction::whereIn('worker_id', $workerIds)
             ->with('deductionTemplate')
             ->get()
             ->groupBy('worker_id');
 
-        // Map entries with additional data
-        $this->timesheetData = $entries->map(function ($entry) use ($contractors, $workerSalaries, $deductionTemplates, $contractorConfigs, $workerDeductions) {
-            $contractor = $contractors[$entry->contractor_clab_no] ?? null;
-            $workerPayroll = $workerSalaries[$entry->worker_id] ?? null;
+        // Get worker emails from worker_db
+        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
+            ->pluck('wkr_email', 'wkr_id');
 
-            // Get allowance, advance, and client deduction from transactions
-            $allowance = 0;
-            $advanceSalary = 0;
-            $clientDeduction = 0;
-            foreach ($entry->transactions as $transaction) {
-                if ($transaction->type === 'allowance') {
-                    $allowance += $transaction->amount;
-                } elseif ($transaction->type === 'advance_payment') {
-                    $advanceSalary += $transaction->amount;
-                } elseif ($transaction->type === 'deduction') {
-                    $clientDeduction += $transaction->amount;
-                }
-            }
+        // Build timesheet data from payroll workers
+        $timesheetData = [];
 
-            // Get admin template deductions for this worker
-            $contractorConfig = $contractorConfigs[$entry->contractor_clab_no] ?? null;
+        foreach ($submissions as $submission) {
+            $contractor = $submission->user;
+            $contractorConfig = $contractorConfigs[$submission->contractor_clab_no] ?? null;
             $contractorDeductionIds = $contractorConfig
                 ? $contractorConfig->deductions->pluck('id')->toArray()
                 : [];
-            $workerDeductionsList = $workerDeductions[$entry->worker_id] ?? collect();
 
-            $templateDeductions = [];
-            foreach ($deductionTemplates as $template) {
-                $hasDeduction = false;
+            foreach ($submission->workers as $worker) {
+                // Get OT entry for this worker (from MonthlyOTEntry submitted this month)
+                $otKey = $submission->contractor_clab_no.'_'.$worker->worker_id;
+                $otEntry = $otEntries[$otKey]->first() ?? null;
 
-                if ($template->type === 'contractor') {
-                    // Contractor-level: check if contractor has this deduction enabled
-                    $hasDeduction = in_array($template->id, $contractorDeductionIds);
-                } else {
-                    // Worker-level: check if this specific worker has this deduction assigned
-                    $hasDeduction = $workerDeductionsList->contains(function ($deduction) use ($template) {
-                        return $deduction->deduction_template_id === $template->id;
-                    });
+                // Get allowance, advance, and client deduction from OT entry transactions
+                $allowance = 0;
+                $advanceSalary = 0;
+                $clientDeduction = 0;
+
+                if ($otEntry) {
+                    foreach ($otEntry->transactions as $transaction) {
+                        if ($transaction->type === 'allowance') {
+                            $allowance += $transaction->amount;
+                        } elseif ($transaction->type === 'advance_payment') {
+                            $advanceSalary += $transaction->amount;
+                        } elseif ($transaction->type === 'deduction') {
+                            $clientDeduction += $transaction->amount;
+                        }
+                    }
                 }
 
-                if ($hasDeduction) {
-                    $templateDeductions[] = [
-                        'name' => $template->name,
-                        'amount' => $template->amount,
-                    ];
+                // Get admin template deductions for this worker
+                $workerDeductionsList = $workerDeductions[$worker->worker_id] ?? collect();
+
+                $templateDeductions = [];
+                foreach ($deductionTemplates as $template) {
+                    $hasDeduction = false;
+
+                    if ($template->type === 'contractor') {
+                        // Contractor-level: check if contractor has this deduction enabled
+                        $hasDeduction = in_array($template->id, $contractorDeductionIds);
+                    } else {
+                        // Worker-level: check if this specific worker has this deduction assigned
+                        $hasDeduction = $workerDeductionsList->contains(function ($deduction) use ($template) {
+                            return $deduction->deduction_template_id === $template->id;
+                        });
+                    }
+
+                    if ($hasDeduction) {
+                        $templateDeductions[] = [
+                            'name' => $template->name,
+                            'amount' => $template->amount,
+                        ];
+                    }
                 }
+
+                // Use OT hours from MonthlyOTEntry if available, otherwise from PayrollWorker
+                $otNormal = $otEntry ? $otEntry->ot_normal_hours : $worker->ot_normal_hours;
+                $otRest = $otEntry ? $otEntry->ot_rest_hours : $worker->ot_rest_hours;
+                $otPublic = $otEntry ? $otEntry->ot_public_hours : $worker->ot_public_hours;
+
+                $timesheetData[] = [
+                    'worker_id' => $worker->worker_id,
+                    'worker_email' => $workerEmails[$worker->worker_id] ?? '',
+                    'worker_name' => $worker->worker_name,
+                    'contractor_name' => $contractor ? $contractor->name : 'Unknown',
+                    'contractor_state' => $contractor->state ?? '',
+                    'salary' => $worker->basic_salary,
+                    'allowance' => $allowance,
+                    'advance_salary' => $advanceSalary,
+                    'client_deduction' => $clientDeduction,
+                    'template_deductions' => $templateDeductions,
+                    'ot_normal' => $otNormal,
+                    'ot_rest' => $otRest,
+                    'ot_public' => $otPublic,
+                    'status' => $submission->status,
+                ];
+            }
+        }
+
+        // Sort by contractor name then worker name
+        usort($timesheetData, function ($a, $b) {
+            $contractorCompare = strcmp($a['contractor_name'], $b['contractor_name']);
+            if ($contractorCompare !== 0) {
+                return $contractorCompare;
             }
 
-            return [
-                'worker_id' => $entry->worker_id,
-                'worker_name' => $entry->worker_name,
-                'contractor_name' => $contractor ? $contractor->name : 'Unknown',
-                'contractor_state' => $contractor->state ?? '',
-                'salary' => $workerPayroll ? $workerPayroll->basic_salary : '',
-                'allowance' => $allowance,
-                'advance_salary' => $advanceSalary,
-                'client_deduction' => $clientDeduction,
-                'template_deductions' => $templateDeductions,
-                'ot_normal' => $entry->ot_normal_hours,
-                'ot_rest' => $entry->ot_rest_hours,
-                'ot_public' => $entry->ot_public_hours,
-                'status' => $entry->status,
-            ];
-        })->toArray();
+            return strcmp($a['worker_name'], $b['worker_name']);
+        });
+
+        $this->timesheetData = $timesheetData;
     }
 
     public function exportTimesheetReport()
@@ -751,7 +794,173 @@ class Report extends Component
         $selectedMonth = $this->selectedMonth ?? now()->month;
         $selectedYear = $this->selectedYear ?? now()->year;
 
-        // Get all submitted/locked OT entries for the selected period
+        // Get all payroll submissions for the period with workers
+        $submissions = PayrollSubmission::where('month', $selectedMonth)
+            ->where('year', $selectedYear)
+            ->with(['user', 'workers'])
+            ->orderBy('contractor_clab_no')
+            ->get();
+
+        // Get contractor information
+        $clabNos = $submissions->pluck('contractor_clab_no')->unique()->toArray();
+
+        // Get OT entries with transactions for this submission period (previous month's OT)
+        $otEntries = MonthlyOTEntry::with('transactions')
+            ->where('submission_month', $selectedMonth)
+            ->where('submission_year', $selectedYear)
+            ->whereIn('contractor_clab_no', $clabNos)
+            ->whereIn('status', ['submitted', 'locked'])
+            ->get()
+            ->groupBy(function ($entry) {
+                return $entry->contractor_clab_no.'_'.$entry->worker_id;
+            });
+
+        // Get worker emails from worker_db
+        $workerIds = $submissions->flatMap(fn ($s) => $s->workers->pluck('worker_id'))->unique()->toArray();
+        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
+            ->pluck('wkr_email', 'wkr_id');
+
+        // Build entries collection for export with all required data
+        $entries = collect();
+
+        foreach ($submissions as $submission) {
+            $contractor = $submission->user;
+
+            foreach ($submission->workers as $worker) {
+                // Get OT entry for this worker
+                $otKey = $submission->contractor_clab_no.'_'.$worker->worker_id;
+                $otEntry = $otEntries[$otKey]->first() ?? null;
+
+                // Use OT hours from MonthlyOTEntry if available, otherwise from PayrollWorker
+                $otNormal = $otEntry ? $otEntry->ot_normal_hours : $worker->ot_normal_hours;
+                $otRest = $otEntry ? $otEntry->ot_rest_hours : $worker->ot_rest_hours;
+                $otPublic = $otEntry ? $otEntry->ot_public_hours : $worker->ot_public_hours;
+
+                // Create an object with all required properties for TimesheetExport
+                $entry = (object) [
+                    'worker_id' => $worker->worker_id,
+                    'worker_email' => $workerEmails[$worker->worker_id] ?? '',
+                    'worker_name' => $worker->worker_name,
+                    'contractor_clab_no' => $submission->contractor_clab_no,
+                    'contractor_name' => $contractor ? $contractor->name : 'Unknown',
+                    'contractor_state' => $contractor->state ?? '',
+                    'worker_salary' => $worker->basic_salary,
+                    'ot_normal_hours' => $otNormal,
+                    'ot_rest_hours' => $otRest,
+                    'ot_public_hours' => $otPublic,
+                    'transactions' => $otEntry ? $otEntry->transactions : collect(),
+                ];
+
+                $entries->push($entry);
+            }
+        }
+
+        // Sort by contractor name then worker name
+        $entries = $entries->sortBy([
+            ['contractor_name', 'asc'],
+            ['worker_name', 'asc'],
+        ])->values();
+
+        $period = \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('Y_m');
+        $filename = 'timesheet_report_'.$period.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(
+            new TimesheetExport($entries, ['month' => $selectedMonth, 'year' => $selectedYear]),
+            $filename
+        );
+    }
+
+    protected function loadOTTransactionData()
+    {
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        // Get all OT entries for the selected period (with their transactions)
+        // This shows OT entries where entry_month/year matches the selected period
+        $entries = MonthlyOTEntry::with('transactions')
+            ->where('entry_month', $selectedMonth)
+            ->where('entry_year', $selectedYear)
+            ->whereIn('status', ['submitted', 'locked'])
+            ->orderBy('contractor_clab_no')
+            ->orderBy('worker_name')
+            ->get();
+
+        if ($entries->isEmpty()) {
+            $this->otTransactionData = [];
+
+            return;
+        }
+
+        // Get contractor information
+        $clabNos = $entries->pluck('contractor_clab_no')->unique()->toArray();
+        $contractors = \App\Models\User::whereIn('contractor_clab_no', $clabNos)
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        // Get worker emails from worker_db
+        $workerIds = $entries->pluck('worker_id')->unique()->toArray();
+        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
+            ->pluck('wkr_email', 'wkr_id');
+
+        // Get worker salary information from worker_db
+        $workerSalaries = \App\Models\Worker::whereIn('wkr_id', $workerIds)
+            ->pluck('wkr_salary', 'wkr_id');
+
+        // Map entries with additional data
+        $this->otTransactionData = $entries->map(function ($entry) use ($contractors, $workerEmails, $workerSalaries) {
+            $contractor = $contractors[$entry->contractor_clab_no] ?? null;
+
+            // Get allowance, advance, and deduction from transactions
+            $allowance = 0;
+            $advanceSalary = 0;
+            $deduction = 0;
+
+            foreach ($entry->transactions as $transaction) {
+                if ($transaction->type === 'allowance') {
+                    $allowance += $transaction->amount;
+                } elseif ($transaction->type === 'advance_payment') {
+                    $advanceSalary += $transaction->amount;
+                } elseif ($transaction->type === 'deduction') {
+                    $deduction += $transaction->amount;
+                }
+            }
+
+            return [
+                'id' => $entry->id,
+                'worker_id' => $entry->worker_id,
+                'worker_email' => $workerEmails[$entry->worker_id] ?? '',
+                'worker_name' => $entry->worker_name,
+                'contractor_clab_no' => $entry->contractor_clab_no,
+                'contractor_name' => $contractor ? $contractor->name : 'Unknown',
+                'contractor_state' => $contractor->state ?? '',
+                'salary' => $workerSalaries[$entry->worker_id] ?? '',
+                'entry_month' => $entry->entry_month,
+                'entry_year' => $entry->entry_year,
+                'entry_period' => $entry->entry_period,
+                'allowance' => $allowance,
+                'advance_salary' => $advanceSalary,
+                'deduction' => $deduction,
+                'ot_normal' => $entry->ot_normal_hours,
+                'ot_rest' => $entry->ot_rest_hours,
+                'ot_public' => $entry->ot_public_hours,
+                'status' => $entry->status,
+                'submitted_at' => $entry->submitted_at,
+            ];
+        })->toArray();
+    }
+
+    public function exportOTTransactionReport()
+    {
+        if (empty($this->otTransactionData)) {
+            Flux::toast(variant: 'error', text: 'No data to export. Please generate the OT & Transaction Report first.');
+
+            return;
+        }
+
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        // Get all OT entries for the selected period
         $entries = MonthlyOTEntry::with('transactions')
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
@@ -762,35 +971,34 @@ class Report extends Component
 
         // Get contractor information
         $clabNos = $entries->pluck('contractor_clab_no')->unique()->toArray();
-        $contractors = User::whereIn('contractor_clab_no', $clabNos)
+        $contractors = \App\Models\User::whereIn('contractor_clab_no', $clabNos)
             ->get()
             ->keyBy('contractor_clab_no');
 
-        // Get worker salary information from PayrollWorker (if available)
-        $workerSalaries = PayrollWorker::whereHas('payrollSubmission', function ($q) use ($selectedMonth, $selectedYear) {
-            $q->where('month', $selectedMonth)
-                ->where('year', $selectedYear);
-        })
+        // Get worker emails and salaries from worker_db
+        $workerIds = $entries->pluck('worker_id')->unique()->toArray();
+        $workers = \App\Models\Worker::whereIn('wkr_id', $workerIds)
             ->get()
-            ->keyBy('worker_id');
+            ->keyBy('wkr_id');
 
-        // Add contractor name, state, and salary to entries
-        $entries = $entries->map(function ($entry) use ($contractors, $workerSalaries) {
+        // Add contractor and worker info to entries
+        $entries = $entries->map(function ($entry) use ($contractors, $workers) {
             $contractor = $contractors[$entry->contractor_clab_no] ?? null;
-            $workerPayroll = $workerSalaries[$entry->worker_id] ?? null;
+            $worker = $workers[$entry->worker_id] ?? null;
 
             $entry->contractor_name = $contractor ? $contractor->name : 'Unknown';
             $entry->contractor_state = $contractor->state ?? '';
-            $entry->worker_salary = $workerPayroll ? $workerPayroll->basic_salary : '';
+            $entry->worker_email = $worker->wkr_email ?? '';
+            $entry->worker_salary = $worker->wkr_salary ?? '';
 
             return $entry;
         });
 
         $period = \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('Y_m');
-        $filename = 'timesheet_report_'.$period.'_'.now()->format('Ymd_His').'.xlsx';
+        $filename = 'ot_transaction_report_'.$period.'_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(
-            new TimesheetExport($entries, ['month' => $selectedMonth, 'year' => $selectedYear]),
+            new OTTransactionExport($entries, ['month' => $selectedMonth, 'year' => $selectedYear]),
             $filename
         );
     }
