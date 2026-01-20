@@ -2,6 +2,9 @@
 
 namespace App\Exports;
 
+use App\Models\ContractorConfiguration;
+use App\Models\DeductionTemplate;
+use App\Models\WorkerDeduction;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -16,10 +19,35 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
 
     protected $period;
 
+    protected $deductionTemplates;
+
+    protected $workerDeductions;
+
+    protected $contractorDeductions;
+
     public function __construct($entries, $period = null)
     {
         $this->entries = $entries;
         $this->period = $period;
+
+        // Get all active deduction templates (both contractor and worker level)
+        $this->deductionTemplates = DeductionTemplate::active()
+            ->orderBy('name')
+            ->get();
+
+        // Get all worker deductions for the workers in this export (for worker-level deductions)
+        $workerIds = $entries->pluck('worker_id')->unique()->toArray();
+        $this->workerDeductions = WorkerDeduction::whereIn('worker_id', $workerIds)
+            ->with('deductionTemplate')
+            ->get()
+            ->groupBy('worker_id');
+
+        // Get contractor deductions for all contractors in this export (for contractor-level deductions)
+        $clabNos = $entries->pluck('contractor_clab_no')->unique()->toArray();
+        $this->contractorDeductions = ContractorConfiguration::whereIn('contractor_clab_no', $clabNos)
+            ->with('deductions')
+            ->get()
+            ->keyBy('contractor_clab_no');
     }
 
     public function collection()
@@ -34,7 +62,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
 
     public function headings(): array
     {
-        return [
+        $headings = [
             'Employee ID',
             'Employee Email',
             'Employee Name',
@@ -45,8 +73,16 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'General Allowance',
             'ADVANCE SALARY',
             'Normal',
+            'Rest',
             'Public holiday',
         ];
+
+        // Add dynamic deduction columns based on template names
+        foreach ($this->deductionTemplates as $template) {
+            $headings[] = $template->name;
+        }
+
+        return $headings;
     }
 
     public function map($entry): array
@@ -65,7 +101,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             }
         }
 
-        return [
+        $row = [
             $entry->worker_id, // Employee ID
             '', // Employee Email - blank
             $entry->worker_name, // Employee Name
@@ -76,8 +112,35 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             $allowance > 0 ? $allowance : '', // General Allowance
             $advanceSalary > 0 ? $advanceSalary : '', // ADVANCE SALARY
             $entry->ot_normal_hours > 0 ? $entry->ot_normal_hours : '', // Normal OT
+            $entry->ot_rest_hours > 0 ? $entry->ot_rest_hours : '', // Rest OT
             $entry->ot_public_hours > 0 ? $entry->ot_public_hours : '', // Public holiday OT
         ];
+
+        // Add deduction values for each template
+        $workerDeductions = $this->workerDeductions[$entry->worker_id] ?? collect();
+        $contractorConfig = $this->contractorDeductions[$entry->contractor_clab_no] ?? null;
+        $contractorDeductionIds = $contractorConfig
+            ? $contractorConfig->deductions->pluck('id')->toArray()
+            : [];
+
+        foreach ($this->deductionTemplates as $template) {
+            $hasDeduction = false;
+
+            if ($template->type === 'contractor') {
+                // Contractor-level: check if contractor has this deduction enabled
+                $hasDeduction = in_array($template->id, $contractorDeductionIds);
+            } else {
+                // Worker-level: check if this specific worker has this deduction assigned
+                $hasDeduction = $workerDeductions->contains(function ($deduction) use ($template) {
+                    return $deduction->deduction_template_id === $template->id;
+                });
+            }
+
+            // If deduction applies, show the template amount
+            $row[] = $hasDeduction ? $template->amount : '';
+        }
+
+        return $row;
     }
 
     public function styles(Worksheet $sheet)
@@ -89,7 +152,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
 
     public function columnWidths(): array
     {
-        return [
+        $widths = [
             'A' => 15, // Employee ID
             'B' => 25, // Employee Email
             'C' => 30, // Employee Name
@@ -100,7 +163,32 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'H' => 18, // General Allowance
             'I' => 18, // ADVANCE SALARY
             'J' => 12, // Normal
-            'K' => 15, // Public holiday
+            'K' => 12, // Rest
+            'L' => 15, // Public holiday
         ];
+
+        // Add column widths for deduction templates (starting from column M)
+        $columnIndex = 12; // M = 13th column (0-indexed = 12)
+        foreach ($this->deductionTemplates as $template) {
+            $columnLetter = $this->getColumnLetter($columnIndex);
+            $widths[$columnLetter] = max(15, strlen($template->name) + 2);
+            $columnIndex++;
+        }
+
+        return $widths;
+    }
+
+    /**
+     * Convert column index to Excel column letter (0 = A, 1 = B, etc.)
+     */
+    protected function getColumnLetter(int $index): string
+    {
+        $letter = '';
+        while ($index >= 0) {
+            $letter = chr(($index % 26) + 65).$letter;
+            $index = intval($index / 26) - 1;
+        }
+
+        return $letter;
     }
 }

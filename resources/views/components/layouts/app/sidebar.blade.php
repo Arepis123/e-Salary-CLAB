@@ -52,7 +52,7 @@
                     <flux:sidebar.item icon="newspaper" :href="route('news')" :current="request()->routeIs('news')" wire:navigate>{{ __('News') }}</flux:sidebar.item>
                 @endif
 
-                @if(auth()->user()->isSuperAdmin() || auth()->user()->isFinance())
+                @if(auth()->user()->isSuperAdmin() || auth()->user()->isAdmin() || auth()->user()->isFinance())
                     <div class="px-3 py-2 mt-4 in-data-flux-sidebar-collapsed-desktop:hidden">
                         <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">{{ auth()->user()->isSuperAdmin() ? __('SUPER ADMIN') : __('REPORTS') }}</h3>
                     </div>

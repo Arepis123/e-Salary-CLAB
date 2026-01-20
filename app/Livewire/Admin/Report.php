@@ -656,19 +656,69 @@ class Report extends Component
             ->get()
             ->keyBy('worker_id');
 
+        // Get all active deduction templates
+        $deductionTemplates = \App\Models\DeductionTemplate::active()
+            ->orderBy('name')
+            ->get();
+
+        // Get contractor deductions (for contractor-level deductions)
+        $contractorConfigs = \App\Models\ContractorConfiguration::whereIn('contractor_clab_no', $clabNos)
+            ->with('deductions')
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        // Get worker deductions (for worker-level deductions)
+        $workerIds = $entries->pluck('worker_id')->unique()->toArray();
+        $workerDeductions = \App\Models\WorkerDeduction::whereIn('worker_id', $workerIds)
+            ->with('deductionTemplate')
+            ->get()
+            ->groupBy('worker_id');
+
         // Map entries with additional data
-        $this->timesheetData = $entries->map(function ($entry) use ($contractors, $workerSalaries) {
+        $this->timesheetData = $entries->map(function ($entry) use ($contractors, $workerSalaries, $deductionTemplates, $contractorConfigs, $workerDeductions) {
             $contractor = $contractors[$entry->contractor_clab_no] ?? null;
             $workerPayroll = $workerSalaries[$entry->worker_id] ?? null;
 
-            // Get allowance and advance from transactions
+            // Get allowance, advance, and client deduction from transactions
             $allowance = 0;
             $advanceSalary = 0;
+            $clientDeduction = 0;
             foreach ($entry->transactions as $transaction) {
                 if ($transaction->type === 'allowance') {
                     $allowance += $transaction->amount;
                 } elseif ($transaction->type === 'advance_payment') {
                     $advanceSalary += $transaction->amount;
+                } elseif ($transaction->type === 'deduction') {
+                    $clientDeduction += $transaction->amount;
+                }
+            }
+
+            // Get admin template deductions for this worker
+            $contractorConfig = $contractorConfigs[$entry->contractor_clab_no] ?? null;
+            $contractorDeductionIds = $contractorConfig
+                ? $contractorConfig->deductions->pluck('id')->toArray()
+                : [];
+            $workerDeductionsList = $workerDeductions[$entry->worker_id] ?? collect();
+
+            $templateDeductions = [];
+            foreach ($deductionTemplates as $template) {
+                $hasDeduction = false;
+
+                if ($template->type === 'contractor') {
+                    // Contractor-level: check if contractor has this deduction enabled
+                    $hasDeduction = in_array($template->id, $contractorDeductionIds);
+                } else {
+                    // Worker-level: check if this specific worker has this deduction assigned
+                    $hasDeduction = $workerDeductionsList->contains(function ($deduction) use ($template) {
+                        return $deduction->deduction_template_id === $template->id;
+                    });
+                }
+
+                if ($hasDeduction) {
+                    $templateDeductions[] = [
+                        'name' => $template->name,
+                        'amount' => $template->amount,
+                    ];
                 }
             }
 
@@ -680,7 +730,10 @@ class Report extends Component
                 'salary' => $workerPayroll ? $workerPayroll->basic_salary : '',
                 'allowance' => $allowance,
                 'advance_salary' => $advanceSalary,
+                'client_deduction' => $clientDeduction,
+                'template_deductions' => $templateDeductions,
                 'ot_normal' => $entry->ot_normal_hours,
+                'ot_rest' => $entry->ot_rest_hours,
                 'ot_public' => $entry->ot_public_hours,
                 'status' => $entry->status,
             ];

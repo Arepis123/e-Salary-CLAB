@@ -378,6 +378,14 @@
                 </div>
 
                 @if(count($timesheetData) > 0)
+                    @php
+                        // Get unique deduction template names from all entries
+                        $allTemplateNames = collect($timesheetData)
+                            ->flatMap(fn($e) => collect($e['template_deductions'])->pluck('name'))
+                            ->unique()
+                            ->sort()
+                            ->values();
+                    @endphp
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
@@ -386,10 +394,15 @@
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Employee Name</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Department</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Salary</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">General Allowance</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance Salary</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Allowance</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Client Deduction</th>
+                                    @foreach($allTemplateNames as $templateName)
+                                        <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ $templateName }}</th>
+                                    @endforeach
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Normal OT</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest OT</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Public OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
                                 </tr>
                             </thead>
@@ -413,23 +426,49 @@
                                                 -
                                             @endif
                                         </td>
-                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                        <td class="py-3 text-sm text-amber-600 dark:text-amber-400">
                                             @if($entry['advance_salary'] > 0)
                                                 RM {{ number_format($entry['advance_salary'], 2) }}
                                             @else
                                                 -
                                             @endif
                                         </td>
+                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                            @if($entry['client_deduction'] > 0)
+                                                RM {{ number_format($entry['client_deduction'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        @foreach($allTemplateNames as $templateName)
+                                            @php
+                                                $templateDeduction = collect($entry['template_deductions'])->firstWhere('name', $templateName);
+                                            @endphp
+                                            <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                                @if($templateDeduction)
+                                                    RM {{ number_format($templateDeduction['amount'], 2) }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                        @endforeach
                                         <td class="py-3 text-sm text-blue-600 dark:text-blue-400">
                                             @if($entry['ot_normal'] > 0)
-                                                {{ number_format($entry['ot_normal'], 1) }} hrs
+                                                {{ number_format($entry['ot_normal'], 1) }}h
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-purple-600 dark:text-purple-400">
+                                            @if($entry['ot_rest'] > 0)
+                                                {{ number_format($entry['ot_rest'], 1) }}h
                                             @else
                                                 -
                                             @endif
                                         </td>
                                         <td class="py-3 text-sm text-orange-600 dark:text-orange-400">
                                             @if($entry['ot_public'] > 0)
-                                                {{ number_format($entry['ot_public'], 1) }} hrs
+                                                {{ number_format($entry['ot_public'], 1) }}h
                                             @else
                                                 -
                                             @endif
@@ -445,13 +484,23 @@
                         </table>
                     </div>
 
-                    <div class="mt-4 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-zinc-600 dark:text-zinc-400">
                         <div>
                             Total: {{ count($timesheetData) }} {{ Str::plural('entry', count($timesheetData)) }}
                         </div>
-                        <div class="flex gap-4">
-                            <span>Total Allowances: RM {{ number_format(collect($timesheetData)->sum('allowance'), 2) }}</span>
-                            <span>Total Advances: RM {{ number_format(collect($timesheetData)->sum('advance_salary'), 2) }}</span>
+                        <div class="flex flex-wrap gap-4">
+                            <span>Allowances: RM {{ number_format(collect($timesheetData)->sum('allowance'), 2) }}</span>
+                            <span>Advances: RM {{ number_format(collect($timesheetData)->sum('advance_salary'), 2) }}</span>
+                            <span class="text-red-600 dark:text-red-400">Client Deductions: RM {{ number_format(collect($timesheetData)->sum('client_deduction'), 2) }}</span>
+                            @foreach($allTemplateNames as $templateName)
+                                @php
+                                    $templateTotal = collect($timesheetData)->sum(function($e) use ($templateName) {
+                                        $d = collect($e['template_deductions'])->firstWhere('name', $templateName);
+                                        return $d ? $d['amount'] : 0;
+                                    });
+                                @endphp
+                                <span class="text-red-600 dark:text-red-400">{{ $templateName }}: RM {{ number_format($templateTotal, 2) }}</span>
+                            @endforeach
                         </div>
                     </div>
                 @else
