@@ -706,7 +706,7 @@ class Report extends Component
             foreach ($submission->workers as $worker) {
                 // Get OT entry for this worker (from MonthlyOTEntry submitted this month)
                 $otKey = $submission->contractor_clab_no.'_'.$worker->worker_id;
-                $otEntry = $otEntries[$otKey]->first() ?? null;
+                $otEntry = isset($otEntries[$otKey]) ? $otEntries[$otKey]->first() : null;
 
                 // Get allowance, advance, and client deduction from OT entry transactions
                 $allowance = 0;
@@ -863,7 +863,7 @@ class Report extends Component
             foreach ($submission->workers as $worker) {
                 // Get OT entry for this worker
                 $otKey = $submission->contractor_clab_no.'_'.$worker->worker_id;
-                $otEntry = $otEntries[$otKey]->first() ?? null;
+                $otEntry = isset($otEntries[$otKey]) ? $otEntries[$otKey]->first() : null;
 
                 // Use OT hours from MonthlyOTEntry if available, otherwise from PayrollWorker
                 $otNormal = $otEntry ? $otEntry->ot_normal_hours : $worker->ot_normal_hours;
