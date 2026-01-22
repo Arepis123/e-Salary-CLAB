@@ -639,28 +639,40 @@ class Report extends Component
         $selectedMonth = $this->selectedMonth ?? now()->month;
         $selectedYear = $this->selectedYear ?? now()->year;
 
-        // Get all payroll submissions for the period with workers
-        $submissions = PayrollSubmission::where('month', $selectedMonth)
-            ->where('year', $selectedYear)
-            ->with(['user', 'workers'])
-            ->orderBy('contractor_clab_no')
+        // Get all contractors with active workers from ContractWorker
+        $allContractWorkers = \App\Models\ContractWorker::active()
+            ->with(['worker', 'contractor'])
+            ->orderBy('con_ctr_clab_no')
             ->get();
 
-        if ($submissions->isEmpty()) {
+        if ($allContractWorkers->isEmpty()) {
             $this->timesheetData = [];
 
             return;
         }
 
-        // Get contractor information
-        $clabNos = $submissions->pluck('contractor_clab_no')->unique()->toArray();
+        // Get unique contractor CLAB numbers
+        $allClabNos = $allContractWorkers->pluck('con_ctr_clab_no')->unique()->toArray();
 
-        // Get OT entries with transactions for this submission period (previous month's OT)
-        // e.g., for Jan 2026 payroll, get OT entries submitted in Jan 2026 (which are Dec 2025 OT)
+        // Get all payroll submissions for the period (to check who submitted)
+        $submissions = PayrollSubmission::where('month', $selectedMonth)
+            ->where('year', $selectedYear)
+            ->with(['user', 'workers'])
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        $submittedClabNos = $submissions->keys()->toArray();
+
+        // Get contractor users for contractor info
+        $contractors = \App\Models\User::whereIn('contractor_clab_no', $allClabNos)
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        // Get OT entries with transactions for this submission period
         $otEntries = MonthlyOTEntry::with('transactions')
             ->where('submission_month', $selectedMonth)
             ->where('submission_year', $selectedYear)
-            ->whereIn('contractor_clab_no', $clabNos)
+            ->whereIn('contractor_clab_no', $allClabNos)
             ->whereIn('status', ['submitted', 'locked'])
             ->get()
             ->groupBy(function ($entry) {
@@ -673,39 +685,71 @@ class Report extends Component
             ->get();
 
         // Get contractor deductions (for contractor-level deductions)
-        $contractorConfigs = \App\Models\ContractorConfiguration::whereIn('contractor_clab_no', $clabNos)
+        $contractorConfigs = \App\Models\ContractorConfiguration::whereIn('contractor_clab_no', $allClabNos)
             ->with('deductions')
             ->get()
             ->keyBy('contractor_clab_no');
 
+        // Get all worker IDs
+        $allWorkerIds = $allContractWorkers->pluck('con_wkr_id')->unique()->toArray();
+
         // Get worker deductions (for worker-level deductions)
-        $workerIds = $submissions->flatMap(fn ($s) => $s->workers->pluck('worker_id'))->unique()->toArray();
-        $workerDeductions = \App\Models\WorkerDeduction::whereIn('worker_id', $workerIds)
+        $workerDeductions = \App\Models\WorkerDeduction::whereIn('worker_id', $allWorkerIds)
             ->with('deductionTemplate')
             ->get()
             ->groupBy('worker_id');
 
         // Get worker emails from worker_db
-        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
+        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $allWorkerIds)
             ->pluck('wkr_email', 'wkr_id');
 
         // Get payroll period counts for workers (for period-based deductions)
         $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
         $workerPeriodCounts = [];
 
-        // Build timesheet data from payroll workers
+        // Build timesheet data
         $timesheetData = [];
 
-        foreach ($submissions as $submission) {
-            $contractor = $submission->user;
-            $contractorConfig = $contractorConfigs[$submission->contractor_clab_no] ?? null;
+        // Group contract workers by contractor
+        $workersByContractor = $allContractWorkers->groupBy('con_ctr_clab_no');
+
+        foreach ($workersByContractor as $clabNo => $contractWorkers) {
+            $contractor = $contractors[$clabNo] ?? null;
+            $submission = $submissions[$clabNo] ?? null;
+            $isSubmitted = $submission !== null;
+
+            $contractorConfig = $contractorConfigs[$clabNo] ?? null;
             $contractorDeductionIds = $contractorConfig
                 ? $contractorConfig->deductions->pluck('id')->toArray()
                 : [];
 
-            foreach ($submission->workers as $worker) {
-                // Get OT entry for this worker (from MonthlyOTEntry submitted this month)
-                $otKey = $submission->contractor_clab_no.'_'.$worker->worker_id;
+            // Get PayrollWorker data if submitted (keyed by worker_id)
+            $payrollWorkers = $isSubmitted
+                ? $submission->workers->keyBy('worker_id')
+                : collect();
+
+            // Get period counts for this contractor's workers
+            $contractorWorkerIds = $contractWorkers->pluck('con_wkr_id')->toArray();
+            if (! isset($workerPeriodCounts[$clabNo])) {
+                $workerPeriodCounts[$clabNo] = $workerDeductionService->getWorkersPayrollPeriodCounts(
+                    $contractorWorkerIds,
+                    $clabNo
+                );
+            }
+
+            foreach ($contractWorkers as $contractWorker) {
+                $worker = $contractWorker->worker;
+                if (! $worker) {
+                    continue;
+                }
+
+                $workerId = $worker->wkr_id;
+
+                // Get data from PayrollWorker if submitted, otherwise from Worker model
+                $payrollWorker = $payrollWorkers[$workerId] ?? null;
+
+                // Get OT entry for this worker
+                $otKey = $clabNo.'_'.$workerId;
                 $otEntry = isset($otEntries[$otKey]) ? $otEntries[$otKey]->first() : null;
 
                 // Get allowance, advance, and client deduction from OT entry transactions
@@ -726,36 +770,22 @@ class Report extends Component
                 }
 
                 // Get admin template deductions for this worker
-                $workerDeductionsList = $workerDeductions[$worker->worker_id] ?? collect();
-
-                // Get worker's payroll period count (cached by contractor)
-                $periodCacheKey = $submission->contractor_clab_no;
-                if (! isset($workerPeriodCounts[$periodCacheKey])) {
-                    $contractorWorkerIds = $submission->workers->pluck('worker_id')->toArray();
-                    $workerPeriodCounts[$periodCacheKey] = $workerDeductionService->getWorkersPayrollPeriodCounts(
-                        $contractorWorkerIds,
-                        $submission->contractor_clab_no
-                    );
-                }
-                $currentPeriod = $workerPeriodCounts[$periodCacheKey][$worker->worker_id] ?? 0;
+                $workerDeductionsList = $workerDeductions[$workerId] ?? collect();
+                $currentPeriod = $workerPeriodCounts[$clabNo][$workerId] ?? 0;
 
                 $templateDeductions = [];
                 foreach ($deductionTemplates as $template) {
                     $hasDeduction = false;
 
                     if ($template->type === 'contractor') {
-                        // Contractor-level: check if contractor has this deduction enabled
                         $hasDeduction = in_array($template->id, $contractorDeductionIds);
-                        // Also check period if deduction has period restrictions
                         if ($hasDeduction && ! empty($template->apply_periods)) {
                             $hasDeduction = $template->shouldApplyInPeriod($currentPeriod);
                         }
                     } else {
-                        // Worker-level: check if this specific worker has this deduction assigned
                         $hasDeduction = $workerDeductionsList->contains(function ($deduction) use ($template) {
                             return $deduction->deduction_template_id === $template->id;
                         });
-                        // Also check period if deduction has period restrictions
                         if ($hasDeduction && ! empty($template->apply_periods)) {
                             $hasDeduction = $template->shouldApplyInPeriod($currentPeriod);
                         }
@@ -769,18 +799,22 @@ class Report extends Component
                     }
                 }
 
-                // Use OT hours from MonthlyOTEntry if available, otherwise from PayrollWorker
-                $otNormal = $otEntry ? $otEntry->ot_normal_hours : $worker->ot_normal_hours;
-                $otRest = $otEntry ? $otEntry->ot_rest_hours : $worker->ot_rest_hours;
-                $otPublic = $otEntry ? $otEntry->ot_public_hours : $worker->ot_public_hours;
+                // Use PayrollWorker data if submitted, otherwise Worker data
+                $salary = $payrollWorker ? $payrollWorker->basic_salary : $worker->wkr_salary;
+                $otNormal = $payrollWorker ? $payrollWorker->ot_normal_hours : ($otEntry ? $otEntry->ot_normal_hours : 0);
+                $otRest = $payrollWorker ? $payrollWorker->ot_rest_hours : ($otEntry ? $otEntry->ot_rest_hours : 0);
+                $otPublic = $payrollWorker ? $payrollWorker->ot_public_hours : ($otEntry ? $otEntry->ot_public_hours : 0);
+
+                // Remarks: 'Submit' if contractor has submitted timesheet, 'Not Submit' otherwise
+                $remarks = $isSubmitted ? 'Submit' : 'Not Submit';
 
                 $timesheetData[] = [
-                    'worker_id' => $worker->worker_id,
-                    'worker_email' => $workerEmails[$worker->worker_id] ?? '',
-                    'worker_name' => $worker->worker_name,
+                    'worker_id' => $workerId,
+                    'worker_email' => $workerEmails[$workerId] ?? '',
+                    'worker_name' => $payrollWorker ? $payrollWorker->worker_name : $worker->wkr_name,
                     'contractor_name' => $contractor ? $contractor->name : 'Unknown',
                     'contractor_state' => $contractor->state ?? '',
-                    'salary' => $worker->basic_salary,
+                    'salary' => $salary,
                     'allowance' => $allowance,
                     'advance_salary' => $advanceSalary,
                     'client_deduction' => $clientDeduction,
@@ -788,7 +822,8 @@ class Report extends Component
                     'ot_normal' => $otNormal,
                     'ot_rest' => $otRest,
                     'ot_public' => $otPublic,
-                    'status' => $submission->status,
+                    'status' => $isSubmitted ? $submission->status : '-',
+                    'remarks' => $remarks,
                 ];
             }
         }
@@ -817,30 +852,43 @@ class Report extends Component
         $selectedMonth = $this->selectedMonth ?? now()->month;
         $selectedYear = $this->selectedYear ?? now()->year;
 
-        // Get all payroll submissions for the period with workers
+        // Get all contractors with active workers from ContractWorker
+        $allContractWorkers = \App\Models\ContractWorker::active()
+            ->with(['worker', 'contractor'])
+            ->orderBy('con_ctr_clab_no')
+            ->get();
+
+        // Get unique contractor CLAB numbers
+        $allClabNos = $allContractWorkers->pluck('con_ctr_clab_no')->unique()->toArray();
+
+        // Get all payroll submissions for the period (to check who submitted)
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
             ->with(['user', 'workers'])
-            ->orderBy('contractor_clab_no')
-            ->get();
+            ->get()
+            ->keyBy('contractor_clab_no');
 
-        // Get contractor information
-        $clabNos = $submissions->pluck('contractor_clab_no')->unique()->toArray();
+        // Get contractor users for contractor info
+        $contractors = \App\Models\User::whereIn('contractor_clab_no', $allClabNos)
+            ->get()
+            ->keyBy('contractor_clab_no');
 
-        // Get OT entries with transactions for this submission period (previous month's OT)
+        // Get OT entries with transactions for this submission period
         $otEntries = MonthlyOTEntry::with('transactions')
             ->where('submission_month', $selectedMonth)
             ->where('submission_year', $selectedYear)
-            ->whereIn('contractor_clab_no', $clabNos)
+            ->whereIn('contractor_clab_no', $allClabNos)
             ->whereIn('status', ['submitted', 'locked'])
             ->get()
             ->groupBy(function ($entry) {
                 return $entry->contractor_clab_no.'_'.$entry->worker_id;
             });
 
+        // Get all worker IDs
+        $allWorkerIds = $allContractWorkers->pluck('con_wkr_id')->unique()->toArray();
+
         // Get worker emails from worker_db
-        $workerIds = $submissions->flatMap(fn ($s) => $s->workers->pluck('worker_id'))->unique()->toArray();
-        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
+        $workerEmails = \App\Models\Worker::whereIn('wkr_id', $allWorkerIds)
             ->pluck('wkr_email', 'wkr_id');
 
         // Get payroll period counts for workers (for period-based deductions)
@@ -850,40 +898,65 @@ class Report extends Component
         // Build entries collection for export with all required data
         $entries = collect();
 
-        foreach ($submissions as $submission) {
-            $contractor = $submission->user;
+        // Group contract workers by contractor
+        $workersByContractor = $allContractWorkers->groupBy('con_ctr_clab_no');
 
-            // Get period counts for all workers in this submission
-            $contractorWorkerIds = $submission->workers->pluck('worker_id')->toArray();
-            $periodCounts = $workerDeductionService->getWorkersPayrollPeriodCounts(
-                $contractorWorkerIds,
-                $submission->contractor_clab_no
-            );
+        foreach ($workersByContractor as $clabNo => $contractWorkers) {
+            $contractor = $contractors[$clabNo] ?? null;
+            $submission = $submissions[$clabNo] ?? null;
+            $isSubmitted = $submission !== null;
 
-            foreach ($submission->workers as $worker) {
+            // Get PayrollWorker data if submitted (keyed by worker_id)
+            $payrollWorkers = $isSubmitted
+                ? $submission->workers->keyBy('worker_id')
+                : collect();
+
+            // Get period counts for this contractor's workers
+            $contractorWorkerIds = $contractWorkers->pluck('con_wkr_id')->toArray();
+            if (! isset($workerPeriodCounts[$clabNo])) {
+                $workerPeriodCounts[$clabNo] = $workerDeductionService->getWorkersPayrollPeriodCounts(
+                    $contractorWorkerIds,
+                    $clabNo
+                );
+            }
+
+            foreach ($contractWorkers as $contractWorker) {
+                $worker = $contractWorker->worker;
+                if (! $worker) {
+                    continue;
+                }
+
+                $workerId = $worker->wkr_id;
+                $payrollWorker = $payrollWorkers[$workerId] ?? null;
+
                 // Get OT entry for this worker
-                $otKey = $submission->contractor_clab_no.'_'.$worker->worker_id;
+                $otKey = $clabNo.'_'.$workerId;
                 $otEntry = isset($otEntries[$otKey]) ? $otEntries[$otKey]->first() : null;
 
-                // Use OT hours from MonthlyOTEntry if available, otherwise from PayrollWorker
-                $otNormal = $otEntry ? $otEntry->ot_normal_hours : $worker->ot_normal_hours;
-                $otRest = $otEntry ? $otEntry->ot_rest_hours : $worker->ot_rest_hours;
-                $otPublic = $otEntry ? $otEntry->ot_public_hours : $worker->ot_public_hours;
+                // Use PayrollWorker data if submitted, otherwise Worker data
+                $salary = $payrollWorker ? $payrollWorker->basic_salary : $worker->wkr_salary;
+                $otNormal = $payrollWorker ? $payrollWorker->ot_normal_hours : ($otEntry ? $otEntry->ot_normal_hours : 0);
+                $otRest = $payrollWorker ? $payrollWorker->ot_rest_hours : ($otEntry ? $otEntry->ot_rest_hours : 0);
+                $otPublic = $payrollWorker ? $payrollWorker->ot_public_hours : ($otEntry ? $otEntry->ot_public_hours : 0);
+
+                // Remarks: 'Submit' if contractor has submitted timesheet, 'Not Submit' otherwise
+                $remarks = $isSubmitted ? 'Submit' : 'Not Submit';
 
                 // Create an object with all required properties for TimesheetExport
                 $entry = (object) [
-                    'worker_id' => $worker->worker_id,
-                    'worker_email' => $workerEmails[$worker->worker_id] ?? '',
-                    'worker_name' => $worker->worker_name,
-                    'contractor_clab_no' => $submission->contractor_clab_no,
+                    'worker_id' => $workerId,
+                    'worker_email' => $workerEmails[$workerId] ?? '',
+                    'worker_name' => $payrollWorker ? $payrollWorker->worker_name : $worker->wkr_name,
+                    'contractor_clab_no' => $clabNo,
                     'contractor_name' => $contractor ? $contractor->name : 'Unknown',
                     'contractor_state' => $contractor->state ?? '',
-                    'worker_salary' => $worker->basic_salary,
-                    'period_count' => $periodCounts[$worker->worker_id] ?? 0,
+                    'worker_salary' => $salary,
+                    'period_count' => $workerPeriodCounts[$clabNo][$workerId] ?? 0,
                     'ot_normal_hours' => $otNormal,
                     'ot_rest_hours' => $otRest,
                     'ot_public_hours' => $otPublic,
                     'transactions' => $otEntry ? $otEntry->transactions : collect(),
+                    'remarks' => $remarks,
                 ];
 
                 $entries->push($entry);

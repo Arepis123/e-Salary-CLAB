@@ -527,6 +527,7 @@
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Public OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Remarks</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
@@ -599,6 +600,11 @@
                                         <td class="py-3">
                                             <flux:badge color="{{ $entry['status'] === 'locked' ? 'green' : 'blue' }}" size="sm">
                                                 {{ ucfirst($entry['status']) }}
+                                            </flux:badge>
+                                        </td>
+                                        <td class="py-3">
+                                            <flux:badge color="{{ ($entry['remarks'] ?? '') === 'Submit' ? 'green' : 'orange' }}" size="sm">
+                                                {{ $entry['remarks'] ?? 'Not Submit' }}
                                             </flux:badge>
                                         </td>
                                     </tr>

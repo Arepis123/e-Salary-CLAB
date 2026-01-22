@@ -86,6 +86,9 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             $headings[] = $template->name;
         }
 
+        // Add Remarks column at the end
+        $headings[] = 'Remarks';
+
         return $headings;
     }
 
@@ -158,6 +161,9 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             // If deduction applies, show the template amount
             $row[] = $hasDeduction ? $template->amount : '';
         }
+
+        // Add Remarks column
+        $row[] = $entry->remarks ?? '';
 
         return $row;
     }
