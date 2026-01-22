@@ -521,11 +521,8 @@ class TimesheetEdit extends Component
                 'workers.*.ot_public_hours' => 'nullable|numeric|min:0',
             ]);
 
-            // Additional validation: workers with active contracts must have minimum RM 1,700
+            // Additional validation for workers
             foreach ($this->workers as $index => $worker) {
-                if (! ($worker['contract_ended'] ?? false) && $worker['basic_salary'] < 1700) {
-                    throw new \Exception("Worker {$worker['worker_name']} must have a basic salary of at least RM 1,700.");
-                }
                 // Workers with ended contracts must have exactly RM 0 basic salary
                 if (($worker['contract_ended'] ?? false) && $worker['basic_salary'] != 0) {
                     throw new \Exception("Worker {$worker['worker_name']} has an ended contract and cannot receive basic salary.");

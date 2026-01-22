@@ -775,11 +775,8 @@ class Timesheet extends Component
                 'workers.*.ot_public_hours' => 'nullable|numeric|min:0',
             ]);
 
-            // Additional validation: workers with active contracts must have minimum RM 1,700
+            // Additional validation for workers
             foreach ($this->workers as $index => $worker) {
-                if (! ($worker['contract_ended'] ?? false) && $worker['basic_salary'] < 1700) {
-                    throw new \Exception("Worker {$worker['worker_name']} must have a basic salary of at least RM 1,700.");
-                }
                 // Workers with ended contracts must have exactly RM 0 basic salary
                 if (($worker['contract_ended'] ?? false) && $worker['basic_salary'] != 0) {
                     throw new \Exception("Worker {$worker['worker_name']} has an ended contract and cannot receive basic salary.");
@@ -1233,15 +1230,48 @@ class Timesheet extends Component
                 // Check if deduction applies this month
                 $willApplyThisMonth = $deduction->shouldApplyInMonth($month);
 
+                // For contractor-level deductions with apply_periods, check each worker's period
+                $workerIds = $remainingWorkers->pluck('wkr_id')->toArray();
+                $workerData = [];
+                $activeCount = 0;
+                $pendingCount = 0;
+
+                if (! empty($deduction->apply_periods)) {
+                    // Has period restrictions - check each worker individually
+                    foreach ($workerIds as $workerId) {
+                        $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo);
+                        $willApplyForWorker = $willApplyThisMonth && $deduction->shouldApplyInPeriod($currentPeriod);
+
+                        $workerData[$workerId] = [
+                            'current_period' => $currentPeriod,
+                            'will_apply' => $willApplyForWorker,
+                        ];
+
+                        if ($willApplyForWorker) {
+                            $activeCount++;
+                        } else {
+                            $pendingCount++;
+                        }
+                    }
+                } else {
+                    // No period restrictions - applies to all workers if month matches
+                    $activeCount = $willApplyThisMonth ? count($workerIds) : 0;
+                    $pendingCount = $willApplyThisMonth ? 0 : count($workerIds);
+                }
+
                 $this->applicableDeductions[] = [
                     'type' => 'contractor',
                     'template_id' => $deduction->id,
                     'name' => $deduction->name,
                     'amount' => $deduction->amount,
                     'description' => $deduction->description,
-                    'worker_count' => $remainingWorkers->count(),
-                    'worker_ids' => $remainingWorkers->pluck('wkr_id')->toArray(),
-                    'status' => $willApplyThisMonth ? 'active' : 'pending',
+                    'worker_count' => count($workerIds),
+                    'worker_ids' => $workerIds,
+                    'target_periods' => $deduction->apply_periods ?? [],
+                    'status' => $activeCount > 0 ? 'active' : 'pending',
+                    'active_worker_count' => $activeCount,
+                    'pending_worker_count' => $pendingCount,
+                    'worker_details' => $workerData,
                     'apply_months' => $deduction->apply_months ?? [],
                 ];
             }
@@ -1312,6 +1342,7 @@ class Timesheet extends Component
             if ($a['status'] !== 'active' && $b['status'] === 'active') {
                 return 1;
             }
+
             // If both have same status, sort by name alphabetically
             return strcmp($a['name'], $b['name']);
         });

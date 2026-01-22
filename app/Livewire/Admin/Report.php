@@ -689,6 +689,10 @@ class Report extends Component
         $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
             ->pluck('wkr_email', 'wkr_id');
 
+        // Get payroll period counts for workers (for period-based deductions)
+        $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
+        $workerPeriodCounts = [];
+
         // Build timesheet data from payroll workers
         $timesheetData = [];
 
@@ -724,6 +728,17 @@ class Report extends Component
                 // Get admin template deductions for this worker
                 $workerDeductionsList = $workerDeductions[$worker->worker_id] ?? collect();
 
+                // Get worker's payroll period count (cached by contractor)
+                $periodCacheKey = $submission->contractor_clab_no;
+                if (! isset($workerPeriodCounts[$periodCacheKey])) {
+                    $contractorWorkerIds = $submission->workers->pluck('worker_id')->toArray();
+                    $workerPeriodCounts[$periodCacheKey] = $workerDeductionService->getWorkersPayrollPeriodCounts(
+                        $contractorWorkerIds,
+                        $submission->contractor_clab_no
+                    );
+                }
+                $currentPeriod = $workerPeriodCounts[$periodCacheKey][$worker->worker_id] ?? 0;
+
                 $templateDeductions = [];
                 foreach ($deductionTemplates as $template) {
                     $hasDeduction = false;
@@ -731,11 +746,19 @@ class Report extends Component
                     if ($template->type === 'contractor') {
                         // Contractor-level: check if contractor has this deduction enabled
                         $hasDeduction = in_array($template->id, $contractorDeductionIds);
+                        // Also check period if deduction has period restrictions
+                        if ($hasDeduction && ! empty($template->apply_periods)) {
+                            $hasDeduction = $template->shouldApplyInPeriod($currentPeriod);
+                        }
                     } else {
                         // Worker-level: check if this specific worker has this deduction assigned
                         $hasDeduction = $workerDeductionsList->contains(function ($deduction) use ($template) {
                             return $deduction->deduction_template_id === $template->id;
                         });
+                        // Also check period if deduction has period restrictions
+                        if ($hasDeduction && ! empty($template->apply_periods)) {
+                            $hasDeduction = $template->shouldApplyInPeriod($currentPeriod);
+                        }
                     }
 
                     if ($hasDeduction) {
@@ -820,11 +843,22 @@ class Report extends Component
         $workerEmails = \App\Models\Worker::whereIn('wkr_id', $workerIds)
             ->pluck('wkr_email', 'wkr_id');
 
+        // Get payroll period counts for workers (for period-based deductions)
+        $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
+        $workerPeriodCounts = [];
+
         // Build entries collection for export with all required data
         $entries = collect();
 
         foreach ($submissions as $submission) {
             $contractor = $submission->user;
+
+            // Get period counts for all workers in this submission
+            $contractorWorkerIds = $submission->workers->pluck('worker_id')->toArray();
+            $periodCounts = $workerDeductionService->getWorkersPayrollPeriodCounts(
+                $contractorWorkerIds,
+                $submission->contractor_clab_no
+            );
 
             foreach ($submission->workers as $worker) {
                 // Get OT entry for this worker
@@ -845,6 +879,7 @@ class Report extends Component
                     'contractor_name' => $contractor ? $contractor->name : 'Unknown',
                     'contractor_state' => $contractor->state ?? '',
                     'worker_salary' => $worker->basic_salary,
+                    'period_count' => $periodCounts[$worker->worker_id] ?? 0,
                     'ot_normal_hours' => $otNormal,
                     'ot_rest_hours' => $otRest,
                     'ot_public_hours' => $otPublic,

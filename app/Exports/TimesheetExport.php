@@ -131,17 +131,28 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             ? $contractorConfig->deductions->pluck('id')->toArray()
             : [];
 
+        // Get worker's payroll period count for period-based deductions
+        $periodCount = $entry->period_count ?? 0;
+
         foreach ($this->deductionTemplates as $template) {
             $hasDeduction = false;
 
             if ($template->type === 'contractor') {
                 // Contractor-level: check if contractor has this deduction enabled
                 $hasDeduction = in_array($template->id, $contractorDeductionIds);
+                // Also check period if deduction has period restrictions
+                if ($hasDeduction && ! empty($template->apply_periods)) {
+                    $hasDeduction = $template->shouldApplyInPeriod($periodCount);
+                }
             } else {
                 // Worker-level: check if this specific worker has this deduction assigned
                 $hasDeduction = $workerDeductions->contains(function ($deduction) use ($template) {
                     return $deduction->deduction_template_id === $template->id;
                 });
+                // Also check period if deduction has period restrictions
+                if ($hasDeduction && ! empty($template->apply_periods)) {
+                    $hasDeduction = $template->shouldApplyInPeriod($periodCount);
+                }
             }
 
             // If deduction applies, show the template amount
