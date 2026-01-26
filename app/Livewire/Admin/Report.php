@@ -673,7 +673,7 @@ class Report extends Component
             ->where('submission_month', $selectedMonth)
             ->where('submission_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
-            ->whereIn('status', ['submitted', 'locked'])
+            ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->get()
             ->groupBy(function ($entry) {
                 return $entry->contractor_clab_no.'_'.$entry->worker_id;
@@ -878,7 +878,7 @@ class Report extends Component
             ->where('submission_month', $selectedMonth)
             ->where('submission_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
-            ->whereIn('status', ['submitted', 'locked'])
+            ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->get()
             ->groupBy(function ($entry) {
                 return $entry->contractor_clab_no.'_'.$entry->worker_id;
@@ -985,10 +985,11 @@ class Report extends Component
 
         // Get all OT entries for the selected period (with their transactions)
         // This shows OT entries where entry_month/year matches the selected period
+        // Include draft, submitted, and locked statuses
         $entries = MonthlyOTEntry::with('transactions')
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
-            ->whereIn('status', ['submitted', 'locked'])
+            ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->orderBy('contractor_clab_no')
             ->orderBy('worker_name')
             ->get();
@@ -1068,11 +1069,11 @@ class Report extends Component
         $selectedMonth = $this->selectedMonth ?? now()->month;
         $selectedYear = $this->selectedYear ?? now()->year;
 
-        // Get all OT entries for the selected period
+        // Get all OT entries for the selected period (include draft, submitted, locked)
         $entries = MonthlyOTEntry::with('transactions')
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
-            ->whereIn('status', ['submitted', 'locked'])
+            ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->orderBy('contractor_clab_no')
             ->orderBy('worker_name')
             ->get();
