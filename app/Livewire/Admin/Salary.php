@@ -25,6 +25,12 @@ class Salary extends Component
     #[Url(except: '')]
     public $search = '';
 
+    #[Url(except: '')]
+    public $yearFilter = '';
+
+    #[Url(except: '')]
+    public $monthFilter = '';
+
     #[Url(except: 1)]
     public $page = 1;
 
@@ -45,6 +51,11 @@ class Salary extends Component
 
     public function mount()
     {
+        // Set default year to current year if not set
+        if (empty($this->yearFilter)) {
+            $this->yearFilter = (string) now()->year;
+        }
+
         $this->loadStats();
         $this->loadContractors();
     }
@@ -133,12 +144,24 @@ class Salary extends Component
         $this->resetPage();
     }
 
+    public function updatingYearFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingMonthFilter()
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters()
     {
         $this->contractor = '';
         $this->statusFilter = '';
         $this->paymentStatusFilter = '';
         $this->search = '';
+        $this->yearFilter = (string) now()->year;
+        $this->monthFilter = '';
         $this->resetPage();
     }
 
@@ -211,6 +234,16 @@ class Salary extends Component
         // Apply contractor filter
         if ($this->contractor) {
             $query->where('contractor_clab_no', $this->contractor);
+        }
+
+        // Apply year filter
+        if ($this->yearFilter) {
+            $query->where('year', $this->yearFilter);
+        }
+
+        // Apply month filter
+        if ($this->monthFilter) {
+            $query->where('month', $this->monthFilter);
         }
 
         // Apply status filter

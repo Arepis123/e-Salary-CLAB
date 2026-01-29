@@ -483,6 +483,7 @@ class SalaryDetail extends Component
             // Note: HRDF is optional as some Excel formats don't have it
             $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
             $optionalColumns = ['HRDF'];
+            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation'];
             $columnIndices = [];
             $missingColumns = [];
 
@@ -503,11 +504,21 @@ class SalaryDetail extends Component
                 }
             }
 
-            // Check for optional columns
+            // Check for optional columns (additions)
             foreach ($optionalColumns as $optionalCol) {
                 foreach ($headers as $colIndex => $headerName) {
                     if (strcasecmp($headerName, $optionalCol) === 0) {
                         $columnIndices[$optionalCol] = $colIndex;
+                        // Don't break - take last occurrence
+                    }
+                }
+            }
+
+            // Check for optional deduction columns (subtractions)
+            foreach ($optionalDeductionColumns as $deductionCol) {
+                foreach ($headers as $colIndex => $headerName) {
+                    if (strcasecmp($headerName, $deductionCol) === 0) {
+                        $columnIndices[$deductionCol] = $colIndex;
                         // Don't break - take last occurrence
                     }
                 }
@@ -548,8 +559,21 @@ class SalaryDetail extends Component
                 }
             }
 
-            // Calculate total payroll amount
-            $totalAmount = array_sum($totals);
+            // Read optional deduction columns (use abs() since Excel values are negative)
+            $deductions = [];
+            foreach ($optionalDeductionColumns as $deductionCol) {
+                if (isset($columnIndices[$deductionCol])) {
+                    $value = $sheet->getCellByColumnAndRow($columnIndices[$deductionCol], $highestRow)->getCalculatedValue();
+                    $deductions[$deductionCol] = abs(floatval($value));
+                } else {
+                    $deductions[$deductionCol] = 0;
+                }
+            }
+
+            // Calculate total payroll amount (additions - deductions)
+            $totalAdditions = array_sum($totals);
+            $totalDeductions = array_sum($deductions);
+            $totalAmount = $totalAdditions - $totalDeductions;
 
             // Store breakdown for display
             $this->calculatedBreakdown = [
@@ -558,6 +582,8 @@ class SalaryDetail extends Component
                 'socso' => $totals['SOCSO'],
                 'eis' => $totals['EIS'],
                 'hrdf' => $totals['HRDF'],
+                'custom_advance_salary' => $deductions['Custom Advance Salary'],
+                'custom_accomodation' => $deductions['Custom Accomodation'],
                 'total' => $totalAmount,
             ];
 
@@ -1073,6 +1099,7 @@ class SalaryDetail extends Component
             // Note: HRDF is optional as some Excel formats don't have it
             $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
             $optionalColumns = ['HRDF'];
+            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation'];
             $columnIndices = [];
             $missingColumns = [];
 
@@ -1093,11 +1120,21 @@ class SalaryDetail extends Component
                 }
             }
 
-            // Check for optional columns
+            // Check for optional columns (additions)
             foreach ($optionalColumns as $optionalCol) {
                 foreach ($headers as $colIndex => $headerName) {
                     if (strcasecmp($headerName, $optionalCol) === 0) {
                         $columnIndices[$optionalCol] = $colIndex;
+                        // Don't break - take last occurrence
+                    }
+                }
+            }
+
+            // Check for optional deduction columns (subtractions)
+            foreach ($optionalDeductionColumns as $deductionCol) {
+                foreach ($headers as $colIndex => $headerName) {
+                    if (strcasecmp($headerName, $deductionCol) === 0) {
+                        $columnIndices[$deductionCol] = $colIndex;
                         // Don't break - take last occurrence
                     }
                 }
@@ -1138,8 +1175,21 @@ class SalaryDetail extends Component
                 }
             }
 
-            // Calculate total payroll amount
-            $totalAmount = array_sum($totals);
+            // Read optional deduction columns (use abs() since Excel values are negative)
+            $deductions = [];
+            foreach ($optionalDeductionColumns as $deductionCol) {
+                if (isset($columnIndices[$deductionCol])) {
+                    $value = $sheet->getCellByColumnAndRow($columnIndices[$deductionCol], $highestRow)->getCalculatedValue();
+                    $deductions[$deductionCol] = abs(floatval($value));
+                } else {
+                    $deductions[$deductionCol] = 0;
+                }
+            }
+
+            // Calculate total payroll amount (additions - deductions)
+            $totalAdditions = array_sum($totals);
+            $totalDeductions = array_sum($deductions);
+            $totalAmount = $totalAdditions - $totalDeductions;
 
             // Store breakdown for display
             $this->calculatedBreakdown = [
@@ -1148,6 +1198,8 @@ class SalaryDetail extends Component
                 'socso' => $totals['SOCSO'],
                 'eis' => $totals['EIS'],
                 'hrdf' => $totals['HRDF'],
+                'custom_advance_salary' => $deductions['Custom Advance Salary'],
+                'custom_accomodation' => $deductions['Custom Accomodation'],
                 'total' => $totalAmount,
             ];
 

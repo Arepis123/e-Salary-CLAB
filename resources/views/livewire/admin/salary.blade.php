@@ -67,7 +67,7 @@
         <!-- Filters and Search -->
         @if($showFilters)
         <div class="mb-6" x-data x-transition>
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
                 <div>
                     <flux:input
                         wire:model.live="search"
@@ -77,10 +77,26 @@
                     />
                 </div>
                 <div>
-                    <flux:select wire:model.live="contractor" variant="listbox" placeholder="Filter by Contractor" size="sm">
+                    <flux:select wire:model.live="contractor" variant="listbox" searchable placeholder="Filter by Contractor" size="sm">
                         <flux:select.option value="">All Contractors</flux:select.option>
                         @foreach($contractors as $clabNo => $name)
                             <flux:select.option value="{{ $clabNo }}">{{ $name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+                <div>
+                    <flux:select wire:model.live="yearFilter" variant="listbox" placeholder="Filter by Year" size="sm">
+                        <flux:select.option value="">All Years</flux:select.option>
+                        @for($y = now()->year; $y >= 2024; $y--)
+                            <flux:select.option value="{{ $y }}">{{ $y }}</flux:select.option>
+                        @endfor
+                    </flux:select>
+                </div>
+                <div>
+                    <flux:select wire:model.live="monthFilter" variant="listbox" placeholder="Filter by Month" size="sm">
+                        <flux:select.option value="">All Months</flux:select.option>
+                        @foreach(range(1, 12) as $m)
+                            <flux:select.option value="{{ $m }}">{{ date('F', mktime(0, 0, 0, $m, 1)) }}</flux:select.option>
                         @endforeach
                     </flux:select>
                 </div>

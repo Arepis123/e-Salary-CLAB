@@ -504,6 +504,18 @@
                             <span class="text-green-700 dark:text-green-300">HRDF:</span>
                             <span class="font-medium text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['hrdf'], 2) }}</span>
                         </div>
+                        @if(isset($calculatedBreakdown['custom_advance_salary']) && $calculatedBreakdown['custom_advance_salary'] > 0)
+                        <div class="flex justify-between">
+                            <span class="text-red-600 dark:text-red-400">Custom Advance Salary:</span>
+                            <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_advance_salary'], 2) }}</span>
+                        </div>
+                        @endif
+                        @if(isset($calculatedBreakdown['custom_accomodation']) && $calculatedBreakdown['custom_accomodation'] > 0)
+                        <div class="flex justify-between">
+                            <span class="text-red-600 dark:text-red-400">Custom Accomodation:</span>
+                            <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_accomodation'], 2) }}</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between border-t border-green-300 dark:border-green-600 pt-1">
                             <span class="font-bold text-green-900 dark:text-green-100">Total Payroll:</span>
                             <span class="font-bold text-lg text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['total'], 2) }}</span>
@@ -625,6 +637,18 @@
                             <span class="text-green-700 dark:text-green-300">HRDF:</span>
                             <span class="font-medium text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['hrdf'], 2) }}</span>
                         </div>
+                        @if(isset($calculatedBreakdown['custom_advance_salary']) && $calculatedBreakdown['custom_advance_salary'] > 0)
+                        <div class="flex justify-between">
+                            <span class="text-red-600 dark:text-red-400">Custom Advance Salary:</span>
+                            <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_advance_salary'], 2) }}</span>
+                        </div>
+                        @endif
+                        @if(isset($calculatedBreakdown['custom_accomodation']) && $calculatedBreakdown['custom_accomodation'] > 0)
+                        <div class="flex justify-between">
+                            <span class="text-red-600 dark:text-red-400">Custom Accomodation:</span>
+                            <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_accomodation'], 2) }}</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between border-t border-green-300 dark:border-green-600 pt-1">
                             <span class="font-bold text-green-900 dark:text-green-100">Total Payroll:</span>
                             <span class="font-bold text-lg text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['total'], 2) }}</span>
