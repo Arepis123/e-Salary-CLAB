@@ -14,9 +14,31 @@ class WorkerDetailsSheet implements FromCollection, WithColumnWidths, WithHeadin
 {
     protected $workers;
 
+    protected $contractorNames = [];
+
     public function __construct($workers)
     {
         $this->workers = $workers;
+
+        // Preload contractor names to avoid N+1 queries
+        $clabNos = collect($workers)->map(function ($worker) {
+            if (is_object($worker)) {
+                $contract = $worker->contract_info ?? $worker->activeContract ?? null;
+                if ($contract && isset($contract->con_ctr_clab_no)) {
+                    return $contract->con_ctr_clab_no;
+                }
+
+                return $worker->wkr_currentemp ?? null;
+            }
+
+            return null;
+        })->filter()->unique()->values()->toArray();
+
+        if (! empty($clabNos)) {
+            $this->contractorNames = \App\Models\User::whereIn('contractor_clab_no', $clabNos)
+                ->pluck('name', 'contractor_clab_no')
+                ->toArray();
+        }
     }
 
     public function collection()
@@ -36,6 +58,7 @@ class WorkerDetailsSheet implements FromCollection, WithColumnWidths, WithHeadin
             'Name',
             'Passport Number',
             'CLAB ID',
+            'Contractor Name',
             'Passport Expiry',
             'Permit Expiry',
             'Nationality',
@@ -75,11 +98,18 @@ class WorkerDetailsSheet implements FromCollection, WithColumnWidths, WithHeadin
             $clabId = $worker->wkr_currentemp ?? '-';
         }
 
+        // Get Contractor Name from preloaded data
+        $contractorName = '-';
+        if ($clabId !== '-' && isset($this->contractorNames[$clabId])) {
+            $contractorName = $this->contractorNames[$clabId];
+        }
+
         return [
             is_object($worker) ? $worker->wkr_id : ($worker['wkr_id'] ?? '-'),
             is_object($worker) ? $worker->name : ($worker['name'] ?? '-'),
             is_object($worker) ? $worker->ic_number : ($worker['ic_number'] ?? '-'),
             $clabId,
+            $contractorName,
             is_object($worker) && $worker->wkr_passexp ? $worker->wkr_passexp->format('Y-m-d') : '-',
             is_object($worker) && $worker->wkr_permitexp ? $worker->wkr_permitexp->format('Y-m-d') : '-',
             is_object($worker) && $worker->country ? $worker->country->cty_desc : '-',
@@ -116,16 +146,17 @@ class WorkerDetailsSheet implements FromCollection, WithColumnWidths, WithHeadin
             'B' => 25, // Name
             'C' => 20, // Passport Number
             'D' => 18, // CLAB ID
-            'E' => 18, // Passport Expiry
-            'F' => 18, // Permit Expiry
-            'G' => 20, // Nationality
-            'H' => 25, // Position/Trade
-            'I' => 12, // Gender
-            'J' => 18, // Phone
-            'K' => 18, // Basic Salary
-            'L' => 18, // Contract Start
-            'M' => 18, // Contract End
-            'N' => 18, // Contract Status
+            'E' => 30, // Contractor Name
+            'F' => 18, // Passport Expiry
+            'G' => 18, // Permit Expiry
+            'H' => 20, // Nationality
+            'I' => 25, // Position/Trade
+            'J' => 12, // Gender
+            'K' => 18, // Phone
+            'L' => 18, // Basic Salary
+            'M' => 18, // Contract Start
+            'N' => 18, // Contract End
+            'O' => 18, // Contract Status
         ];
     }
 }

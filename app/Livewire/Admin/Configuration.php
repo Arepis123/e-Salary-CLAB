@@ -844,6 +844,143 @@ class Configuration extends Component
         }
     }
 
+    public function fixMissingReceipts()
+    {
+        // Check if user is super admin
+        if (! auth()->user()->isSuperAdmin()) {
+            Flux::toast(variant: 'danger', text: 'Unauthorized access.');
+
+            return;
+        }
+
+        try {
+            // Find all paid submissions to check for missing data
+            $submissions = \App\Models\PayrollSubmission::where('status', 'paid')
+                ->with(['payments' => function ($q) {
+                    $q->where('status', 'completed');
+                }])
+                ->get();
+
+            if ($submissions->isEmpty()) {
+                Flux::toast(
+                    variant: 'info',
+                    heading: 'No Paid Submissions',
+                    text: 'There are no paid submissions to check.'
+                );
+
+                return;
+            }
+
+            $fixedReceipts = 0;
+            $fixedDates = 0;
+            $fixedTransactions = 0;
+
+            foreach ($submissions as $submission) {
+                $changes = [];
+
+                // Fix missing tax invoice number
+                if (! $submission->tax_invoice_number) {
+                    $submission->generateTaxInvoiceNumber();
+                    $fixedReceipts++;
+                    $changes[] = 'tax_invoice_number';
+                }
+
+                // Fix missing paid_at date from payment record
+                $completedPayment = $submission->payments->first();
+                if (! $submission->paid_at && $completedPayment) {
+                    $paidAt = $completedPayment->completed_at;
+
+                    // Try to get paid_at from payment_response if completed_at is null
+                    if (! $paidAt && $completedPayment->payment_response) {
+                        // Handle both array (already cast) and string (JSON) formats
+                        $response = is_array($completedPayment->payment_response)
+                            ? $completedPayment->payment_response
+                            : json_decode($completedPayment->payment_response, true);
+                        if (isset($response['paid_at'])) {
+                            $paidAt = $response['paid_at'];
+                        }
+                    }
+
+                    if ($paidAt) {
+                        $submission->update(['paid_at' => $paidAt]);
+                        $fixedDates++;
+                        $changes[] = 'paid_at';
+                    }
+                }
+
+                // Fix missing transaction_id on payment record
+                if ($completedPayment && ! $completedPayment->transaction_id) {
+                    // Try to get transaction_id from payment_response
+                    if ($completedPayment->payment_response) {
+                        // Handle both array (already cast) and string (JSON) formats
+                        $response = is_array($completedPayment->payment_response)
+                            ? $completedPayment->payment_response
+                            : json_decode($completedPayment->payment_response, true);
+                        if (isset($response['id'])) {
+                            $completedPayment->update(['transaction_id' => $response['id']]);
+                            $fixedTransactions++;
+                            $changes[] = 'transaction_id';
+                        }
+                    }
+                    // If still no transaction_id, use billplz_bill_id
+                    if (! $completedPayment->transaction_id && $completedPayment->billplz_bill_id) {
+                        $completedPayment->update(['transaction_id' => $completedPayment->billplz_bill_id]);
+                        $fixedTransactions++;
+                        $changes[] = 'transaction_id';
+                    }
+                }
+
+                if (! empty($changes)) {
+                    \Log::info('Fixed missing submission data', [
+                        'submission_id' => $submission->id,
+                        'fixed_fields' => $changes,
+                        'tax_invoice_number' => $submission->tax_invoice_number,
+                        'paid_at' => $submission->paid_at,
+                        'fixed_by' => auth()->user()->name,
+                    ]);
+                }
+            }
+
+            $messages = [];
+            if ($fixedReceipts > 0) {
+                $messages[] = "{$fixedReceipts} receipt number(s)";
+            }
+            if ($fixedDates > 0) {
+                $messages[] = "{$fixedDates} paid date(s)";
+            }
+            if ($fixedTransactions > 0) {
+                $messages[] = "{$fixedTransactions} transaction ID(s)";
+            }
+
+            if (empty($messages)) {
+                Flux::toast(
+                    variant: 'info',
+                    heading: 'All Data Complete',
+                    text: 'All paid submissions already have complete data.'
+                );
+
+                return;
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Data Fixed',
+                text: 'Generated: '.implode(', ', $messages)
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Fix Failed',
+                text: 'Failed to fix missing data: '.$e->getMessage()
+            );
+
+            \Log::error('Failed to fix missing receipts', [
+                'error' => $e->getMessage(),
+                'fixed_by' => auth()->user()->name,
+            ]);
+        }
+    }
+
     public function syncAllPendingPayments()
     {
         // Check if user is super admin
@@ -901,9 +1038,11 @@ class Configuration extends Component
                         // Update payment status in a transaction
                         DB::beginTransaction();
 
+                        $paidAt = $bill['paid_at'] ?? now();
+
                         $payment->update([
                             'status' => 'completed',
-                            'completed_at' => $bill['paid_at'] ?? now(),
+                            'completed_at' => $paidAt,
                             'payment_response' => json_encode($bill),
                             'transaction_id' => $bill['id'],
                         ]);
@@ -912,8 +1051,13 @@ class Configuration extends Component
                         $submission = $payment->payrollSubmission;
                         $submission->update([
                             'status' => 'paid',
-                            'paid_at' => $bill['paid_at'] ?? now(),
+                            'paid_at' => $paidAt,
                         ]);
+
+                        // Generate tax invoice number (receipt number)
+                        if (! $submission->hasTaxInvoice()) {
+                            $submission->generateTaxInvoiceNumber();
+                        }
 
                         DB::commit();
 

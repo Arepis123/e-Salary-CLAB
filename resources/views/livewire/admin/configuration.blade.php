@@ -8,15 +8,25 @@
             </p>
         </div>
 
-        <!-- Payment Sync Button -->
-        <div>
+        <!-- Payment Sync & Fix Buttons -->
+        <div class="flex gap-2">
+            <flux:button
+                wire:click="fixMissingReceipts"
+                variant="filled"
+                icon="document-check"
+                wire:loading.attr="disabled"
+                wire:target="fixMissingReceipts"
+            >
+                <span wire:loading.remove wire:target="fixMissingReceipts">Fix Missing Receipts</span>
+                <span wire:loading wire:target="fixMissingReceipts">Fixing...</span>
+            </flux:button>
             <flux:button
                 wire:click="syncAllPendingPayments"
                 variant="primary"
                 :disabled="$isSyncingPayments"
                 icon="arrow-path"
                 class="{{ $isSyncingPayments ? 'animate-spin' : '' }}"
-            >                
+            >
                 {{ $isSyncingPayments ? 'Syncing...' : 'Sync Pending Payments' }}
             </flux:button>
         </div>

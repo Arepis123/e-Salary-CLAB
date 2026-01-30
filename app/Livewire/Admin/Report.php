@@ -52,6 +52,8 @@ class Report extends Component
 
     public $otTransactionData = [];
 
+    public $paidPayrollData = [];
+
     public function updatedSelectAll($value)
     {
         if ($value) {
@@ -107,6 +109,7 @@ class Report extends Component
         $this->selectAll = false;
         $this->timesheetData = [];
         $this->otTransactionData = [];
+        $this->paidPayrollData = [];
     }
 
     protected function generateAvailableMonths()
@@ -396,6 +399,9 @@ class Report extends Component
                 break;
             case 'ot_transaction':
                 $this->loadOTTransactionData();
+                break;
+            case 'paid_payroll':
+                $this->loadPaidPayrollData();
                 break;
             default: // All Reports
                 $this->loadStats();
@@ -1108,6 +1114,119 @@ class Report extends Component
 
         return Excel::download(
             new OTTransactionExport($entries, ['month' => $selectedMonth, 'year' => $selectedYear]),
+            $filename
+        );
+    }
+
+    protected function loadPaidPayrollData()
+    {
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        // Get all paid submissions for the selected period with workers
+        $submissions = PayrollSubmission::where('month', $selectedMonth)
+            ->where('year', $selectedYear)
+            ->where('status', 'paid')
+            ->with(['user', 'workers', 'payment', 'payments'])
+            ->orderBy('contractor_clab_no')
+            ->get();
+
+        if ($submissions->isEmpty()) {
+            $this->paidPayrollData = [];
+
+            return;
+        }
+
+        // Build paid payroll data grouped by contractor
+        $this->paidPayrollData = $submissions->map(function ($submission) {
+            $contractor = $submission->user;
+
+            // Calculate totals
+            $totalBasicSalary = $submission->workers->sum('basic_salary');
+            $totalOTPay = $submission->workers->sum('total_ot_pay');
+            $totalDeductions = $submission->workers->sum('total_deductions');
+            $totalNetSalary = $submission->workers->sum('net_salary');
+
+            return [
+                'submission_id' => $submission->id,
+                'contractor_clab_no' => $submission->contractor_clab_no,
+                'contractor_name' => $contractor ? $contractor->name : 'Unknown',
+                'contractor_email' => $contractor ? $contractor->email : '',
+                'total_workers' => $submission->workers->count(),
+                'total_basic_salary' => $totalBasicSalary,
+                'total_ot_pay' => $totalOTPay,
+                'total_deductions' => $totalDeductions,
+                'total_net_salary' => $totalNetSalary,
+                'admin_final_amount' => $submission->admin_final_amount ?? 0,
+                'service_charge' => $submission->service_charge ?? 0,
+                'sst' => $submission->sst ?? 0,
+                'penalty' => $submission->penalty_amount ?? 0,
+                'total_paid' => $submission->total_due ?? ($submission->admin_final_amount + $submission->service_charge + $submission->sst + ($submission->penalty_amount ?? 0)),
+                'tax_invoice_number' => $submission->tax_invoice_number,
+                'paid_at' => $submission->paid_at,
+                'transaction_id' => $this->getTransactionId($submission),
+                'workers' => $submission->workers->map(function ($worker) {
+                    return [
+                        'worker_id' => $worker->worker_id,
+                        'worker_name' => $worker->worker_name,
+                        'worker_passport' => $worker->worker_passport,
+                        'basic_salary' => $worker->basic_salary,
+                        'ot_normal_hours' => $worker->ot_normal_hours,
+                        'ot_rest_hours' => $worker->ot_rest_hours,
+                        'ot_public_hours' => $worker->ot_public_hours,
+                        'total_ot_pay' => $worker->total_ot_pay,
+                        'gross_salary' => $worker->gross_salary,
+                        'total_deductions' => $worker->total_deductions,
+                        'net_salary' => $worker->net_salary,
+                    ];
+                })->toArray(),
+            ];
+        })->toArray();
+    }
+
+    protected function getTransactionId($submission)
+    {
+        // First try to get from completed payment in payments collection
+        if ($submission->payments && $submission->payments->count() > 0) {
+            $completedPayment = $submission->payments->firstWhere('status', 'completed');
+            if ($completedPayment && $completedPayment->transaction_id) {
+                return $completedPayment->transaction_id;
+            }
+            // Fallback to billplz_bill_id if transaction_id is not set
+            if ($completedPayment && $completedPayment->billplz_bill_id) {
+                return $completedPayment->billplz_bill_id;
+            }
+        }
+
+        // Fallback to single payment relationship
+        if ($submission->payment) {
+            if ($submission->payment->transaction_id) {
+                return $submission->payment->transaction_id;
+            }
+            if ($submission->payment->billplz_bill_id) {
+                return $submission->payment->billplz_bill_id;
+            }
+        }
+
+        return null;
+    }
+
+    public function exportPaidPayrollReport()
+    {
+        if (empty($this->paidPayrollData)) {
+            Flux::toast(variant: 'error', text: 'No data to export. Please generate the Paid Payroll Report first.');
+
+            return;
+        }
+
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        $period = \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('Y_m');
+        $filename = 'paid_payroll_report_'.$period.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(
+            new \App\Exports\PaidPayrollExport($this->paidPayrollData, ['month' => $selectedMonth, 'year' => $selectedYear]),
             $filename
         );
     }
