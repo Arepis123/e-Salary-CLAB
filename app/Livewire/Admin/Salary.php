@@ -49,6 +49,11 @@ class Salary extends Component
 
     public $selectedSubmission = null;
 
+    // Loading states for lazy loading
+    public $isLoadingStats = true;
+
+    public $isLoadingTable = true;
+
     public function mount()
     {
         // Set default year to current year if not set
@@ -56,8 +61,26 @@ class Salary extends Component
             $this->yearFilter = (string) now()->year;
         }
 
-        $this->loadStats();
+        // Initialize with empty stats for fast initial render
+        $this->stats = [
+            'total_submissions' => 0,
+            'grand_total' => 0,
+            'completed' => 0,
+            'pending' => 0,
+        ];
+
+        // Load contractors immediately (now fast since it queries Users table directly)
         $this->loadContractors();
+    }
+
+    /**
+     * Load initial data - called via wire:init for fast initial render
+     */
+    public function loadInitialData()
+    {
+        $this->loadStats();
+        $this->isLoadingStats = false;
+        $this->isLoadingTable = false;
     }
 
     public function toggleFilters()
@@ -206,20 +229,17 @@ class Salary extends Component
 
     protected function loadContractors()
     {
-        // Get unique contractors from submissions
-        $this->contractors = PayrollSubmission::with('user')
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->unique('id')
-            ->sortBy('name')
+        // Get contractors directly from Users table (much faster than loading all submissions)
+        $this->contractors = \App\Models\User::where('role', 'client')
+            ->whereNotNull('contractor_clab_no')
+            ->orderBy('name')
             ->pluck('name', 'contractor_clab_no')
             ->toArray();
     }
 
-    protected function getSubmissions()
+    protected function getSubmissionsQuery()
     {
-        $query = PayrollSubmission::with(['user', 'payment', 'payments']);
+        $query = PayrollSubmission::with(['user', 'payment']);
 
         // Apply search filter
         if ($this->search) {
@@ -254,10 +274,8 @@ class Salary extends Component
         // Apply payment status filter
         if ($this->paymentStatusFilter) {
             if ($this->paymentStatusFilter === 'paid') {
-                // Check submission status, not just latest payment
                 $query->where('status', 'paid');
             } elseif ($this->paymentStatusFilter === 'awaiting') {
-                // Check if submission is awaiting payment (approved, pending_payment, overdue)
                 $query->whereIn('status', ['approved', 'pending_payment', 'overdue']);
             }
         }
@@ -265,28 +283,33 @@ class Salary extends Component
         // Apply sorting
         $query->orderBy($this->sortBy, $this->sortDirection);
 
-        return $query->get();
+        return $query;
+    }
+
+    /**
+     * Get submissions for export (all matching records)
+     */
+    protected function getSubmissions()
+    {
+        return $this->getSubmissionsQuery()->get();
     }
 
     public function render()
     {
-        $allSubmissions = $this->getSubmissions();
-
-        // Manual pagination
-        $total = $allSubmissions->count();
-        $submissions = $allSubmissions->slice(($this->page - 1) * $this->perPage, $this->perPage)->values();
+        // Use database-level pagination (much faster than loading all then slicing)
+        $paginator = $this->getSubmissionsQuery()->paginate($this->perPage, ['*'], 'page', $this->page);
 
         $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $this->perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $this->perPage),
-            'from' => (($this->page - 1) * $this->perPage) + 1,
-            'to' => min($this->page * $this->perPage, $total),
+            'current_page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
+            'from' => $paginator->firstItem() ?? 0,
+            'to' => $paginator->lastItem() ?? 0,
         ];
 
         return view('livewire.admin.salary', [
-            'submissions' => $submissions,
+            'submissions' => $paginator->items(),
             'pagination' => $pagination,
         ]);
     }

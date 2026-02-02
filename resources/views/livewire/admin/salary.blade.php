@@ -1,4 +1,4 @@
-<div class="flex h-full w-full flex-1 flex-col gap-6">
+<div class="flex h-full w-full flex-1 flex-col gap-6" wire:init="loadInitialData">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -9,45 +9,60 @@
 
     <!-- Statistics Summary -->
     <div class="grid gap-4 md:grid-cols-4">
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Submissions</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['total_submissions'] ?? 0 }}</p>
+        @if($isLoadingStats)
+            <!-- Skeleton loaders for stats -->
+            @for($i = 0; $i < 4; $i++)
+                <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg animate-pulse">
+                    <div class="flex items-center justify-between">
+                        <div class="space-y-2">
+                            <div class="h-4 w-24 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+                            <div class="h-8 w-16 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+                        </div>
+                        <div class="size-8 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+                    </div>
+                </flux:card>
+            @endfor
+        @else
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Submissions</p>
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['total_submissions'] ?? 0 }}</p>
+                    </div>
+                    <flux:icon.document-text class="size-8 text-blue-600 dark:text-blue-400" />
                 </div>
-                <flux:icon.document-text class="size-8 text-blue-600 dark:text-blue-400" />
-            </div>
-        </flux:card>
+            </flux:card>
 
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Grand Total (incl. Service & SST)</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['grand_total'] ?? 0, 2) }}</p>
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Grand Total (incl. Service & SST)</p>
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['grand_total'] ?? 0, 2) }}</p>
+                    </div>
+                    <flux:icon.wallet class="size-8 text-purple-600 dark:text-purple-400" />
                 </div>
-                <flux:icon.wallet class="size-8 text-purple-600 dark:text-purple-400" />
-            </div>
-        </flux:card>
+            </flux:card>
 
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Completed</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['completed'] ?? 0 }}</p>
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Completed</p>
+                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['completed'] ?? 0 }}</p>
+                    </div>
+                    <flux:icon.check-circle class="size-8 text-green-600 dark:text-green-400" />
                 </div>
-                <flux:icon.check-circle class="size-8 text-green-600 dark:text-green-400" />
-            </div>
-        </flux:card>
+            </flux:card>
 
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending</p>
-                    <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending'] ?? 0 }}</p>
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending</p>
+                        <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending'] ?? 0 }}</p>
+                    </div>
+                    <flux:icon.clock class="size-8 text-orange-600 dark:text-orange-400" />
                 </div>
-                <flux:icon.clock class="size-8 text-orange-600 dark:text-orange-400" />
-            </div>
-        </flux:card>
+            </flux:card>
+        @endif
     </div>
 
     <!-- Submissions Table -->
@@ -128,6 +143,15 @@
         </div>
         @endif
 
+        @if($isLoadingTable)
+            <!-- Table Skeleton -->
+            <div class="animate-pulse">
+                <div class="h-10 bg-zinc-200 dark:bg-zinc-700 rounded mb-2"></div>
+                @for($i = 0; $i < 5; $i++)
+                    <div class="h-14 bg-zinc-100 dark:bg-zinc-800 rounded mb-2"></div>
+                @endfor
+            </div>
+        @else
         <flux:table>
             <flux:table.columns>
                 <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
@@ -258,6 +282,7 @@
                 </flux:button>
             </div>
         </div>
+        @endif
         @endif
     </flux:card>
 

@@ -198,6 +198,13 @@ class PaymentController extends Controller
         $totalAmount = $submission->total_due;
 
         // Create Billplz bill
+        // Set expiry based on whether penalty has been applied:
+        // - Before deadline: expire at deadline (prevents paying late without penalty)
+        // - After deadline: penalty already included, give 14 days to pay
+        $dueAt = $submission->has_penalty
+            ? now()->addDays(14)->format('Y-m-d')  // Penalty applied, 14 days to pay
+            : $submission->payment_deadline->format('Y-m-d');  // No penalty, expire at deadline
+
         $billData = [
             'email' => $request->user()->email,
             'name' => $request->user()->name ?? $request->user()->company_name,
@@ -207,6 +214,7 @@ class PaymentController extends Controller
             'description' => "Payroll Payment - {$submission->month_year}",
             'reference_1_label' => 'Payroll ID',
             'reference_1' => $submission->id,
+            'due_at' => $dueAt,
         ];
 
         // Attempt to create Billplz bill

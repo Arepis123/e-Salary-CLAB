@@ -22,16 +22,79 @@ class Dashboard extends Component
 
     public $selectedYear;
 
+    // Loading states for lazy-loaded sections
+    public $isLoadingStats = true;
+
+    public $isLoadingRecentPayments = true;
+
+    public $isLoadingCharts = true;
+
     public function mount()
     {
-        // Set default to current month/year
-        $this->selectedMonth = now()->month;
-        $this->selectedYear = now()->year;
+        // Set default month based on payroll period logic:
+        // Day 16 to end of month → show current month
+        // Day 1 to 15 → show previous month
+        $today = now();
 
+        if ($today->day >= 16) {
+            // 16th onwards: show current month
+            $this->selectedMonth = $today->month;
+            $this->selectedYear = $today->year;
+        } else {
+            // 1st to 15th: show previous month
+            $previousMonth = $today->copy()->subMonth();
+            $this->selectedMonth = $previousMonth->month;
+            $this->selectedYear = $previousMonth->year;
+        }
+
+        // Initialize with empty/default data for immediate render
+        $this->stats = [
+            'clients_without_submission' => 0,
+            'total_clients' => 0,
+            'clients_with_submission_count' => 0,
+            'active_workers' => 0,
+            'this_month_payments' => 0,
+            'outstanding_balance' => 0,
+            'workers_growth' => 0,
+            'payments_growth' => 0,
+        ];
+
+        $this->chartData = [
+            'labels' => [],
+            'totalPayments' => [],
+            'numberOfPayments' => [],
+        ];
+
+        $this->contractorStatusChartData = [
+            'labels' => ['Submitted & Paid', 'Submitted - Not Paid', 'Not Submitted'],
+            'data' => [0, 0, 0],
+            'colors' => ['#10b981', '#f59e0b', '#ef4444'],
+        ];
+    }
+
+    /**
+     * Load stats - called via wire:init for fast initial render
+     */
+    public function loadInitialData()
+    {
         $this->loadStats();
+        $this->isLoadingStats = false;
+    }
+
+    /**
+     * Load deferred data (charts, recent payments) - called via wire:init
+     */
+    public function loadDeferredData()
+    {
         $this->loadRecentPayments();
+        $this->isLoadingRecentPayments = false;
+
         $this->loadChartData();
         $this->loadContractorStatusChartData();
+        $this->isLoadingCharts = false;
+
+        // Dispatch event to initialize charts after data is loaded
+        $this->dispatch('chartsDataLoaded');
     }
 
     public function updatedSelectedMonth()
@@ -151,18 +214,17 @@ class Dashboard extends Component
 
     protected function loadChartData()
     {
-        $currentYear = now()->year;
         $labels = [];
         $totalPayments = [];
         $numberOfPayments = [];
 
-        // Get data for last 12 months
-        for ($i = 11; $i >= 0; $i--) {
+        // Get data for last 5 months + current month (6 months total)
+        for ($i = 5; $i >= 0; $i--) {
             $date = now()->subMonths($i);
             $month = $date->month;
             $year = $date->year;
 
-            $labels[] = $date->format('M');
+            $labels[] = $date->format('M Y');
 
             // Total payment amount for the month
             $monthTotal = PayrollPayment::where('status', 'completed')

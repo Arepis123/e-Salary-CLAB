@@ -46,18 +46,26 @@ class BillplzService
     public function createBill(array $data): ?array
     {
         try {
+            $formParams = [
+                'collection_id' => $this->collectionId,
+                'email' => $data['email'],
+                'name' => $data['name'],
+                'amount' => $this->convertToSen($data['amount']), // Convert RM to sen (cents)
+                'callback_url' => $data['callback_url'],
+                'redirect_url' => $data['redirect_url'] ?? $data['callback_url'],
+                'description' => $data['description'] ?? 'Payroll Payment',
+                'reference_1_label' => $data['reference_1_label'] ?? 'Payroll ID',
+                'reference_1' => $data['reference_1'] ?? '',
+            ];
+
+            // Add due_at (expiry date) if provided - format: YYYY-MM-DD
+            // Bills will expire after this date and cannot be paid
+            if (! empty($data['due_at'])) {
+                $formParams['due_at'] = $data['due_at'];
+            }
+
             $response = $this->client->post('bills', [
-                'form_params' => [
-                    'collection_id' => $this->collectionId,
-                    'email' => $data['email'],
-                    'name' => $data['name'],
-                    'amount' => $this->convertToSen($data['amount']), // Convert RM to sen (cents)
-                    'callback_url' => $data['callback_url'],
-                    'redirect_url' => $data['redirect_url'] ?? $data['callback_url'],
-                    'description' => $data['description'] ?? 'Payroll Payment',
-                    'reference_1_label' => $data['reference_1_label'] ?? 'Payroll ID',
-                    'reference_1' => $data['reference_1'] ?? '',
-                ],
+                'form_params' => $formParams,
             ]);
 
             $result = json_decode($response->getBody()->getContents(), true);
@@ -65,6 +73,7 @@ class BillplzService
             Log::info('Billplz bill created successfully', [
                 'bill_id' => $result['id'] ?? null,
                 'url' => $result['url'] ?? null,
+                'due_at' => $data['due_at'] ?? 'no expiry',
             ]);
 
             return $result;

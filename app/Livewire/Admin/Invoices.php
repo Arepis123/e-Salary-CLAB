@@ -30,11 +30,79 @@ class Invoices extends Component
     #[Url]
     public $sortDirection = 'desc';
 
+    // Cached data loaded once
+    public $contractors = [];
+
+    public $availableYears = [];
+
+    public $stats = [];
+
+    // Loading states
+    public $isLoadingStats = true;
+
+    public $isLoadingTable = true;
+
+    public $perPage = 15;
+
     public function mount()
     {
         if (! $this->year) {
             $this->year = now()->year;
         }
+
+        // Initialize empty stats for fast initial render
+        $this->stats = [
+            'pending_invoices' => 0,
+            'paid_invoices' => 0,
+            'total_invoiced' => 0,
+        ];
+
+        // Load dropdown data once (fast queries)
+        $this->loadContractors();
+        $this->loadAvailableYears();
+    }
+
+    /**
+     * Load initial data - called via wire:init
+     */
+    public function loadInitialData()
+    {
+        $this->loadStats();
+        $this->isLoadingStats = false;
+        $this->isLoadingTable = false;
+    }
+
+    protected function loadContractors()
+    {
+        $this->contractors = User::where('role', 'client')
+            ->whereNotNull('contractor_clab_no')
+            ->orderBy('name')
+            ->get(['contractor_clab_no', 'name'])
+            ->map(fn($user) => [
+                'clab_no' => $user->contractor_clab_no,
+                'name' => $user->name,
+            ])
+            ->toArray();
+    }
+
+    protected function loadAvailableYears()
+    {
+        $this->availableYears = PayrollSubmission::selectRaw('DISTINCT year')
+            ->orderBy('year', 'desc')
+            ->pluck('year')
+            ->toArray();
+    }
+
+    protected function loadStats()
+    {
+        // Use aggregation queries instead of loading all records
+        $this->stats = [
+            'pending_invoices' => PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])->count(),
+            'paid_invoices' => PayrollSubmission::where('status', 'paid')->count(),
+            'total_invoiced' => PayrollSubmission::whereIn('status', ['approved', 'pending_payment', 'paid', 'overdue'])
+                ->selectRaw('COALESCE(SUM(COALESCE(admin_final_amount, 0) + COALESCE(grand_total, 0)), 0) as total')
+                ->value('total') ?? 0,
+        ];
     }
 
     public function updatedSearch()
@@ -81,9 +149,8 @@ class Invoices extends Component
         $this->resetPage();
     }
 
-    public function render()
+    protected function getInvoicesQuery()
     {
-        // Get all invoices
         $query = PayrollSubmission::query()
             ->where('year', $this->year)
             ->with(['user', 'payment']);
@@ -93,134 +160,63 @@ class Invoices extends Component
             $query->where('contractor_clab_no', $this->contractor);
         }
 
-        $allInvoices = $query->get();
-
-        // Apply search filter
+        // Apply search filter at database level
         if ($this->search) {
-            $allInvoices = $allInvoices->filter(function ($invoice) {
-                $searchLower = strtolower($this->search);
-                $invoiceNumber = 'INV-'.str_pad($invoice->id, 4, '0', STR_PAD_LEFT);
-                $contractorName = $invoice->user ? strtolower($invoice->user->name) : '';
-
-                return str_contains(strtolower($invoiceNumber), $searchLower) ||
-                       str_contains(strtolower($invoice->month_year ?? ''), $searchLower) ||
-                       str_contains($contractorName, $searchLower) ||
-                       str_contains(strtolower($invoice->contractor_clab_no ?? ''), $searchLower);
+            $search = $this->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('id', 'like', '%'.$search.'%')
+                    ->orWhere('contractor_clab_no', 'like', '%'.$search.'%')
+                    ->orWhereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', '%'.$search.'%');
+                    });
             });
         }
 
         // Apply status filter
         if ($this->statusFilter && $this->statusFilter !== 'all') {
-            $allInvoices = $allInvoices->filter(function ($invoice) {
-                return $invoice->status === $this->statusFilter;
-            });
+            $query->where('status', $this->statusFilter);
         }
 
-        // Apply sorting
-        $allInvoices = $allInvoices->sort(function ($a, $b) {
-            $primaryA = match ($this->sortBy) {
-                'invoice_number' => str_pad($a->id, 4, '0', STR_PAD_LEFT),
-                'contractor' => $a->user ? $a->user->name : $a->contractor_clab_no,
-                'period' => $a->month_year ?? '',
-                'workers' => $a->total_workers ?? 0,
-                'amount' => $a->total_with_penalty ?? 0,
-                'issue_date' => $a->submitted_at ? $a->submitted_at->timestamp : 0,
-                'due_date' => $a->payment_deadline ? $a->payment_deadline->timestamp : 0,
-                'status' => match ($a->status) {
-                    'overdue' => 0,
-                    'pending_payment' => 1,
-                    'paid' => 2,
-                    'draft' => 3,
-                    default => 4,
-                },
-                default => $a->submitted_at ? $a->submitted_at->timestamp : 0,
-            };
+        // Apply sorting at database level
+        $sortColumn = match ($this->sortBy) {
+            'invoice_number' => 'id',
+            'contractor' => 'contractor_clab_no',
+            'period' => 'month',
+            'workers' => 'total_workers',
+            'amount' => 'grand_total',
+            'issue_date' => 'submitted_at',
+            'due_date' => 'payment_deadline',
+            'status' => 'status',
+            default => 'submitted_at',
+        };
 
-            $primaryB = match ($this->sortBy) {
-                'invoice_number' => str_pad($b->id, 4, '0', STR_PAD_LEFT),
-                'contractor' => $b->user ? $b->user->name : $b->contractor_clab_no,
-                'period' => $b->month_year ?? '',
-                'workers' => $b->total_workers ?? 0,
-                'amount' => $b->total_with_penalty ?? 0,
-                'issue_date' => $b->submitted_at ? $b->submitted_at->timestamp : 0,
-                'due_date' => $b->payment_deadline ? $b->payment_deadline->timestamp : 0,
-                'status' => match ($b->status) {
-                    'overdue' => 0,
-                    'pending_payment' => 1,
-                    'paid' => 2,
-                    'draft' => 3,
-                    default => 4,
-                },
-                default => $b->submitted_at ? $b->submitted_at->timestamp : 0,
-            };
+        $query->orderBy($sortColumn, $this->sortDirection);
 
-            // Primary sort comparison
-            $comparison = $primaryA <=> $primaryB;
+        // Secondary sort by submitted_at if not already sorting by it
+        if ($sortColumn !== 'submitted_at') {
+            $query->orderBy('submitted_at', 'desc');
+        }
 
-            // If primary values are equal, sort by issue date as secondary (most recent first)
-            if ($comparison === 0) {
-                $dateA = $a->submitted_at ? $a->submitted_at->timestamp : 0;
-                $dateB = $b->submitted_at ? $b->submitted_at->timestamp : 0;
-                $comparison = $dateB <=> $dateA;
-            }
+        return $query;
+    }
 
-            // Apply sort direction
-            return $this->sortDirection === 'desc' ? -$comparison : $comparison;
-        })->values();
-
-        // Calculate statistics
-        $allSubmissions = PayrollSubmission::all();
-
-        $pendingInvoices = $allSubmissions->whereIn('status', ['pending_payment', 'overdue'])->count();
-        $paidInvoices = $allSubmissions->where('status', 'paid')->count();
-        // Use total_due accessor to include dynamic penalty calculation
-        $totalInvoiced = $allSubmissions->sum(function ($submission) {
-            return $submission->total_due;
-        });
-
-        // Get all contractors for filter
-        $contractors = User::where('role', 'client')
-            ->whereNotNull('contractor_clab_no')
-            ->orderBy('name')
-            ->get()
-            ->map(function ($user) {
-                return [
-                    'clab_no' => $user->contractor_clab_no,
-                    'name' => $user->name,
-                ];
-            });
-
-        // Available years for filter
-        $availableYears = PayrollSubmission::selectRaw('DISTINCT year')
-            ->orderBy('year', 'desc')
-            ->pluck('year');
-
-        $stats = [
-            'pending_invoices' => $pendingInvoices,
-            'paid_invoices' => $paidInvoices,
-            'total_invoiced' => $totalInvoiced,
-        ];
-
-        // Pagination
-        $perPage = 15;
-        $total = $allInvoices->count();
-        $invoices = $allInvoices->slice(($this->page - 1) * $perPage, $perPage)->values();
+    public function render()
+    {
+        // Use database-level pagination
+        $paginator = $this->getInvoicesQuery()->paginate($this->perPage, ['*'], 'page', $this->page);
 
         $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $perPage,
-            'total' => $total,
-            'last_page' => max(1, ceil($total / $perPage)),
-            'from' => $total > 0 ? (($this->page - 1) * $perPage) + 1 : 0,
-            'to' => min($this->page * $perPage, $total),
+            'current_page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
+            'from' => $paginator->firstItem() ?? 0,
+            'to' => $paginator->lastItem() ?? 0,
         ];
 
         return view('livewire.admin.invoices', [
-            'invoices' => $invoices,
-            'stats' => $stats,
+            'invoices' => $paginator->items(),
             'pagination' => $pagination,
-            'availableYears' => $availableYears,
-            'contractors' => $contractors,
         ]);
     }
 }

@@ -1,4 +1,4 @@
-<div class="flex h-full w-full flex-1 flex-col gap-6">
+<div class="flex h-full w-full flex-1 flex-col gap-6" wire:init="loadInitialData">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -9,41 +9,56 @@
 
     <!-- Statistics Cards -->
     <div class="grid gap-4 md:grid-cols-3">
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Invoices</p>
-                    <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending_invoices'] }}</p>
+        @if($isLoadingStats)
+            <!-- Skeleton loaders for stats -->
+            @for($i = 0; $i < 3; $i++)
+                <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg animate-pulse">
+                    <div class="flex items-center justify-between">
+                        <div class="space-y-2">
+                            <div class="h-4 w-24 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+                            <div class="h-8 w-16 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+                        </div>
+                        <div class="size-12 bg-zinc-200 dark:bg-zinc-700 rounded-full"></div>
+                    </div>
+                </flux:card>
+            @endfor
+        @else
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Invoices</p>
+                        <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending_invoices'] }}</p>
+                    </div>
+                    <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
+                        <flux:icon.clock class="size-6 text-orange-600 dark:text-orange-400" />
+                    </div>
                 </div>
-                <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
-                    <flux:icon.clock class="size-6 text-orange-600 dark:text-orange-400" />
-                </div>
-            </div>
-        </flux:card>
+            </flux:card>
 
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Paid Invoices</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['paid_invoices'] }}</p>
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Paid Invoices</p>
+                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['paid_invoices'] }}</p>
+                    </div>
+                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                        <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400" />
+                    </div>
                 </div>
-                <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
-                    <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400" />
-                </div>
-            </div>
-        </flux:card>
+            </flux:card>
 
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Invoiced</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['total_invoiced'], 2) }}</p>
+            <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Invoiced</p>
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['total_invoiced'], 2) }}</p>
+                    </div>
+                    <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3">
+                        <flux:icon.document-text class="size-6 text-blue-600 dark:text-blue-400" />
+                    </div>
                 </div>
-                <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3">
-                    <flux:icon.document-text class="size-6 text-blue-600 dark:text-blue-400" />
-                </div>
-            </div>
-        </flux:card>
+            </flux:card>
+        @endif
     </div>
 
     <!-- Search and Filters -->
@@ -85,7 +100,7 @@
                         <div>
                             <flux:select variant="listbox" wire:model.live="contractor" size="sm" label="Contractor">
                                 <flux:select.option value="">All Contractors</flux:select.option>
-                                @foreach($contractors as $contractorOption)
+                                @foreach($this->contractors as $contractorOption)
                                     <flux:select.option value="{{ $contractorOption['clab_no'] }}">{{ $contractorOption['name'] }}</flux:select.option>
                                 @endforeach
                             </flux:select>
@@ -101,7 +116,7 @@
                         </div>
                         <div>
                             <flux:select variant="listbox" wire:model.live="year" size="sm" label="Year">
-                                @foreach($availableYears as $yearOption)
+                                @foreach($this->availableYears as $yearOption)
                                     <flux:select.option value="{{ $yearOption }}">{{ $yearOption }}</flux:select.option>
                                 @endforeach
                             </flux:select>
@@ -154,6 +169,15 @@
             </div>
         </div>
 
+        @if($isLoadingTable)
+            <!-- Table Skeleton -->
+            <div class="animate-pulse">
+                <div class="h-10 bg-zinc-200 dark:bg-zinc-700 rounded mb-2"></div>
+                @for($i = 0; $i < 5; $i++)
+                    <div class="h-14 bg-zinc-100 dark:bg-zinc-800 rounded mb-2"></div>
+                @endfor
+            </div>
+        @else
         <flux:table>
             <flux:table.columns>
                 <flux:table.column sortable :sorted="$sortBy === 'invoice_number'" :direction="$sortDirection" wire:click="sortByColumn('invoice_number')" align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
@@ -273,6 +297,7 @@
                     @endif
                 </div>
             </div>
+        @endif
         @endif
     </flux:card>
 </div>
