@@ -139,6 +139,15 @@ class Configuration extends Component
 
     public $syncResults = [];
 
+    // Cancelled payment sync properties
+    public $isSyncingCancelledPayments = false;
+
+    public $cancelledSyncResults = [];
+
+    public $cancelledSyncMonth;
+
+    public $cancelledSyncYear;
+
     public function boot(
         WorkerService $workerService,
         ContractorWindowService $windowService,
@@ -157,6 +166,10 @@ class Configuration extends Component
         if (! auth()->user()->isSuperAdmin()) {
             abort(403, 'Unauthorized access. Only Super Admin can access this page.');
         }
+
+        // Set default cancelled sync month/year to current
+        $this->cancelledSyncMonth = now()->month;
+        $this->cancelledSyncYear = now()->year;
 
         $this->loadStats();
         $this->loadWindowStats();
@@ -1121,6 +1134,164 @@ class Configuration extends Component
             ]);
         } finally {
             $this->isSyncingPayments = false;
+        }
+    }
+
+    public function syncCancelledPayments()
+    {
+        // Check if user is super admin
+        if (! auth()->user()->isSuperAdmin()) {
+            Flux::toast(variant: 'danger', text: 'Unauthorized access.');
+
+            return;
+        }
+
+        $this->isSyncingCancelledPayments = true;
+        $this->cancelledSyncResults = [];
+
+        try {
+            // Build period filter based on selected month/year
+            $periodStart = \Carbon\Carbon::create($this->cancelledSyncYear, $this->cancelledSyncMonth, 1)->startOfMonth();
+            $periodEnd = $periodStart->copy()->endOfMonth();
+
+            // Find all cancelled payments with Billplz bill IDs for the selected month
+            $cancelledPayments = \App\Models\PayrollPayment::where('status', 'cancelled')
+                ->whereNotNull('billplz_bill_id')
+                ->whereBetween('created_at', [$periodStart, $periodEnd])
+                ->with('payrollSubmission')
+                ->get();
+
+            if ($cancelledPayments->isEmpty()) {
+                Flux::toast(
+                    variant: 'info',
+                    heading: 'No Cancelled Payments',
+                    text: 'There are no cancelled payments to check for '.$periodStart->format('F Y').'.'
+                );
+                $this->isSyncingCancelledPayments = false;
+
+                return;
+            }
+
+            $totalCancelled = $cancelledPayments->count();
+            $updated = 0;
+            $failed = 0;
+            $stillUnpaid = 0;
+
+            foreach ($cancelledPayments as $payment) {
+                try {
+                    // Fetch bill status from Billplz
+                    $bill = $this->billplzService->getBill($payment->billplz_bill_id);
+
+                    if (! $bill) {
+                        $this->cancelledSyncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'status' => 'error',
+                            'message' => 'Failed to retrieve bill from Billplz API',
+                        ];
+                        $failed++;
+
+                        continue;
+                    }
+
+                    // Check if bill is actually paid
+                    if ($bill['paid']) {
+                        // Update payment status in a transaction
+                        DB::beginTransaction();
+
+                        $paidAt = $bill['paid_at'] ?? now();
+
+                        $payment->update([
+                            'status' => 'completed',
+                            'completed_at' => $paidAt,
+                            'payment_response' => json_encode($bill),
+                            'transaction_id' => $bill['id'],
+                        ]);
+
+                        // Update submission status
+                        $submission = $payment->payrollSubmission;
+
+                        // Only update submission if it's not already paid
+                        if ($submission && $submission->status !== 'paid') {
+                            $submission->update([
+                                'status' => 'paid',
+                                'paid_at' => $paidAt,
+                            ]);
+
+                            // Generate tax invoice number (receipt number)
+                            if (! $submission->hasTaxInvoice()) {
+                                $submission->generateTaxInvoiceNumber();
+                            }
+                        }
+
+                        DB::commit();
+
+                        $this->cancelledSyncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'submission_id' => $submission->id ?? 'N/A',
+                            'status' => 'success',
+                            'message' => 'Cancelled payment was actually PAID! Updated submission '.($submission->month_year ?? 'N/A'),
+                        ];
+                        $updated++;
+
+                        \Log::info('Cancelled payment found to be paid - synced from Configuration page', [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'submission_id' => $submission->id ?? null,
+                            'paid_at' => $paidAt,
+                            'synced_by' => auth()->user()->name,
+                        ]);
+                    } else {
+                        $this->cancelledSyncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'status' => 'unpaid',
+                            'message' => 'Cancelled payment confirmed unpaid on Billplz',
+                        ];
+                        $stillUnpaid++;
+                    }
+                } catch (\Exception $e) {
+                    DB::rollBack();
+
+                    $this->cancelledSyncResults[] = [
+                        'payment_id' => $payment->id,
+                        'bill_id' => $payment->billplz_bill_id,
+                        'status' => 'error',
+                        'message' => $e->getMessage(),
+                    ];
+                    $failed++;
+
+                    \Log::error('Failed to sync cancelled payment', [
+                        'payment_id' => $payment->id,
+                        'bill_id' => $payment->billplz_bill_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Show summary toast
+            $variant = $updated > 0 ? 'success' : ($failed > 0 ? 'danger' : 'info');
+            Flux::toast(
+                variant: $variant,
+                heading: 'Cancelled Payment Sync Complete',
+                text: "Checked {$totalCancelled} cancelled payments for {$periodStart->format('F Y')}: {$updated} found paid, {$stillUnpaid} confirmed unpaid, {$failed} failed"
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Sync Failed',
+                text: 'Failed to sync cancelled payments: '.$e->getMessage()
+            );
+
+            \Log::error('Cancelled payment sync failed', [
+                'error' => $e->getMessage(),
+                'month' => $this->cancelledSyncMonth,
+                'year' => $this->cancelledSyncYear,
+                'synced_by' => auth()->user()->name,
+            ]);
+        } finally {
+            $this->isSyncingCancelledPayments = false;
         }
     }
 

@@ -62,6 +62,7 @@
                         <flux:select.option value="timesheet">Timesheet Report</flux:select.option>
                         <flux:select.option value="tax">Official Receipt Report</flux:select.option>
                         <flux:select.option value="paid_payroll">Paid Payroll Report</flux:select.option>
+                        <flux:select.option value="unpaid_payroll">Unpaid Payroll Report</flux:select.option>
                     </flux:select>
                 </flux:field>
 
@@ -757,6 +758,130 @@
                         <flux:icon.banknotes class="mx-auto size-12 text-zinc-400 dark:text-zinc-600 mb-4" />
                         <p class="text-zinc-600 dark:text-zinc-400">No paid payroll data available for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</p>
                         <p class="text-sm text-zinc-500 dark:text-zinc-500 mt-1">Contractors that have paid their payroll will appear here.</p>
+                    </div>
+                @endif
+            </flux:card>
+            @endif
+
+            @if($reportType === 'unpaid_payroll')
+            <!-- Unpaid Payroll Report -->
+            <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Unpaid Payroll Report - {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</h2>
+                    <flux:button variant="primary" size="sm" wire:click="exportUnpaidPayrollReport" wire:loading.attr="disabled" wire:loading.class="opacity-50">
+                        <flux:icon.arrow-down-tray class="size-4 inline" wire:loading.remove wire:target="exportUnpaidPayrollReport" />
+                        <svg wire:loading wire:target="exportUnpaidPayrollReport" class="animate-spin size-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="exportUnpaidPayrollReport">Export to Excel</span>
+                        <span wire:loading wire:target="exportUnpaidPayrollReport">Generating...</span>
+                    </flux:button>
+                </div>
+
+                @if(count($unpaidPayrollData) > 0)
+                    <!-- Summary Stats -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
+                            <div class="text-sm text-orange-600 dark:text-orange-400">Total Contractors Unpaid</div>
+                            <div class="text-2xl font-bold text-orange-700 dark:text-orange-300">{{ count($unpaidPayrollData) }}</div>
+                        </div>
+                        <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                            <div class="text-sm text-red-600 dark:text-red-400">Total Workers</div>
+                            <div class="text-2xl font-bold text-red-700 dark:text-red-300">{{ collect($unpaidPayrollData)->sum('total_workers') }}</div>
+                        </div>
+                        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                            <div class="text-sm text-purple-600 dark:text-purple-400">Total Payroll Amount</div>
+                            <div class="text-2xl font-bold text-purple-700 dark:text-purple-300">RM {{ number_format(collect($unpaidPayrollData)->sum('admin_final_amount'), 2) }}</div>
+                        </div>
+                        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
+                            <div class="text-sm text-amber-600 dark:text-amber-400">Total Amount Due</div>
+                            <div class="text-2xl font-bold text-amber-700 dark:text-amber-300">RM {{ number_format(collect($unpaidPayrollData)->sum('total_due'), 2) }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Unpaid Payroll Table -->
+                    @foreach($unpaidPayrollData as $contractor)
+                    <div class="mb-6 border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+                        <!-- Contractor Header -->
+                        <div class="bg-orange-100 dark:bg-orange-900/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <h3 class="font-semibold text-orange-800 dark:text-orange-200">{{ $contractor['contractor_name'] }}</h3>
+                                <p class="text-sm text-orange-600 dark:text-orange-400">{{ $contractor['contractor_clab_no'] }}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-3 text-sm">
+                                <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
+                                    <span class="text-zinc-500">Workers:</span>
+                                    <span class="font-semibold">{{ $contractor['total_workers'] }}</span>
+                                </span>
+                                <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
+                                    <span class="text-zinc-500">Total Due:</span>
+                                    <span class="font-semibold text-orange-600 dark:text-orange-400">RM {{ number_format($contractor['total_due'], 2) }}</span>
+                                </span>
+                                <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
+                                    <flux:badge color="{{ $contractor['status'] === 'overdue' ? 'red' : ($contractor['status'] === 'pending_payment' ? 'orange' : 'blue') }}" size="sm">
+                                        {{ ucfirst(str_replace('_', ' ', $contractor['status'])) }}
+                                    </flux:badge>
+                                </span>
+                                @if($contractor['payment_deadline'])
+                                <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
+                                    <span class="text-zinc-500">Deadline:</span>
+                                    <span class="font-semibold {{ \Carbon\Carbon::parse($contractor['payment_deadline'])->isPast() ? 'text-red-600' : '' }}">
+                                        {{ \Carbon\Carbon::parse($contractor['payment_deadline'])->format('d M Y') }}
+                                    </span>
+                                </span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <!-- Workers Table -->
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead class="bg-zinc-50 dark:bg-zinc-800">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Worker ID</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Passport</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Basic Salary</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">OT Pay</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Gross Salary</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Deductions</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Net Salary</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                                    @foreach($contractor['workers'] as $worker)
+                                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                        <td class="px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100">{{ $worker['worker_id'] }}</td>
+                                        <td class="px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100">{{ $worker['worker_name'] }}</td>
+                                        <td class="px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400">{{ $worker['worker_passport'] ?? '-' }}</td>
+                                        <td class="px-4 py-2 text-sm text-right text-zinc-900 dark:text-zinc-100">RM {{ number_format($worker['basic_salary'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right text-blue-600 dark:text-blue-400">RM {{ number_format($worker['total_ot_pay'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right text-zinc-900 dark:text-zinc-100">RM {{ number_format($worker['gross_salary'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right text-red-600 dark:text-red-400">RM {{ number_format($worker['total_deductions'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right font-semibold text-orange-600 dark:text-orange-400">RM {{ number_format($worker['net_salary'], 2) }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                                <tfoot class="bg-zinc-100 dark:bg-zinc-800">
+                                    <tr>
+                                        <td colspan="3" class="px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Subtotal</td>
+                                        <td class="px-4 py-2 text-sm text-right font-semibold text-zinc-700 dark:text-zinc-300">RM {{ number_format($contractor['total_basic_salary'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right font-semibold text-blue-600 dark:text-blue-400">RM {{ number_format($contractor['total_ot_pay'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right font-semibold text-zinc-700 dark:text-zinc-300">RM {{ number_format($contractor['total_basic_salary'] + $contractor['total_ot_pay'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right font-semibold text-red-600 dark:text-red-400">RM {{ number_format($contractor['total_deductions'], 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-right font-semibold text-orange-600 dark:text-orange-400">RM {{ number_format($contractor['total_net_salary'], 2) }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    @endforeach
+                @else
+                    <div class="text-center py-12">
+                        <flux:icon.check-circle class="mx-auto size-12 text-green-400 dark:text-green-600 mb-4" />
+                        <p class="text-zinc-600 dark:text-zinc-400">No unpaid payroll for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-500 mt-1">All contractors have paid their payroll for this period.</p>
                     </div>
                 @endif
             </flux:card>

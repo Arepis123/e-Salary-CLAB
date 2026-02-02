@@ -7,75 +7,7 @@
                 Manage system configuration and contractor settings
             </p>
         </div>
-
-        <!-- Payment Sync & Fix Buttons -->
-        <div class="flex gap-2">
-            <flux:button
-                wire:click="fixMissingReceipts"
-                variant="filled"
-                icon="document-check"
-                wire:loading.attr="disabled"
-                wire:target="fixMissingReceipts"
-            >
-                <span wire:loading.remove wire:target="fixMissingReceipts">Fix Missing Receipts</span>
-                <span wire:loading wire:target="fixMissingReceipts">Fixing...</span>
-            </flux:button>
-            <flux:button
-                wire:click="syncAllPendingPayments"
-                variant="primary"
-                :disabled="$isSyncingPayments"
-                icon="arrow-path"
-                class="{{ $isSyncingPayments ? 'animate-spin' : '' }}"
-            >
-                {{ $isSyncingPayments ? 'Syncing...' : 'Sync Pending Payments' }}
-            </flux:button>
-        </div>
     </div>
-
-    <!-- Sync Results -->
-    @if(count($syncResults) > 0)
-        <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
-            <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Payment Sync Results</h3>
-            <div class="space-y-2 max-h-96 overflow-y-auto">
-                @foreach($syncResults as $result)
-                    <div class="flex items-start gap-3 p-3 rounded-lg border
-                        @if($result['status'] === 'success') border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800
-                        @elseif($result['status'] === 'error') border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800
-                        @else border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800
-                        @endif">
-                        @if($result['status'] === 'success')
-                            <flux:icon.check-circle class="size-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                        @elseif($result['status'] === 'error')
-                            <flux:icon.x-circle class="size-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-                        @else
-                            <flux:icon.clock class="size-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-                        @endif
-                        <div class="flex-1 text-sm">
-                            <div class="font-medium
-                                @if($result['status'] === 'success') text-green-900 dark:text-green-100
-                                @elseif($result['status'] === 'error') text-red-900 dark:text-red-100
-                                @else text-yellow-900 dark:text-yellow-100
-                                @endif">
-                                {{ $result['message'] }}
-                            </div>
-                            <div class="text-xs mt-1
-                                @if($result['status'] === 'success') text-green-700 dark:text-green-300
-                                @elseif($result['status'] === 'error') text-red-700 dark:text-red-300
-                                @else text-yellow-700 dark:text-yellow-300
-                                @endif">
-                                Payment ID: {{ $result['payment_id'] }} • Bill ID: {{ $result['bill_id'] }}
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-            <div class="mt-4 flex justify-end">
-                <flux:button wire:click="$set('syncResults', [])" variant="ghost" size="sm">
-                    Clear Results
-                </flux:button>
-            </div>
-        </flux:card>
-    @endif
 
     <!-- Tab Navigation -->
     <div class="border-b border-zinc-200 dark:border-zinc-700">
@@ -101,6 +33,13 @@
                 <flux:icon.cog class="size-5 inline mr-2" />
                 Contractor Settings
             </button>
+            <button
+                wire:click="switchTab('payments')"
+                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'payments' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+            >
+                <flux:icon.credit-card class="size-5 inline mr-2" />
+                Payments
+            </button>
         </nav>
     </div>
 
@@ -115,6 +54,10 @@
 
     @if($activeTab === 'contractor-settings')
         @include('livewire.admin.configuration-contractor-settings')
+    @endif
+
+    @if($activeTab === 'payments')
+        @include('livewire.admin.configuration-payments')
     @endif
 
     <!-- Window Action Modal -->

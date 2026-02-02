@@ -200,6 +200,9 @@
                                     @if($invoice->hasPayslipFile())
                                         <flux:menu.item icon="document-arrow-down" href="{{ route('payroll.payslip.download', $invoice->id) }}">Download Payslip</flux:menu.item>
                                     @endif
+                                    @if($invoice->status === 'paid' && $invoice->hasTaxInvoice())
+                                        <flux:menu.item icon="receipt-percent" href="{{ route('invoices.receipt', $invoice->id) }}">Download Receipt</flux:menu.item>
+                                    @endif
                                     @if($invoice->status === 'draft')
                                         <flux:menu.separator />
                                         <flux:menu.item icon="paper-airplane" wire:click="finalizeDraft({{ $invoice->id }})">Finalize & Submit</flux:menu.item>

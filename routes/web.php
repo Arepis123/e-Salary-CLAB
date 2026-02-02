@@ -181,6 +181,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('payments', \App\Livewire\Client\Payments::class)->name('payments');
         Route::post('payment/{submission}', [\App\Http\Controllers\Client\PaymentController::class, 'createPayment'])->name('payment.create');
         Route::get('invoices-client', \App\Livewire\Client\Invoices::class)->name('invoices.client');
+        Route::get('invoices/{id}/receipt', [\App\Http\Controllers\TaxInvoiceController::class, 'downloadSingleReceipt'])->name('invoices.receipt');
     });
 });
 

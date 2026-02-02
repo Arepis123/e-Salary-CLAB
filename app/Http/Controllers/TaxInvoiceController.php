@@ -7,6 +7,41 @@ use Illuminate\Http\Request;
 
 class TaxInvoiceController extends Controller
 {
+    /**
+     * Download a single receipt (for client use)
+     */
+    public function downloadSingleReceipt($id)
+    {
+        $invoice = PayrollSubmission::with([
+            'workers.transactions',
+            'workers.worker',
+            'payment',
+            'user',
+        ])->findOrFail($id);
+
+        // Check if user has access to this invoice
+        $user = auth()->user();
+        if ($user->isClient() && $invoice->contractor_clab_no !== $user->contractor_clab_no) {
+            abort(403, 'You do not have access to this receipt');
+        }
+
+        // Check if receipt is available (must be paid with tax invoice)
+        if ($invoice->status !== 'paid' || ! $invoice->hasTaxInvoice()) {
+            abort(404, 'Receipt not available');
+        }
+
+        $contractor = $invoice->user;
+
+        $pdf = \PDF::loadView('admin.tax-invoice-pdf', compact('invoice', 'contractor'))
+            ->setPaper('a4', 'landscape')
+            ->setOption('enable-local-file-access', true)
+            ->setOption('no-stop-slow-scripts', true);
+
+        $filename = 'Receipt-'.$invoice->tax_invoice_number.'-'.$invoice->month_year.'.pdf';
+
+        return $pdf->download($filename);
+    }
+
     public function downloadReceipts(Request $request)
     {
         $invoiceIds = $request->input('invoices', []);

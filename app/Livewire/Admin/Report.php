@@ -54,6 +54,8 @@ class Report extends Component
 
     public $paidPayrollData = [];
 
+    public $unpaidPayrollData = [];
+
     public function updatedSelectAll($value)
     {
         if ($value) {
@@ -110,6 +112,7 @@ class Report extends Component
         $this->timesheetData = [];
         $this->otTransactionData = [];
         $this->paidPayrollData = [];
+        $this->unpaidPayrollData = [];
     }
 
     protected function generateAvailableMonths()
@@ -402,6 +405,9 @@ class Report extends Component
                 break;
             case 'paid_payroll':
                 $this->loadPaidPayrollData();
+                break;
+            case 'unpaid_payroll':
+                $this->loadUnpaidPayrollData();
                 break;
             default: // All Reports
                 $this->loadStats();
@@ -1227,6 +1233,92 @@ class Report extends Component
 
         return Excel::download(
             new \App\Exports\PaidPayrollExport($this->paidPayrollData, ['month' => $selectedMonth, 'year' => $selectedYear]),
+            $filename
+        );
+    }
+
+    protected function loadUnpaidPayrollData()
+    {
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        // Get all unpaid submissions for the selected period (pending_payment, overdue, submitted, approved)
+        $submissions = PayrollSubmission::where('month', $selectedMonth)
+            ->where('year', $selectedYear)
+            ->whereIn('status', ['submitted', 'approved', 'pending_payment', 'overdue'])
+            ->with(['user', 'workers'])
+            ->orderBy('contractor_clab_no')
+            ->get();
+
+        if ($submissions->isEmpty()) {
+            $this->unpaidPayrollData = [];
+
+            return;
+        }
+
+        // Build unpaid payroll data grouped by contractor
+        $this->unpaidPayrollData = $submissions->map(function ($submission) {
+            $contractor = $submission->user;
+
+            // Calculate totals
+            $totalBasicSalary = $submission->workers->sum('basic_salary');
+            $totalOTPay = $submission->workers->sum('total_ot_pay');
+            $totalDeductions = $submission->workers->sum('total_deductions');
+            $totalNetSalary = $submission->workers->sum('net_salary');
+
+            return [
+                'submission_id' => $submission->id,
+                'contractor_clab_no' => $submission->contractor_clab_no,
+                'contractor_name' => $contractor ? $contractor->name : 'Unknown',
+                'contractor_email' => $contractor ? $contractor->email : '',
+                'total_workers' => $submission->workers->count(),
+                'total_basic_salary' => $totalBasicSalary,
+                'total_ot_pay' => $totalOTPay,
+                'total_deductions' => $totalDeductions,
+                'total_net_salary' => $totalNetSalary,
+                'admin_final_amount' => $submission->admin_final_amount ?? 0,
+                'service_charge' => $submission->service_charge ?? 0,
+                'sst' => $submission->sst ?? 0,
+                'penalty' => $submission->penalty_amount ?? 0,
+                'total_due' => $submission->total_due ?? ($submission->admin_final_amount + $submission->service_charge + $submission->sst + ($submission->penalty_amount ?? 0)),
+                'status' => $submission->status,
+                'payment_deadline' => $submission->payment_deadline,
+                'submitted_at' => $submission->submitted_at,
+                'workers' => $submission->workers->map(function ($worker) {
+                    return [
+                        'worker_id' => $worker->worker_id,
+                        'worker_name' => $worker->worker_name,
+                        'worker_passport' => $worker->worker_passport,
+                        'basic_salary' => $worker->basic_salary,
+                        'ot_normal_hours' => $worker->ot_normal_hours,
+                        'ot_rest_hours' => $worker->ot_rest_hours,
+                        'ot_public_hours' => $worker->ot_public_hours,
+                        'total_ot_pay' => $worker->total_ot_pay,
+                        'gross_salary' => $worker->gross_salary,
+                        'total_deductions' => $worker->total_deductions,
+                        'net_salary' => $worker->net_salary,
+                    ];
+                })->toArray(),
+            ];
+        })->toArray();
+    }
+
+    public function exportUnpaidPayrollReport()
+    {
+        if (empty($this->unpaidPayrollData)) {
+            Flux::toast(variant: 'error', text: 'No data to export. Please generate the Unpaid Payroll Report first.');
+
+            return;
+        }
+
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+
+        $period = \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('Y_m');
+        $filename = 'unpaid_payroll_report_'.$period.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(
+            new \App\Exports\UnpaidPayrollExport($this->unpaidPayrollData, ['month' => $selectedMonth, 'year' => $selectedYear]),
             $filename
         );
     }
