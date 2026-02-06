@@ -43,16 +43,18 @@ class ContractorConfigurationService
     }
 
     /**
-     * Update contractor configuration (service charge exempt only)
+     * Update contractor configuration
      */
     public function updateConfiguration(
         string $clabNo,
-        bool $serviceChargeExempt
+        bool $serviceChargeExempt,
+        bool $penaltyExempt = false
     ): ContractorConfiguration {
         $config = $this->getContractorConfiguration($clabNo);
 
         $config->update([
             'service_charge_exempt' => $serviceChargeExempt,
+            'penalty_exempt' => $penaltyExempt,
             'updated_by' => auth()->id(),
         ]);
 
@@ -131,6 +133,16 @@ class ContractorConfigurationService
         $config = $this->getContractorConfiguration($clabNo);
 
         return $config->service_charge_exempt;
+    }
+
+    /**
+     * Check if contractor is exempt from penalty
+     */
+    public function isPenaltyExempt(string $clabNo): bool
+    {
+        $config = $this->getContractorConfiguration($clabNo);
+
+        return $config->penalty_exempt;
     }
 
     /**

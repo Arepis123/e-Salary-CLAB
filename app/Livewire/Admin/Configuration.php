@@ -77,6 +77,8 @@ class Configuration extends Component
 
     public $editServiceChargeExempt = false;
 
+    public $editPenaltyExempt = false;
+
     public $editEnabledDeductions = []; // Array of deduction template IDs
 
     // Deduction template management
@@ -147,6 +149,29 @@ class Configuration extends Component
     public $cancelledSyncMonth;
 
     public $cancelledSyncYear;
+
+    // Worker settings properties
+    public $workerSearch = '';
+
+    public $workerContractorFilter = '';
+
+    public $workerStatusFilter = '';
+
+    public $workersPage = 1;
+
+    public $workersPerPage = 15;
+
+    public $showDeactivateModal = false;
+
+    public $deactivatingWorkerId = '';
+
+    public $deactivatingWorkerName = '';
+
+    public $deactivatingWorkerPassport = '';
+
+    public $deactivatingContractorClab = '';
+
+    public $deactivateReason = '';
 
     public function boot(
         WorkerService $workerService,
@@ -434,6 +459,7 @@ class Configuration extends Component
         $this->editingContractorClab = $config->contractor_clab_no;
         $this->editingContractorName = $config->contractor_name;
         $this->editServiceChargeExempt = $config->service_charge_exempt;
+        $this->editPenaltyExempt = $config->penalty_exempt;
 
         // Load currently enabled deduction template IDs
         $this->editEnabledDeductions = $config->deductions->pluck('id')->toArray();
@@ -447,6 +473,7 @@ class Configuration extends Component
         $this->editingContractorClab = '';
         $this->editingContractorName = '';
         $this->editServiceChargeExempt = false;
+        $this->editPenaltyExempt = false;
         $this->editEnabledDeductions = [];
     }
 
@@ -458,10 +485,11 @@ class Configuration extends Component
         ]);
 
         try {
-            // Update service charge exemption
+            // Update service charge and penalty exemption
             $this->configService->updateConfiguration(
                 $this->editingContractorClab,
-                $this->editServiceChargeExempt
+                $this->editServiceChargeExempt,
+                $this->editPenaltyExempt
             );
 
             // Update enabled deductions
@@ -1295,6 +1323,191 @@ class Configuration extends Component
         }
     }
 
+    // Worker settings methods
+    public function updatedWorkerSearch()
+    {
+        $this->workersPage = 1;
+    }
+
+    public function updatedWorkerContractorFilter()
+    {
+        $this->workersPage = 1;
+    }
+
+    public function updatedWorkerStatusFilter()
+    {
+        $this->workersPage = 1;
+    }
+
+    public function clearWorkerFilters()
+    {
+        $this->workerSearch = '';
+        $this->workerContractorFilter = '';
+        $this->workerStatusFilter = '';
+        $this->workersPage = 1;
+    }
+
+    public function openDeactivateModal(string $workerId, string $workerName, string $passport, string $contractorClab)
+    {
+        $this->deactivatingWorkerId = $workerId;
+        $this->deactivatingWorkerName = $workerName;
+        $this->deactivatingWorkerPassport = $passport;
+        $this->deactivatingContractorClab = $contractorClab;
+        $this->deactivateReason = '';
+        $this->showDeactivateModal = true;
+    }
+
+    public function closeDeactivateModal()
+    {
+        $this->showDeactivateModal = false;
+        $this->deactivatingWorkerId = '';
+        $this->deactivatingWorkerName = '';
+        $this->deactivatingWorkerPassport = '';
+        $this->deactivatingContractorClab = '';
+        $this->deactivateReason = '';
+    }
+
+    public function confirmDeactivate()
+    {
+        try {
+            \App\Models\InactiveWorker::deactivate(
+                $this->deactivatingWorkerId,
+                $this->deactivatingWorkerName,
+                $this->deactivatingWorkerPassport,
+                $this->deactivatingContractorClab,
+                $this->deactivateReason,
+                auth()->id()
+            );
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Worker Deactivated',
+                text: "{$this->deactivatingWorkerName} has been set as inactive."
+            );
+
+            $this->closeDeactivateModal();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to deactivate worker: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function reactivateWorker(string $workerId)
+    {
+        try {
+            $inactive = \App\Models\InactiveWorker::where('worker_id', $workerId)->first();
+            $workerName = $inactive?->worker_name ?? 'Worker';
+
+            \App\Models\InactiveWorker::reactivate($workerId);
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Worker Reactivated',
+                text: "{$workerName} has been set as active."
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to reactivate worker: '.$e->getMessage()
+            );
+        }
+    }
+
+    protected function getWorkersData(): array
+    {
+        // Get inactive worker IDs
+        $inactiveWorkerIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+
+        // Get contracted worker IDs
+        $contractedWorkerIds = \App\Models\ContractWorker::pluck('con_wkr_id')->unique();
+
+        // Build query
+        $query = Worker::query()
+            ->with(['country', 'workTrade', 'contractor'])
+            ->whereIn('wkr_id', $contractedWorkerIds);
+
+        // Apply search filter
+        if ($this->workerSearch) {
+            $query->where(function ($q) {
+                $q->where('wkr_name', 'like', '%'.$this->workerSearch.'%')
+                    ->orWhere('wkr_passno', 'like', '%'.$this->workerSearch.'%')
+                    ->orWhere('wkr_id', 'like', '%'.$this->workerSearch.'%');
+            });
+        }
+
+        // Apply contractor filter
+        if ($this->workerContractorFilter) {
+            $query->where('wkr_currentemp', $this->workerContractorFilter);
+        }
+
+        // Apply status filter
+        if ($this->workerStatusFilter === 'inactive') {
+            $query->whereIn('wkr_id', $inactiveWorkerIds);
+        } elseif ($this->workerStatusFilter === 'active') {
+            $query->whereNotIn('wkr_id', $inactiveWorkerIds);
+        }
+
+        // Order by name
+        $query->orderBy('wkr_name');
+
+        // Paginate
+        $total = $query->count();
+        $workers = $query
+            ->skip(($this->workersPage - 1) * $this->workersPerPage)
+            ->take($this->workersPerPage)
+            ->get();
+
+        // Transform to array with status
+        $workersList = $workers->map(function ($worker) use ($inactiveWorkerIds) {
+            return [
+                'id' => $worker->wkr_id,
+                'name' => $worker->wkr_name,
+                'passport' => $worker->wkr_passno,
+                'contractor_clab' => $worker->wkr_currentemp,
+                'contractor_name' => $worker->contractor?->ctr_comp_name ?? $worker->wkr_currentemp,
+                'is_inactive' => in_array($worker->wkr_id, $inactiveWorkerIds),
+            ];
+        })->toArray();
+
+        // Get contractors for filter dropdown
+        $workerContractors = \App\Models\User::where('role', 'client')
+            ->whereNotNull('contractor_clab_no')
+            ->orderBy('name')
+            ->get(['contractor_clab_no', 'name'])
+            ->map(fn ($u) => ['clab_no' => $u->contractor_clab_no, 'name' => $u->name])
+            ->toArray();
+
+        // Stats
+        $totalWorkers = Worker::whereIn('wkr_id', $contractedWorkerIds)->count();
+        $inactiveCount = count($inactiveWorkerIds);
+
+        return [
+            'workersList' => $workersList,
+            'workerContractors' => $workerContractors,
+            'workerStats' => [
+                'total' => $totalWorkers,
+                'active' => $totalWorkers - $inactiveCount,
+                'inactive' => $inactiveCount,
+            ],
+            'workersPagination' => [
+                'current_page' => $this->workersPage,
+                'per_page' => $this->workersPerPage,
+                'total' => $total,
+                'last_page' => max(1, ceil($total / $this->workersPerPage)),
+                'from' => $total > 0 ? (($this->workersPage - 1) * $this->workersPerPage) + 1 : 0,
+                'to' => min($this->workersPage * $this->workersPerPage, $total),
+            ],
+            'inactiveWorkersList' => \App\Models\InactiveWorker::with('deactivatedBy')
+                ->orderBy('deactivated_at', 'desc')
+                ->limit(10)
+                ->get(),
+        ];
+    }
+
     public function render()
     {
         // Get worker IDs that have contracts (only show workers with contracts)
@@ -1392,7 +1605,13 @@ class Configuration extends Component
             $allContractors = $this->configService->getAllContractorConfigurations();
         }
 
-        return view('livewire.admin.configuration', [
+        // Get worker settings data if on workers tab
+        $workersData = [];
+        if ($this->activeTab === 'workers') {
+            $workersData = $this->getWorkersData();
+        }
+
+        return view('livewire.admin.configuration', array_merge([
             'workers' => $workers,
             'countries' => $countries,
             'positions' => $positions,
@@ -1403,6 +1622,6 @@ class Configuration extends Component
             'contractorConfigs' => $contractorConfigs,
             'deductionTemplates' => $deductionTemplates,
             'allContractors' => $allContractors,
-        ])->layout('components.layouts.app', ['title' => __('Configuration')]);
+        ], $workersData))->layout('components.layouts.app', ['title' => __('Configuration')]);
     }
 }

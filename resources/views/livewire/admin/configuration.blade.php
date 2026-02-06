@@ -40,6 +40,13 @@
                 <flux:icon.credit-card class="size-5 inline mr-2" />
                 Payments
             </button>
+            <button
+                wire:click="switchTab('workers')"
+                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'workers' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+            >
+                <flux:icon.users class="size-5 inline mr-2" />
+                Workers
+            </button>
         </nav>
     </div>
 
@@ -58,6 +65,10 @@
 
     @if($activeTab === 'payments')
         @include('livewire.admin.configuration-payments')
+    @endif
+
+    @if($activeTab === 'workers')
+        @include('livewire.admin.configuration-workers')
     @endif
 
     <!-- Window Action Modal -->

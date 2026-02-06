@@ -88,45 +88,22 @@ class TaxInvoiceController extends Controller
             return $pdf->download($filename);
         }
 
-        // Multiple invoices - create ZIP file
-        $zip = new \ZipArchive;
-        $zipFilename = 'Tax-Invoices-'.\Carbon\Carbon::create($year, $month)->format('Y_m').'_'.now()->format('YmdHis').'.zip';
-        $zipPath = storage_path('app/temp/'.$zipFilename);
-
-        // Create temp directory if it doesn't exist
-        if (! file_exists(storage_path('app/temp'))) {
-            mkdir(storage_path('app/temp'), 0755, true);
+        // Multiple invoices - generate a single combined PDF (much faster than separate PDFs + ZIP)
+        // Generate all tax invoice numbers first if needed
+        foreach ($invoices as $invoice) {
+            if (! $invoice->hasTaxInvoice()) {
+                $invoice->generateTaxInvoiceNumber();
+            }
         }
 
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
-            // Generate all tax invoice numbers first if needed (without reloading)
-            foreach ($invoices as $invoice) {
-                if (! $invoice->hasTaxInvoice()) {
-                    $invoice->generateTaxInvoiceNumber();
-                    // Refresh just this invoice to get the generated number
-                    $invoice->refresh();
-                }
-            }
+        // Generate single multi-page PDF (one wkhtmltopdf process instead of N)
+        $pdf = \PDF::loadView('admin.tax-invoice-bulk-pdf', compact('invoices'))
+            ->setPaper('a4', 'landscape')
+            ->setOption('enable-local-file-access', true)
+            ->setOption('no-stop-slow-scripts', true);
 
-            // Generate PDFs and add to ZIP
-            foreach ($invoices as $invoice) {
-                $contractor = $invoice->user;
+        $filename = 'Official-Receipts-'.\Carbon\Carbon::create($year, $month)->format('Y_m').'_'.now()->format('YmdHis').'.pdf';
 
-                $pdf = \PDF::loadView('admin.tax-invoice-pdf', compact('invoice', 'contractor'))
-                    ->setPaper('a4', 'landscape')
-                    ->setOption('enable-local-file-access', true)
-                    ->setOption('no-stop-slow-scripts', true);
-
-                $filename = 'Tax-Invoice-'.$invoice->tax_invoice_number.'-'.$invoice->month_year.'.pdf';
-
-                $zip->addFromString($filename, $pdf->output());
-            }
-
-            $zip->close();
-
-            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
-        }
-
-        abort(500, 'Failed to create ZIP file');
+        return $pdf->download($filename);
     }
 }

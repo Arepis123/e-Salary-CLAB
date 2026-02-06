@@ -10,11 +10,13 @@ class ContractorConfiguration extends Model
         'contractor_clab_no',
         'contractor_name',
         'service_charge_exempt',
+        'penalty_exempt',
         'updated_by',
     ];
 
     protected $casts = [
         'service_charge_exempt' => 'boolean',
+        'penalty_exempt' => 'boolean',
     ];
 
     /**

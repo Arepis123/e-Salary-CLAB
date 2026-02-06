@@ -232,6 +232,9 @@
                     <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Service Charge</span>
                 </flux:table.column>
                 <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Penalty</span>
+                </flux:table.column>
+                <flux:table.column>
                     <span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span>
                 </flux:table.column>
             </flux:table.columns>
@@ -267,6 +270,12 @@
                             </flux:badge>
                         </flux:table.cell>
 
+                        <flux:table.cell variant="strong">
+                            <flux:badge color="{{ $config->penalty_exempt ? 'amber' : 'zinc' }}" size="sm">
+                                {{ $config->penalty_exempt ? 'Exempt' : 'Standard (8%)' }}
+                            </flux:badge>
+                        </flux:table.cell>
+
                         <flux:table.cell>
                             <div class="flex justify-center">
                                 <flux:button
@@ -283,7 +292,7 @@
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="5">
+                        <flux:table.cell colspan="6">
                             <div class="py-12 text-center">
                                 <flux:icon.users class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
                                 <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No Contractors Found</p>
@@ -359,6 +368,13 @@
             wire:model="editServiceChargeExempt"
             label="Exempt from Service Charge"
             description="This contractor will pay RM 0 service charge instead of RM 200 per worker"
+        />
+
+        <!-- Penalty Exemption -->
+        <flux:checkbox
+            wire:model="editPenaltyExempt"
+            label="Exempt from Late Payment Penalty"
+            description="This contractor will not be charged 8% penalty for overdue payments"
         />
     </div>
 

@@ -105,10 +105,26 @@ class PayrollSubmission extends Model
     }
 
     /**
+     * Check if contractor is exempt from penalty
+     */
+    public function isPenaltyExempt(): bool
+    {
+        $configService = app(\App\Services\ContractorConfigurationService::class);
+
+        return $configService->isPenaltyExempt($this->contractor_clab_no);
+    }
+
+    /**
      * Calculate penalty if overdue (8% of client total)
+     * Returns 0 if contractor is exempt from penalty
      */
     public function calculatePenalty(): float
     {
+        // Check if contractor is exempt from penalty
+        if ($this->isPenaltyExempt()) {
+            return 0;
+        }
+
         if ($this->isOverdue()) {
             return $this->client_total * 0.08;
         }
@@ -118,9 +134,15 @@ class PayrollSubmission extends Model
 
     /**
      * Update penalty if overdue
+     * Does not apply penalty if contractor is exempt
      */
     public function updatePenalty(): void
     {
+        // Skip if contractor is exempt from penalty
+        if ($this->isPenaltyExempt()) {
+            return;
+        }
+
         if ($this->isOverdue() && ! $this->has_penalty) {
             $penalty = $this->calculatePenalty();
             $this->update([
@@ -193,10 +215,16 @@ class PayrollSubmission extends Model
 
     /**
      * Get the total amount including penalty (dynamic calculation)
+     * Returns base amount without penalty if contractor is exempt
      */
     public function getTotalDueAttribute(): float
     {
         $baseAmount = $this->client_total;
+
+        // Skip penalty if contractor is exempt
+        if ($this->isPenaltyExempt()) {
+            return $baseAmount;
+        }
 
         // If penalty was already applied and saved, use it
         if ($this->has_penalty && $this->penalty_amount > 0) {
@@ -274,44 +302,59 @@ class PayrollSubmission extends Model
      */
     public function generateTaxInvoiceNumber(): string
     {
+        // Return existing number if already generated
         if ($this->tax_invoice_number) {
             return $this->tax_invoice_number;
         }
 
-        // Get the latest tax invoice number for this year and month
-        $year = $this->year;
-        $month = $this->month;
-        $yearShort = substr((string) $year, -2); // Last 2 digits of year
-        $monthPadded = str_pad($month, 2, '0', STR_PAD_LEFT); // 2-digit month
+        // Use database transaction with locking to prevent race conditions
+        return \DB::transaction(function () {
+            // Re-check within transaction (double-check locking pattern)
+            $freshSelf = static::lockForUpdate()->find($this->id);
+            if ($freshSelf->tax_invoice_number) {
+                return $freshSelf->tax_invoice_number;
+            }
 
-        // Find the latest invoice number for this year-month period
-        $latestInvoice = static::whereNotNull('tax_invoice_number')
-            ->where('year', $year)
-            ->where('month', $month)
-            ->where('tax_invoice_number', 'LIKE', 'OR-P-'.$yearShort.$monthPadded.'%')
-            ->orderBy('tax_invoice_generated_at', 'desc')
-            ->first();
+            // Get the latest tax invoice number for this year and month
+            $year = $this->year;
+            $month = $this->month;
+            $yearShort = substr((string) $year, -2); // Last 2 digits of year
+            $monthPadded = str_pad($month, 2, '0', STR_PAD_LEFT); // 2-digit month
 
-        if ($latestInvoice && $latestInvoice->tax_invoice_number) {
-            // Extract the running number from format OR-P-YYMMNNNN
-            $invoiceNumber = $latestInvoice->tax_invoice_number;
-            // Get last 4 digits (running number)
-            $lastNumber = (int) substr($invoiceNumber, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
+            // Find the latest invoice number for this year-month period with lock
+            $latestInvoice = static::whereNotNull('tax_invoice_number')
+                ->where('year', $year)
+                ->where('month', $month)
+                ->where('tax_invoice_number', 'LIKE', 'OR-P-'.$yearShort.$monthPadded.'%')
+                ->orderByRaw("CAST(SUBSTRING(tax_invoice_number, -4) AS UNSIGNED) DESC")
+                ->lockForUpdate()
+                ->first();
 
-        // Format: OR-P-YYMMNNNN
-        $taxInvoiceNumber = sprintf('OR-P-%s%s%04d', $yearShort, $monthPadded, $nextNumber);
+            if ($latestInvoice && $latestInvoice->tax_invoice_number) {
+                // Extract the running number from format OR-P-YYMMNNNN
+                $invoiceNumber = $latestInvoice->tax_invoice_number;
+                // Get last 4 digits (running number)
+                $lastNumber = (int) substr($invoiceNumber, -4);
+                $nextNumber = $lastNumber + 1;
+            } else {
+                $nextNumber = 1;
+            }
 
-        // Save the tax invoice number and generation timestamp
-        $this->update([
-            'tax_invoice_number' => $taxInvoiceNumber,
-            'tax_invoice_generated_at' => now(),
-        ]);
+            // Format: OR-P-YYMMNNNN
+            $taxInvoiceNumber = sprintf('OR-P-%s%s%04d', $yearShort, $monthPadded, $nextNumber);
 
-        return $taxInvoiceNumber;
+            // Save the tax invoice number and generation timestamp
+            $freshSelf->update([
+                'tax_invoice_number' => $taxInvoiceNumber,
+                'tax_invoice_generated_at' => now(),
+            ]);
+
+            // Update current instance as well
+            $this->tax_invoice_number = $taxInvoiceNumber;
+            $this->tax_invoice_generated_at = now();
+
+            return $taxInvoiceNumber;
+        });
     }
 
     /**

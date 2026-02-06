@@ -82,7 +82,7 @@
                 </flux:select>
             </div>
             <div>
-                <flux:button variant="ghost" size="sm" wire:click="clearFilters" icon="x-mark" icon-variant="outline">
+                <flux:button variant="filled" size="sm" wire:click="clearFilters" icon="x-mark" icon-variant="outline">
                     Clear Filters
                 </flux:button>
             </div>
