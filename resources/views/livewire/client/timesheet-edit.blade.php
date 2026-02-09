@@ -307,6 +307,7 @@
                         <div>
                             <flux:select wire:model.live="newTransactionType" variant="listbox" label="Type">
                                 @if($newTransactionCategory === 'deduction')
+                                    <flux:select.option value="accommodation">Accommodation</flux:select.option>
                                     <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
                                     <flux:select.option value="deduction">Other Deduction</flux:select.option>
                                     <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>

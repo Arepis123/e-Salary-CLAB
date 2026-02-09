@@ -132,7 +132,7 @@ class ContractorConfigurationService
     {
         $config = $this->getContractorConfiguration($clabNo);
 
-        return $config->service_charge_exempt;
+        return $config->service_charge_exempt ?? false;
     }
 
     /**
@@ -142,7 +142,7 @@ class ContractorConfigurationService
     {
         $config = $this->getContractorConfiguration($clabNo);
 
-        return $config->penalty_exempt;
+        return $config->penalty_exempt ?? false;
     }
 
     /**

@@ -475,7 +475,7 @@ class Timesheet extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:advance_payment,deduction,npl,allowance',
+            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [

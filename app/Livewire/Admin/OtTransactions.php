@@ -223,6 +223,7 @@ class OtTransactions extends Component
             'total_weekday_ot_hours' => $otStats->total_weekday_ot ?? 0,
             'total_rest_ot_hours' => $otStats->total_rest_ot ?? 0,
             'total_public_ot_hours' => $otStats->total_public_ot ?? 0,
+            'total_accommodation' => $transactionStats['accommodation']->total_amount ?? 0,
             'total_advance_payment' => $transactionStats['advance_payment']->total_amount ?? 0,
             'total_deduction' => $transactionStats['deduction']->total_amount ?? 0,
             'total_npl_days' => $transactionStats['npl']->total_amount ?? 0,
@@ -318,6 +319,7 @@ class OtTransactions extends Component
                     ->where('entry_year', $item->entry_year);
             })->get();
 
+            $item->total_accommodation = $transactions->where('type', 'accommodation')->sum('amount');
             $item->total_advance = $transactions->where('type', 'advance_payment')->sum('amount');
             $item->total_deduction = $transactions->where('type', 'deduction')->sum('amount');
             $item->total_npl = $transactions->where('type', 'npl')->sum('amount');

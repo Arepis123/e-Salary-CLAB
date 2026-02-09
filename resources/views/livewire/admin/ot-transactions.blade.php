@@ -7,91 +7,63 @@
         </div>
     </div>
 
-    <!-- OT Statistics Row -->
+    <!-- Statistics Row -->
     <div class="grid gap-4 md:grid-cols-4">
+        <!-- OT Card -->
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Weekday OT (1.5x)</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format($stats['total_weekday_ot_hours'] ?? 0, 1) }} hrs</p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Total OT Hours</p>
+                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ number_format(($stats['total_weekday_ot_hours'] ?? 0) + ($stats['total_rest_ot_hours'] ?? 0) + ($stats['total_public_ot_hours'] ?? 0), 1) }} hrs</p>
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 space-y-0.5">
+                        <div>W: {{ number_format($stats['total_weekday_ot_hours'] ?? 0, 1) }}h | R: {{ number_format($stats['total_rest_ot_hours'] ?? 0, 1) }}h | P: {{ number_format($stats['total_public_ot_hours'] ?? 0, 1) }}h</div>
+                    </div>
                 </div>
                 <flux:icon.clock class="size-8 text-blue-600 dark:text-blue-400" />
             </div>
         </flux:card>
 
+        <!-- Deduction Card -->
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Rest Day OT (2.0x)</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format($stats['total_rest_ot_hours'] ?? 0, 1) }} hrs</p>
-                </div>
-                <flux:icon.calendar class="size-8 text-purple-600 dark:text-purple-400" />
-            </div>
-        </flux:card>
-
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Public Holiday OT (3.0x)</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format($stats['total_public_ot_hours'] ?? 0, 1) }} hrs</p>
-                </div>
-                <flux:icon.star class="size-8 text-orange-600 dark:text-orange-400" />
-            </div>
-        </flux:card>
-
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Clients Submitted</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['contractors_submitted'] ?? 0 }}</p>
-                    @if(($stats['contractors_draft'] ?? 0) > 0)
-                        <p class="text-xs text-amber-600 dark:text-amber-400">{{ $stats['contractors_draft'] }} draft</p>
-                    @endif
-                </div>
-                <flux:icon.check-circle class="size-8 text-green-600 dark:text-green-400" />
-            </div>
-        </flux:card>
-    </div>
-
-    <!-- Transaction Statistics Row -->
-    <div class="grid gap-4 md:grid-cols-4">
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Advance Payments</p>
-                    <p class="text-2xl font-bold text-red-600 dark:text-red-400">RM {{ number_format($stats['total_advance_payment'] ?? 0, 2) }}</p>
-                </div>
-                <flux:icon.arrow-trending-down class="size-8 text-red-600 dark:text-red-400" />
-            </div>
-        </flux:card>
-
-        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Deductions</p>
-                    <p class="text-2xl font-bold text-red-600 dark:text-red-400">RM {{ number_format($stats['total_deduction'] ?? 0, 2) }}</p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Deductions</p>
+                    <p class="text-2xl font-bold text-red-600 dark:text-red-400">RM {{ number_format(($stats['total_accommodation'] ?? 0) + ($stats['total_advance_payment'] ?? 0) + ($stats['total_deduction'] ?? 0), 2) }}</p>
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        @if(($stats['total_npl_days'] ?? 0) > 0)
+                            <span>NPL: {{ number_format($stats['total_npl_days'] ?? 0, 1) }} days</span>
+                        @endif
+                    </div>
                 </div>
                 <flux:icon.minus-circle class="size-8 text-red-600 dark:text-red-400" />
             </div>
         </flux:card>
 
+        <!-- Earning Card -->
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">NPL (No-Pay Leave)</p>
-                    <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ number_format($stats['total_npl_days'] ?? 0, 1) }} days</p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Earnings</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">RM {{ number_format($stats['total_allowance'] ?? 0, 2) }}</p>
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        Allowances
+                    </div>
                 </div>
-                <flux:icon.calendar-days class="size-8 text-amber-600 dark:text-amber-400" />
+                <flux:icon.plus-circle class="size-8 text-green-600 dark:text-green-400" />
             </div>
         </flux:card>
 
+        <!-- Client Submitted Card -->
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Allowances</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">RM {{ number_format($stats['total_allowance'] ?? 0, 2) }}</p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Clients Submitted</p>
+                    <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ $stats['contractors_submitted'] ?? 0 }}</p>
+                    @if(($stats['contractors_draft'] ?? 0) > 0)
+                        <p class="text-xs text-amber-600 dark:text-amber-400">{{ $stats['contractors_draft'] }} draft</p>
+                    @endif
                 </div>
-                <flux:icon.plus-circle class="size-8 text-green-600 dark:text-green-400" />
+                <flux:icon.check-circle class="size-8 text-purple-600 dark:text-purple-400" />
             </div>
         </flux:card>
     </div>
@@ -146,6 +118,7 @@
                 <div>
                     <flux:select wire:model.live="transactionType" variant="listbox" placeholder="Transaction Type" size="sm">
                         <flux:select.option value="">All Types</flux:select.option>
+                        <flux:select.option value="accommodation">Accommodation</flux:select.option>
                         <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
                         <flux:select.option value="deduction">Deduction</flux:select.option>
                         <flux:select.option value="npl">NPL (No-Pay Leave)</flux:select.option>
@@ -217,6 +190,9 @@
                         <flux:table.cell>
                             @if($hasTransactions)
                                 <div class="text-xs space-y-0.5">
+                                    @if($submission->total_accommodation > 0)
+                                        <div class="text-amber-600 dark:text-amber-400">Acc: -RM {{ number_format($submission->total_accommodation, 2) }}</div>
+                                    @endif
                                     @if($submission->total_advance > 0)
                                         <div class="text-red-600 dark:text-red-400">Adv: -RM {{ number_format($submission->total_advance, 2) }}</div>
                                     @endif
@@ -224,7 +200,7 @@
                                         <div class="text-red-600 dark:text-red-400">Ded: -RM {{ number_format($submission->total_deduction, 2) }}</div>
                                     @endif
                                     @if($submission->total_npl > 0)
-                                        <div class="text-amber-600 dark:text-amber-400">NPL: {{ number_format($submission->total_npl, 1) }} days</div>
+                                        <div class="text-purple-600 dark:text-purple-400">NPL: {{ number_format($submission->total_npl, 1) }} days</div>
                                     @endif
                                     @if($submission->total_allowance > 0)
                                         <div class="text-green-600 dark:text-green-400">Alw: +RM {{ number_format($submission->total_allowance, 2) }}</div>
@@ -439,12 +415,14 @@
                                         <tr>
                                             <td class="px-3 py-2 text-zinc-900 dark:text-zinc-100">{{ $transaction->worker_name }}</td>
                                             <td class="px-3 py-2">
-                                                @if($transaction->type === 'advance_payment')
+                                                @if($transaction->type === 'accommodation')
+                                                    <flux:badge color="amber" size="sm">Accommodation</flux:badge>
+                                                @elseif($transaction->type === 'advance_payment')
                                                     <flux:badge color="red" size="sm">Advance</flux:badge>
                                                 @elseif($transaction->type === 'deduction')
                                                     <flux:badge color="orange" size="sm">Deduction</flux:badge>
                                                 @elseif($transaction->type === 'npl')
-                                                    <flux:badge color="amber" size="sm">NPL</flux:badge>
+                                                    <flux:badge color="purple" size="sm">NPL</flux:badge>
                                                 @elseif($transaction->type === 'allowance')
                                                     <flux:badge color="green" size="sm">Allowance</flux:badge>
                                                 @endif

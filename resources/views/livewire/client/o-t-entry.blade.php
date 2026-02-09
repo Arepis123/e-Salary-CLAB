@@ -311,6 +311,7 @@
                             <div>
                                 <flux:select wire:model.live="newTransactionType" variant="listbox" label="Type">
                                     @if($newTransactionCategory === 'deduction')
+                                        <flux:select.option value="accommodation">Accommodation</flux:select.option>
                                         <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
                                         <flux:select.option value="deduction">Other Deduction</flux:select.option>
                                         <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
@@ -408,7 +409,7 @@
 
         <!-- Import Modal -->
         @if($showImportModal)
-            <flux:modal id="import-modal" wire:model="showImportModal" class="min-w-[800px]">
+            <flux:modal id="import-modal" wire:model="showImportModal" class="min-w-[800px]" :dismissible="false">
                 <div class="space-y-6">
                     <div id="import-modal-header">
                         <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
@@ -444,7 +445,8 @@
                                     <ul class="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
                                         <li>Download the template file to see the required format</li>
                                         <li>Fill in worker passport, name, OT hours, and transactions</li>
-                                        <li>Transaction types: <strong class="text-zinc-900 dark:text-zinc-100">advance_payment</strong>, <strong class="text-zinc-900 dark:text-zinc-100">deduction</strong>, <strong class="text-zinc-900 dark:text-zinc-100">npl</strong>, <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong></li>
+                                        <li>Deduction types: <strong class="text-zinc-900 dark:text-zinc-100">accommodation</strong>, <strong class="text-zinc-900 dark:text-zinc-100">advance_payment</strong>, <strong class="text-zinc-900 dark:text-zinc-100">deduction</strong>, <strong class="text-zinc-900 dark:text-zinc-100">npl</strong></li>
+                                        <li>Earning types: <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong></li>
                                         <li>You can have multiple rows for the same worker (for multiple transactions)</li>
                                         <li>Leave OT columns empty if you're only adding transactions</li>
                                         <li>Workers must already exist in your contractor worker list</li>
@@ -491,6 +493,29 @@
                                     </p>
                                 </flux:card>
 
+                                <!-- Import Mode Selection -->
+                                <flux:card class="p-4 bg-zinc-100 dark:bg-zinc-800">
+                                    <h3 class="text-sm font-semibold mb-3">
+                                        How should transactions be handled?
+                                    </h3>
+                                    <div class="space-y-2">
+                                        <label class="flex items-start gap-3 cursor-pointer">
+                                            <input type="radio" wire:model="importMode" value="add" class="mt-1">
+                                            <div>
+                                                <span class="text-sm font-medium ">Add to existing</span>
+                                                <p class="text-xs ">OT hours will be <strong>added</strong> to existing values. Transactions will be <strong>appended</strong> to existing list.</p>
+                                            </div>
+                                        </label>
+                                        <label class="flex items-start gap-3 cursor-pointer">
+                                            <input type="radio" wire:model="importMode" value="override" class="mt-1">
+                                            <div>
+                                                <span class="text-sm font-medium ">Override existing</span>
+                                                <p class="text-xs ">OT hours will be <strong>replaced</strong> with imported values. Transactions will be <strong>replaced</strong> entirely.</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </flux:card>
+
                                 <!-- Data Preview Table -->
                                 <div id="import-preview-table" class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
                                     <div class="max-h-96 overflow-y-auto">
@@ -530,6 +555,8 @@
                                                                         <flux:badge color="purple" size="sm">NPL</flux:badge>
                                                                     @elseif($item['transaction_type'] === 'allowance')
                                                                         <flux:badge color="green" size="sm">Allowance</flux:badge>
+                                                                    @elseif($item['transaction_type'] === 'accommodation')
+                                                                        <flux:badge color="amber" size="sm">Accommodation</flux:badge>
                                                                     @endif
                                                                     <span class="text-xs text-zinc-600 dark:text-zinc-400">
                                                                         {{ $item['transaction_type'] === 'npl' ? $item['transaction_amount'] . ' days' : 'RM ' . number_format($item['transaction_amount'], 2) }}
