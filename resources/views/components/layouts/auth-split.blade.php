@@ -7,10 +7,8 @@
         <!-- Full-screen Background Image -->
         <div
             class="fixed inset-0 bg-cover bg-left bg-no-repeat"
-            style="background-image: url('{{ asset('images/payroll-5.jpg') }}');"
+            style="background-image: url('{{ asset('images/payroll-6.jpg') }}');"
         >
-            <!-- Dark overlay for better readability -->
-            <div class="absolute inset-0 bg-black/60"></div>
         </div>
 
         <!-- Content Container -->
