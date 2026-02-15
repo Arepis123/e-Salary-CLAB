@@ -143,6 +143,14 @@
                             <p class="text-sm text-zinc-600 dark:text-zinc-400">Phone</p>
                             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->phone ?? '-' }}</p>
                         </div>
+                        <div>
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400">SOCSO Number</p>
+                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->wkr_sosco_id ?? '-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400">KWSP Number</p>
+                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->wkr_kwsp ?? '-' }}</p>
+                        </div>
                     </div>
                 </flux:card>
 

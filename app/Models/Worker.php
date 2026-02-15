@@ -54,6 +54,8 @@ class Worker extends Model
         'wkr_next_of_kin',
         'wkr_relationship',
         'wkr_homeaddr',
+        'wkr_sosco_id',
+        'wkr_kwsp',
     ];
 
     /**

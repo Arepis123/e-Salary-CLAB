@@ -485,6 +485,20 @@ class Timesheet extends Component
             'newTransactionRemarks.min' => 'Remarks must be at least 3 characters',
         ]);
 
+        // Enforce RM100 max for accommodation per worker
+        if ($validated['newTransactionType'] === 'accommodation') {
+            $currentTransactions = $this->workers[$this->currentWorkerIndex]['transactions'] ?? [];
+            $existingAccommodation = collect($currentTransactions)
+                ->where('type', 'accommodation')
+                ->sum('amount');
+
+            if ($existingAccommodation + floatval($validated['newTransactionAmount']) > 100) {
+                $remaining = max(0, 100 - $existingAccommodation);
+                $this->addError('newTransactionAmount', "Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM " . number_format($remaining, 2));
+                return;
+            }
+        }
+
         // Create new transaction array
         $newTransaction = [
             'type' => $validated['newTransactionType'],

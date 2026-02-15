@@ -23,7 +23,7 @@
                             <img src="{{ asset('images/logo-clab.png') }}" alt="CLAB Logo" class="mx-auto w-16 mb-4">
                         </a>
                         <h1 class="text-3xl font-bold text-white">e-SALARY CLAB</h1>
-                        <p class="mt-2 text-sm text-gray-300">Subcontract Labor Management</p>
+                        <!-- <p class="mt-2 text-sm text-gray-300">Subcontract Labor Management</p> -->
                     </div>
 
                     <!-- Form Content -->

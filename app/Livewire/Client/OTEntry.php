@@ -315,6 +315,20 @@ class OTEntry extends Component
             'newTransactionRemarks.min' => 'Remarks must be at least 3 characters',
         ]);
 
+        // Enforce RM100 max for accommodation per worker
+        if ($validated['newTransactionType'] === 'accommodation') {
+            $currentTransactions = $this->entries[$this->currentWorkerIndex]['transactions'] ?? [];
+            $existingAccommodation = collect($currentTransactions)
+                ->where('type', 'accommodation')
+                ->sum('amount');
+
+            if ($existingAccommodation + floatval($validated['newTransactionAmount']) > 100) {
+                $remaining = max(0, 100 - $existingAccommodation);
+                $this->addError('newTransactionAmount', "Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM " . number_format($remaining, 2));
+                return;
+            }
+        }
+
         // Create new transaction array
         $newTransaction = [
             'type' => $validated['newTransactionType'],
@@ -682,6 +696,9 @@ class OTEntry extends Component
                     } elseif ($txnType === 'npl' && $txnAmount > 31) {
                         $this->importErrors[] = "Row {$rowNumber}: NPL days cannot exceed 31 days (got {$txnAmount})";
                         $rowHasError = true;
+                    } elseif ($txnType === 'accommodation' && $txnAmount > 100) {
+                        $this->importErrors[] = "Row {$rowNumber}: Accommodation cannot exceed RM 100.00 per month (got RM " . number_format($txnAmount, 2) . ")";
+                        $rowHasError = true;
                     } elseif ($txnType !== 'npl' && $txnAmount > 100000) {
                         $this->importErrors[] = "Row {$rowNumber}: Transaction amount seems too high (RM {$txnAmount}). Maximum allowed is RM 100,000";
                         $rowHasError = true;
@@ -723,6 +740,36 @@ class OTEntry extends Component
                 ];
             }
 
+            // Validate aggregate accommodation limit (RM100) per worker across all import rows + existing
+            $accommodationByWorker = [];
+            foreach ($this->importData as $item) {
+                if ($item['transaction_type'] === 'accommodation') {
+                    $passport = $item['passport'];
+                    if (! isset($accommodationByWorker[$passport])) {
+                        $accommodationByWorker[$passport] = ['name' => $item['name'], 'total' => 0];
+                    }
+                    $accommodationByWorker[$passport]['total'] += $item['transaction_amount'];
+                }
+            }
+
+            foreach ($accommodationByWorker as $passport => $info) {
+                // Include existing accommodation from current entries
+                $existingAccommodation = 0;
+                foreach ($this->entries as $entry) {
+                    if ($entry['worker_passport'] === $passport) {
+                        $existingAccommodation = collect($entry['transactions'] ?? [])
+                            ->where('type', 'accommodation')
+                            ->sum('amount');
+                        break;
+                    }
+                }
+
+                $grandTotal = $existingAccommodation + $info['total'];
+                if ($grandTotal > 100) {
+                    $this->importErrors[] = "Worker '{$info['name']}' ({$passport}): Total accommodation RM " . number_format($grandTotal, 2) . " exceeds RM 100.00 per month limit" . ($existingAccommodation > 0 ? " (existing: RM " . number_format($existingAccommodation, 2) . " + import: RM " . number_format($info['total'], 2) . ")" : "");
+                }
+            }
+
             if (empty($this->importData) && empty($this->importErrors)) {
                 Flux::toast(
                     variant: 'danger',
@@ -738,10 +785,15 @@ class OTEntry extends Component
             }
 
             if (! empty($this->importErrors)) {
+                // Show specific error details in the toast so user knows exactly what's wrong
+                $errorSummary = count($this->importErrors) === 1
+                    ? $this->importErrors[0]
+                    : count($this->importErrors) . " errors found:\n" . implode("\n", array_slice($this->importErrors, 0, 3)) . (count($this->importErrors) > 3 ? "\n...and " . (count($this->importErrors) - 3) . " more. See details below." : "");
+
                 Flux::toast(
                     variant: 'warning',
                     heading: 'Import Warnings',
-                    text: count($this->importErrors).' errors found. Please review before proceeding.'
+                    text: $errorSummary
                 );
             }
 
@@ -803,6 +855,43 @@ class OTEntry extends Component
                         'remarks' => $item['transaction_remarks'],
                     ];
                 }
+            }
+
+            // Validate accommodation RM100 limit per worker across all import rows + existing transactions
+            $accommodationErrors = [];
+            foreach ($groupedData as $passport => $data) {
+                $importAccommodation = collect($data['transactions'])
+                    ->where('type', 'accommodation')
+                    ->sum('amount');
+
+                if ($importAccommodation > 0) {
+                    // Get existing accommodation from current entries
+                    $existingAccommodation = 0;
+                    if ($this->importMode !== 'override') {
+                        foreach ($this->entries as $entry) {
+                            if ($entry['worker_passport'] === $passport) {
+                                $existingAccommodation = collect($entry['transactions'] ?? [])
+                                    ->where('type', 'accommodation')
+                                    ->sum('amount');
+                                break;
+                            }
+                        }
+                    }
+
+                    $totalAccommodation = $existingAccommodation + $importAccommodation;
+                    if ($totalAccommodation > 100) {
+                        $accommodationErrors[] = "Worker '{$data['name']}' ({$passport}): Total accommodation RM " . number_format($totalAccommodation, 2) . " exceeds RM 100.00 limit";
+                    }
+                }
+            }
+
+            if (! empty($accommodationErrors)) {
+                Flux::toast(
+                    variant: 'danger',
+                    heading: 'Accommodation Limit Exceeded',
+                    text: implode('. ', $accommodationErrors)
+                );
+                return;
             }
 
             // Update entries

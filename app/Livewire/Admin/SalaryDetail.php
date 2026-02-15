@@ -204,7 +204,7 @@ class SalaryDetail extends Component
 
             // Title row
             $sheet->setCellValue('A1', 'PAYROLL SUBMISSION - '.strtoupper($this->submission->month_year));
-            $sheet->mergeCells('A1:M1');
+            $sheet->mergeCells('A1:O1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -230,15 +230,17 @@ class SalaryDetail extends Component
                 'B9' => 'Worker ID',
                 'C9' => 'Worker Name',
                 'D9' => 'Passport',
-                'E9' => 'Basic Salary (RM)',
-                'F9' => 'OT Normal (hrs)',
-                'G9' => 'OT Rest (hrs)',
-                'H9' => 'OT Public (hrs)',
-                'I9' => 'Advance Payment (RM)',
-                'J9' => 'Other Deduction (RM)',
-                'K9' => 'NPL (days)',
-                'L9' => 'Allowance (RM)',
-                'M9' => 'Transaction Details',
+                'E9' => 'SOCSO No.',
+                'F9' => 'KWSP No.',
+                'G9' => 'Basic Salary (RM)',
+                'H9' => 'OT Normal (hrs)',
+                'I9' => 'OT Rest (hrs)',
+                'J9' => 'OT Public (hrs)',
+                'K9' => 'Advance Payment (RM)',
+                'L9' => 'Other Deduction (RM)',
+                'M9' => 'NPL (days)',
+                'N9' => 'Allowance (RM)',
+                'O9' => 'Transaction Details',
             ];
 
             foreach ($headers as $cell => $value) {
@@ -246,7 +248,7 @@ class SalaryDetail extends Component
             }
 
             // Style headers
-            $sheet->getStyle('A9:M9')->applyFromArray([
+            $sheet->getStyle('A9:O9')->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -266,14 +268,16 @@ class SalaryDetail extends Component
                 $sheet->setCellValue('B'.$row, $worker->worker_id);
                 $sheet->setCellValue('C'.$row, $worker->worker_name);
                 $sheet->setCellValue('D'.$row, $worker->worker_passport);
-                $sheet->setCellValue('E'.$row, $worker->basic_salary);
-                $sheet->setCellValue('F'.$row, $worker->ot_normal_hours ?? 0);
-                $sheet->setCellValue('G'.$row, $worker->ot_rest_hours ?? 0);
-                $sheet->setCellValue('H'.$row, $worker->ot_public_hours ?? 0);
-                $sheet->setCellValue('I'.$row, $worker->advance_payment ?? 0);
-                $sheet->setCellValue('J'.$row, $worker->other_deduction ?? 0);
-                $sheet->setCellValue('K'.$row, $worker->npl_days ?? 0);
-                $sheet->setCellValue('L'.$row, $worker->allowance ?? 0);
+                $sheet->setCellValue('E'.$row, $worker->worker?->wkr_sosco_id ?? '');
+                $sheet->setCellValue('F'.$row, $worker->worker?->wkr_kwsp ?? '');
+                $sheet->setCellValue('G'.$row, $worker->basic_salary);
+                $sheet->setCellValue('H'.$row, $worker->ot_normal_hours ?? 0);
+                $sheet->setCellValue('I'.$row, $worker->ot_rest_hours ?? 0);
+                $sheet->setCellValue('J'.$row, $worker->ot_public_hours ?? 0);
+                $sheet->setCellValue('K'.$row, $worker->advance_payment ?? 0);
+                $sheet->setCellValue('L'.$row, $worker->other_deduction ?? 0);
+                $sheet->setCellValue('M'.$row, $worker->npl_days ?? 0);
+                $sheet->setCellValue('N'.$row, $worker->allowance ?? 0);
 
                 // Add transaction details
                 $transactionDetails = [];
@@ -290,24 +294,24 @@ class SalaryDetail extends Component
                         $transactionDetails[] = "-RM {$txn->amount} ({$label}".($txn->remarks ? ' - '.$txn->remarks : '').')';
                     }
                 }
-                $sheet->setCellValue('M'.$row, implode("\n", $transactionDetails));
-                $sheet->getStyle('M'.$row)->getAlignment()->setWrapText(true);
-                $sheet->getStyle('M'.$row)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->setCellValue('O'.$row, implode("\n", $transactionDetails));
+                $sheet->getStyle('O'.$row)->getAlignment()->setWrapText(true);
+                $sheet->getStyle('O'.$row)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
 
                 // Format currency columns
-                foreach (['E', 'I', 'J', 'L'] as $col) {
+                foreach (['G', 'K', 'L', 'N'] as $col) {
                     $sheet->getStyle($col.$row)->getNumberFormat()
                         ->setFormatCode('#,##0.00');
                 }
 
                 // Format hours columns
-                foreach (['F', 'G', 'H'] as $col) {
+                foreach (['H', 'I', 'J'] as $col) {
                     $sheet->getStyle($col.$row)->getNumberFormat()
                         ->setFormatCode('0.00');
                 }
 
                 // Format NPL days column
-                $sheet->getStyle('K'.$row)->getNumberFormat()
+                $sheet->getStyle('M'.$row)->getNumberFormat()
                     ->setFormatCode('0.0');
 
                 $row++;
@@ -316,19 +320,19 @@ class SalaryDetail extends Component
             // Total row
             $totalRow = $row;
             $sheet->setCellValue('A'.$totalRow, 'TOTAL');
-            $sheet->mergeCells('A'.$totalRow.':D'.$totalRow);
-            $sheet->setCellValue('E'.$totalRow, '=SUM(E10:E'.($totalRow - 1).')');
-            $sheet->setCellValue('F'.$totalRow, '=SUM(F10:F'.($totalRow - 1).')');
+            $sheet->mergeCells('A'.$totalRow.':F'.$totalRow);
             $sheet->setCellValue('G'.$totalRow, '=SUM(G10:G'.($totalRow - 1).')');
             $sheet->setCellValue('H'.$totalRow, '=SUM(H10:H'.($totalRow - 1).')');
             $sheet->setCellValue('I'.$totalRow, '=SUM(I10:I'.($totalRow - 1).')');
             $sheet->setCellValue('J'.$totalRow, '=SUM(J10:J'.($totalRow - 1).')');
             $sheet->setCellValue('K'.$totalRow, '=SUM(K10:K'.($totalRow - 1).')');
             $sheet->setCellValue('L'.$totalRow, '=SUM(L10:L'.($totalRow - 1).')');
-            $sheet->setCellValue('M'.$totalRow, ''); // No total for transaction details
+            $sheet->setCellValue('M'.$totalRow, '=SUM(M10:M'.($totalRow - 1).')');
+            $sheet->setCellValue('N'.$totalRow, '=SUM(N10:N'.($totalRow - 1).')');
+            $sheet->setCellValue('O'.$totalRow, ''); // No total for transaction details
 
             // Style total row
-            $sheet->getStyle('A'.$totalRow.':M'.$totalRow)->applyFromArray([
+            $sheet->getStyle('A'.$totalRow.':O'.$totalRow)->applyFromArray([
                 'font' => ['bold' => true],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -340,28 +344,28 @@ class SalaryDetail extends Component
             ]);
 
             // Format currency in total row
-            foreach (['E', 'I', 'J', 'L'] as $col) {
+            foreach (['G', 'K', 'L', 'N'] as $col) {
                 $sheet->getStyle($col.$totalRow)->getNumberFormat()
                     ->setFormatCode('#,##0.00');
             }
 
             // Format hours in total row
-            foreach (['F', 'G', 'H'] as $col) {
+            foreach (['H', 'I', 'J'] as $col) {
                 $sheet->getStyle($col.$totalRow)->getNumberFormat()
                     ->setFormatCode('0.00');
             }
 
             // Format NPL days in total row
-            $sheet->getStyle('K'.$totalRow)->getNumberFormat()
+            $sheet->getStyle('M'.$totalRow)->getNumberFormat()
                 ->setFormatCode('0.0');
 
             // Auto-size columns
-            foreach (range('A', 'M') as $col) {
+            foreach (range('A', 'O') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
             // Set a minimum width for Transaction Details column to show wrapped text properly
-            $sheet->getColumnDimension('M')->setWidth(50);
+            $sheet->getColumnDimension('O')->setWidth(50);
 
             // Freeze panes at header row
             $sheet->freezePane('A10');
