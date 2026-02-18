@@ -20,3 +20,7 @@ Schedule::command('reminders:payment')->dailyAt('09:00');
 // Runs daily at 12:01 AM as a safety check for any missed penalties
 // Note: Penalties are now applied immediately when client submits late
 Schedule::command('penalties:apply-overdue')->dailyAt('00:01');
+
+// Auto-submit timesheets on the 16th of every month at 12:01 AM
+// Creates submissions for contractors who haven't submitted yet, using basic salary + OT entries
+Schedule::command('payroll:auto-submit')->monthlyOn(16, '00:01');

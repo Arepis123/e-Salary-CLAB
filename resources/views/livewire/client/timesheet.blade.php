@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Timesheet Management</h1>
-            <p class="text-sm text-zinc-600 dark:text-zinc-400">Submit monthly payroll with overtime hours</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Review monthly payroll — auto-submitted on the 16th</p>
         </div>
         <x-tutorial-button page="timesheet" />
     </div>
@@ -95,79 +95,46 @@
                         {{ $period['deadline']->format('F d, Y') }} ({{ floor($period['days_until_deadline']) }} days remaining)
                     </span>
                 </p>
-            </div>
-            @if($currentSubmission->status === 'draft')
-                <flux:badge color="zinc" size="lg">Draft</flux:badge>
-            @elseif($currentSubmission->status === 'submitted')
-                <flux:badge color="blue" size="lg">Awaiting Review</flux:badge>
-            @elseif($currentSubmission->status === 'approved')
-                <flux:badge color="purple" size="lg">Approved</flux:badge>
-            @elseif($currentSubmission->status === 'pending_payment')
-                <flux:badge color="orange" size="lg">Pending Payment</flux:badge>
-            @elseif($currentSubmission->status === 'paid')
-                <flux:badge color="green" size="lg">Paid</flux:badge>
-            @elseif($currentSubmission->status === 'overdue')
-                <flux:badge color="red" size="lg">Overdue</flux:badge>
-            @endif
+            </div>            
         </div>
     </flux:card>
     @endif
 
     <!-- Deduction Preview Section (only show for current month, not overdue months) -->
-    @if(!$errorMessage && !$isBlocked && count($applicableDeductions) > 0 && !$targetMonth && !$targetYear)
+    @php
+        $activeDeductions = array_filter($applicableDeductions, fn($d) => $d['status'] === 'active');
+    @endphp
+    @if(!$errorMessage && !$isBlocked && count($activeDeductions) > 0 && !$targetMonth && !$targetYear)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="flex items-start gap-3">
             <flux:icon.currency-dollar class="size-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
             <div class="flex-1">
-                <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Configured Deductions</h3>
+                <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Deductions This Month</h3>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                    Deductions assigned to your workers. Active deductions will be applied this month, pending ones apply in future periods.
+                    The following deductions will be automatically applied when you submit payroll.
                 </p>
 
                 <div class="space-y-2">
-                    @foreach($applicableDeductions as $deduction)
-                    <div class="flex items-start justify-between p-3 {{ $deduction['status'] === 'active' ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800' : 'bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-600' }} rounded-lg">
+                    @foreach($activeDeductions as $deduction)
+                    <div class="flex items-start justify-between p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $deduction['name'] }}</span>
-
-                                @if($deduction['status'] === 'active')
-                                    <flux:badge color="green" size="sm">Will Apply This Month</flux:badge>
-                                @else
-                                    <flux:badge color="zinc" size="sm">Pending</flux:badge>
-                                @endif
 
                                 @if($deduction['type'] === 'contractor')
                                     <flux:badge color="blue" size="sm">All Workers</flux:badge>
                                 @else
                                     <flux:badge color="purple" size="sm">
-                                        {{ $deduction['worker_count'] }} {{ $deduction['worker_count'] === 1 ? 'Worker' : 'Workers' }}
+                                        {{ $deduction['active_worker_count'] }} {{ $deduction['active_worker_count'] === 1 ? 'Worker' : 'Workers' }}
                                     </flux:badge>
-                                    {{-- @if($deduction['status'] === 'active' && isset($deduction['active_worker_count']))
-                                        <span class="text-xs text-green-700 dark:text-green-300">
-                                            ({{ $deduction['active_worker_count'] }} active, {{ $deduction['pending_worker_count'] }} pending)
-                                        </span>
-                                    @endif --}}
                                 @endif
                             </div>
                             @if($deduction['description'])
                                 <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{{ $deduction['description'] }}</p>
                             @endif
-                            <div class="flex items-center gap-3 mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                @if($deduction['type'] === 'worker' && !empty($deduction['target_periods']))
-                                    <span>
-                                        Target Periods: {{ implode(', ', array_map(fn($p) => "#$p", $deduction['target_periods'])) }}
-                                    </span>
-                                @endif
-                                @if(!empty($deduction['apply_months']))
-                                    <span>
-                                        Months: {{ implode(', ', array_map(fn($m) => date('M', mktime(0, 0, 0, $m, 1)), $deduction['apply_months'])) }}
-                                    </span>
-                                @endif
-                            </div>
                         </div>
                         <div class="text-right ml-4">
-                            <span class="text-sm font-bold">
+                            <span class="text-sm font-bold text-red-600 dark:text-red-400">
                                 -RM {{ number_format($deduction['amount'], 2) }}
                             </span>
                             @if($deduction['type'] === 'contractor')
@@ -183,7 +150,7 @@
                 <div class="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
                     <p class="text-xs text-blue-800 dark:text-blue-200">
                         <flux:icon.information-circle class="size-4 inline mr-1" />
-                        Active deductions will be automatically applied when you submit payroll. Pending deductions will apply when workers reach target periods.
+                        These deductions will be automatically applied when you submit payroll.
                     </p>
                 </div>
             </div>
@@ -199,27 +166,18 @@
         </div>
 
         @if(count($workers) > 0)
-            <!-- Selection Controls -->
-            <div class="mb-4 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">
-                        {{ count($selectedWorkers) }} of {{ count($workers) }} workers selected
-                    </span>
-                </div>
+            <!-- Worker Count -->
+            <div class="mb-4">
+                <span class="text-sm text-zinc-600 dark:text-zinc-400">
+                    {{ count($workers) }} {{ count($workers) === 1 ? 'worker' : 'workers' }}
+                </span>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-10">
-                                <input
-                                    type="checkbox"
-                                    wire:click="toggleAllWorkers"
-                                    @if(count($selectedWorkers) === count($workers) && count($workers) > 0) checked @endif
-                                    class="size-4 rounded border-zinc-300 dark:border-zinc-700"
-                                />
-                            </th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-10">#</th>
                             <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[20%]">Worker</th>
                             <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[120px]" title="Basic Salary">Basic Salary</th>
                             <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]" title="OT Normal Hours">OT Normal (hrs)</th>
@@ -230,15 +188,9 @@
                     </thead>
                     <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                         @foreach($workers as $index => $worker)
-                        <tr wire:key="worker-{{ $worker['worker_id'] }}" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 {{ !in_array($worker['worker_id'], $selectedWorkers) ? 'opacity-50' : '' }}">
-                            <td class="py-3">
-                                <input
-                                    type="checkbox"
-                                    value="{{ $worker['worker_id'] }}"
-                                    wire:model.live="selectedWorkers"
-                                    {{ $isBlocked ? 'disabled' : '' }}
-                                    class="size-4 rounded border-zinc-300 dark:border-zinc-700"
-                                />
+                        <tr wire:key="worker-{{ $worker['worker_id'] }}" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                            <td class="py-3 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                                {{ $index + 1 }}
                             </td>
                             <td class="py-3 pr-4">
                                 <div class="flex items-center gap-2">
@@ -331,14 +283,14 @@
                 </div>
             @endif
 
-            <!-- Action Buttons -->
-            <div id="submission-actions" class="mt-6 flex justify-end items-center gap-2">
-                <flux:button id="save-draft-btn" wire:click="saveDraft" variant="filled" :disabled="$isBlocked || !$canSubmitPayroll">
-                    Save as Draft
-                </flux:button>
-                <flux:button id="submit-btn" wire:click="submitForPayment" variant="primary" :disabled="$isBlocked || !$canSubmitPayroll">
-                    Submit
-                </flux:button>
+            <!-- Auto-submission notice -->
+            <div class="mt-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
+                <div class="flex gap-3">
+                    <flux:icon.information-circle class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        Timesheets are automatically submitted on the <strong>16th of every month</strong>. Please ensure your OT entries are completed before then.
+                    </p>
+                </div>
             </div>
         @else
             <!-- No Workers Available Message -->
@@ -355,7 +307,7 @@
     <!-- Submission History -->
     <flux:card id="submission-history" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent Submissions</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent Timesheets</h2>
             <div class="flex gap-2 hidden">
                 <flux:button variant="filled" size="sm">
                     <flux:icon.arrow-down-tray class="size-4" />
@@ -390,10 +342,8 @@
                         <flux:table.cell variant="strong">{{ $submission->total_workers }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            @if($submission->status === 'draft')
-                                <span class="text-sm text-zinc-500 dark:text-zinc-400">Draft</span>
-                            @elseif($submission->status === 'submitted')
-                                <span class="text-sm text-zinc-500 dark:text-zinc-400">In Process</span>
+                            @if(in_array($submission->status, ['draft', 'submitted']))
+                                <span class="text-sm text-zinc-500 dark:text-zinc-400">-</span>
                             @elseif($submission->hasAdminReview())
                                 <div class="font-semibold text-zinc-900 dark:text-zinc-100">
                                     RM {{ number_format($submission->total_due, 2) }}
@@ -408,10 +358,8 @@
                         </flux:table.cell>
 
                         <flux:table.cell>
-                            @if($submission->status === 'draft')
-                                <flux:badge color="zinc" size="sm" inset="top bottom">Draft</flux:badge>
-                            @elseif($submission->status === 'submitted')
-                                <flux:badge color="blue" size="sm" inset="top bottom">Awaiting Review</flux:badge>
+                            @if(in_array($submission->status, ['draft', 'submitted']))
+                                <flux:badge color="blue" size="sm" inset="top bottom">In Progress</flux:badge>
                             @elseif($submission->status === 'approved')
                                 <flux:badge color="purple" size="sm" inset="top bottom">Approved</flux:badge>
                             @elseif($submission->status === 'pending_payment')
@@ -427,17 +375,9 @@
                             <flux:dropdown>
                                 <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" inset="top bottom" />
                                 <flux:menu>
-                                    @if($submission->status !== 'draft')
-                                        <flux:menu.item icon="eye" icon:variant="outline" href="{{ route('timesheet.show', $submission->id) }}">View Details</flux:menu.item>
-                                    @endif
-                                    @if($submission->hasAdminReview() && $submission->status !== 'draft')
+                                    <flux:menu.item icon="eye" icon:variant="outline" href="{{ route('timesheet.show', $submission->id) }}">View Details</flux:menu.item>
+                                    @if($submission->hasAdminReview())
                                         <flux:menu.item icon="document-text" icon:variant="outline" href="{{ route('invoices.show', $submission->id) }}">View Invoice</flux:menu.item>
-                                    @endif
-
-                                    @if($submission->status === 'draft')
-                                        <flux:menu.separator />
-                                        <flux:menu.item icon="pencil" icon:variant="outline" href="{{ route('timesheet.edit', $submission->id) }}">Edit Draft</flux:menu.item>
-                                        <flux:menu.item icon="paper-airplane" icon:variant="outline" wire:click="submitDraftForPayment({{ $submission->id }})">Submit</flux:menu.item>
                                     @endif
                                     @if($submission->status === 'approved' || $submission->status === 'pending_payment' || $submission->status === 'overdue')
                                         <flux:menu.separator />

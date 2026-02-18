@@ -494,7 +494,8 @@ class Timesheet extends Component
 
             if ($existingAccommodation + floatval($validated['newTransactionAmount']) > 100) {
                 $remaining = max(0, 100 - $existingAccommodation);
-                $this->addError('newTransactionAmount', "Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM " . number_format($remaining, 2));
+                $this->addError('newTransactionAmount', 'Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM '.number_format($remaining, 2));
+
                 return;
             }
         }
@@ -1199,7 +1200,16 @@ class Timesheet extends Component
     public function workerHasDeductions($workerId): bool
     {
         foreach ($this->applicableDeductions as $deduction) {
-            if (in_array($workerId, $deduction['worker_ids'])) {
+            if ($deduction['status'] !== 'active') {
+                continue;
+            }
+
+            // For deductions with per-worker details, check if this specific worker is active
+            if (! empty($deduction['worker_details']) && isset($deduction['worker_details'][$workerId])) {
+                if ($deduction['worker_details'][$workerId]['will_apply']) {
+                    return true;
+                }
+            } elseif (in_array($workerId, $deduction['worker_ids'])) {
                 return true;
             }
         }
@@ -1252,8 +1262,10 @@ class Timesheet extends Component
 
                 if (! empty($deduction->apply_periods)) {
                     // Has period restrictions - check each worker individually
+                    // Add +1 because getWorkerPayrollPeriodCount returns completed payrolls,
+                    // but we need the CURRENT (upcoming) period number
                     foreach ($workerIds as $workerId) {
-                        $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo);
+                        $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo) + 1;
                         $willApplyForWorker = $willApplyThisMonth && $deduction->shouldApplyInPeriod($currentPeriod);
 
                         $workerData[$workerId] = [
@@ -1312,8 +1324,10 @@ class Timesheet extends Component
             $pendingCount = 0;
 
             // Check each assigned worker's status
+            // Add +1 because getWorkerPayrollPeriodCount returns completed payrolls,
+            // but we need the CURRENT (upcoming) period number
             foreach ($assignedWorkerIds as $workerId) {
-                $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo);
+                $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo) + 1;
 
                 $willApply = $template->shouldApplyInMonth($month) &&
                              $template->shouldApplyInPeriod($currentPeriod);

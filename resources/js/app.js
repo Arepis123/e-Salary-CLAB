@@ -246,8 +246,8 @@ const tutorialConfigs = {
             {
                 element: 'body',
                 popover: {
-                    title: 'Timesheet Submission Tutorial',
-                    description: 'Learn how to verify and submit your monthly payroll in just a few simple steps!',
+                    title: 'Timesheet Management Tutorial',
+                    description: 'Learn how to review your workers\' payroll data and understand the automatic submission process.',
                     side: 'center',
                     align: 'center'
                 }
@@ -263,24 +263,16 @@ const tutorialConfigs = {
             {
                 element: '#current-period-info',
                 popover: {
-                    title: 'Current Period & Deadline',
-                    description: 'Shows the current payroll period and payment deadline. Pay attention to the deadline to avoid late payment penalties (8%)!',
+                    title: 'Current Period & Payment Deadline',
+                    description: 'Shows the current payroll period and invoice payment deadline. Pay attention to the deadline to avoid late payment penalties (8%)!',
                     side: 'bottom'
                 }
             },
             {
                 element: '#worker-verification-table',
                 popover: {
-                    title: 'Worker Verification Table',
-                    description: 'This table shows all your workers with their basic salary, OT hours, and transactions already filled in from the OT Entry page. Your job is to verify the information is correct.',
-                    side: 'top'
-                }
-            },
-            {
-                element: '#worker-verification-table',
-                popover: {
-                    title: 'Select Workers to Submit',
-                    description: 'Use the checkboxes to select which workers to include in this submission. You can select all workers or only specific ones. The "Select All" checkbox at the top selects everyone.',
+                    title: 'Worker Payroll Table',
+                    description: 'This table shows all your workers with their basic salary, OT hours, and transactions already filled in from the OT & Transaction Entry page. Review this data to make sure everything is correct before the 16th.',
                     side: 'top'
                 }
             },
@@ -288,23 +280,23 @@ const tutorialConfigs = {
                 element: '#worker-verification-table',
                 popover: {
                     title: 'Pre-filled Data',
-                    description: 'Basic Salary is set automatically. OT Hours and Transactions were entered in the OT & Transaction Entry page (available 1st-15th of each month). Everything is ready - you just verify and submit!',
+                    description: 'Basic Salary is set automatically. OT Hours and Transactions are entered via the OT & Transaction Entry page (available from the 1st to the 15th of each month). Review the entries here to ensure accuracy.',
                     side: 'top'
                 }
             },
             {
-                element: '#submission-actions',
+                element: '#worker-verification-table',
                 popover: {
-                    title: 'Submit Your Payroll',
-                    description: 'After selecting workers and verifying the data: Click "Save as Draft" to save for later, or "Submit" to send for admin review. Once submitted, an invoice will be generated.',
+                    title: '⚡ Automatic Submission on the 16th',
+                    description: 'You no longer need to manually submit payroll. The system automatically submits all worker timesheets on the 16th of every month. Make sure all OT hours and transactions are entered and correct before then!',
                     side: 'top'
                 }
             },
             {
                 element: '#submission-history',
                 popover: {
-                    title: 'Submission History',
-                    description: 'View all your past payroll submissions, their status (Draft, Pending Payment, Paid), and access invoices or receipts.',
+                    title: 'Recent Timesheets',
+                    description: 'View all your past timesheets and their current status: In Progress (admin is processing), Approved, Pending Payment, Paid, or Overdue. You can also view the invoice or pay directly from the actions menu.',
                     side: 'top'
                 }
             },
@@ -312,7 +304,7 @@ const tutorialConfigs = {
                 element: '#tutorial-button',
                 popover: {
                     title: 'Quick Workflow Recap',
-                    description: 'Remember: 1) Enter OT & Transactions (1st-15th), 2) Come here to verify data, 3) Select workers, 4) Submit! Click tutorial button anytime to replay.',
+                    description: 'Remember: 1) Enter OT & Transactions in the OT Entry page (1st–15th), 2) Review worker data here to ensure accuracy, 3) The system auto-submits on the 16th — no manual action needed! Click tutorial anytime to replay.',
                     side: 'bottom'
                 }
             }
