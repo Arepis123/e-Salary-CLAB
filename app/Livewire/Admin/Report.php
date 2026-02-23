@@ -680,10 +680,10 @@ class Report extends Component
             ->get()
             ->keyBy('contractor_clab_no');
 
-        // Get OT entries with transactions for this submission period
+        // Get OT entries with transactions for this entry period
         $otEntries = MonthlyOTEntry::with('transactions')
-            ->where('submission_month', $selectedMonth)
-            ->where('submission_year', $selectedYear)
+            ->where('entry_month', $selectedMonth)
+            ->where('entry_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->get()
@@ -885,10 +885,10 @@ class Report extends Component
             ->get()
             ->keyBy('contractor_clab_no');
 
-        // Get OT entries with transactions for this submission period
+        // Get OT entries with transactions for this entry period
         $otEntries = MonthlyOTEntry::with('transactions')
-            ->where('submission_month', $selectedMonth)
-            ->where('submission_year', $selectedYear)
+            ->where('entry_month', $selectedMonth)
+            ->where('entry_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->get()
