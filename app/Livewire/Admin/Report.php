@@ -680,18 +680,10 @@ class Report extends Component
             ->get()
             ->keyBy('contractor_clab_no');
 
-        // Get OT entry period (previous month - same logic as payroll submission)
-        $otEntryMonth = $selectedMonth - 1;
-        $otEntryYear = $selectedYear;
-        if ($otEntryMonth < 1) {
-            $otEntryMonth = 12;
-            $otEntryYear--;
-        }
-
-        // Get OT entries with transactions for this period (entry_month = previous month)
+        // Get OT entries with transactions for this submission period
         $otEntries = MonthlyOTEntry::with('transactions')
-            ->where('entry_month', $otEntryMonth)
-            ->where('entry_year', $otEntryYear)
+            ->where('submission_month', $selectedMonth)
+            ->where('submission_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->get()
@@ -893,18 +885,10 @@ class Report extends Component
             ->get()
             ->keyBy('contractor_clab_no');
 
-        // Get OT entry period (previous month - same logic as payroll submission)
-        $otEntryMonth = $selectedMonth - 1;
-        $otEntryYear = $selectedYear;
-        if ($otEntryMonth < 1) {
-            $otEntryMonth = 12;
-            $otEntryYear--;
-        }
-
-        // Get OT entries with transactions for this period (entry_month = previous month)
+        // Get OT entries with transactions for this submission period
         $otEntries = MonthlyOTEntry::with('transactions')
-            ->where('entry_month', $otEntryMonth)
-            ->where('entry_year', $otEntryYear)
+            ->where('submission_month', $selectedMonth)
+            ->where('submission_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
             ->get()
