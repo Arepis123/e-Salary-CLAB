@@ -66,6 +66,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'Employee ID',
             'Employee Email',
             'Employee Name',
+            'Passport No',
             'Location',
             'Department',
             'Salary',
@@ -112,6 +113,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             $entry->worker_id, // Employee ID
             $entry->worker_email ?? '', // Employee Email from worker_db
             $entry->worker_name, // Employee Name
+            $entry->worker_passport ?? '', // Passport No
             $entry->contractor_state ?? '', // Location - contractor's state
             $entry->contractor_name ?? '', // Department - contractor name
             $entry->worker_salary ?? '', // Salary
@@ -181,22 +183,23 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'A' => 15, // Employee ID
             'B' => 25, // Employee Email
             'C' => 30, // Employee Name
-            'D' => 20, // Location
-            'E' => 30, // Department
-            'F' => 15, // Salary
-            'G' => 10, // Worked For (month/day/hour)
-            'H' => 15, // Salary Type
-            'I' => 18, // General Allowance
-            'J' => 10, // BACKPAY
-            'K' => 12, // ADVANCE SALARY
-            'L' => 10, // ACCOMODATION
-            'M' => 15, // Normal
-            'N' => 15, // Rest Day
-            'O' => 15, // Public holiday
+            'D' => 18, // Passport No
+            'E' => 20, // Location
+            'F' => 30, // Department
+            'G' => 15, // Salary
+            'H' => 10, // Worked For (month/day/hour)
+            'I' => 15, // Salary Type
+            'J' => 18, // General Allowance
+            'K' => 10, // BACKPAY
+            'L' => 12, // ADVANCE SALARY
+            'M' => 10, // ACCOMODATION
+            'N' => 15, // Normal
+            'O' => 15, // Rest Day
+            'P' => 15, // Public holiday
         ];
 
-        // Add column widths for deduction templates (starting from column M)
-        $columnIndex = 12; // M = 13th column (0-indexed = 12)
+        // Add column widths for deduction templates (starting from column N)
+        $columnIndex = 13; // N = 14th column (0-indexed = 13)
         foreach ($this->deductionTemplates as $template) {
             $columnLetter = $this->getColumnLetter($columnIndex);
             $widths[$columnLetter] = max(15, strlen($template->name) + 2);

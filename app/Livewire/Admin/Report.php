@@ -959,6 +959,7 @@ class Report extends Component
                     'worker_id' => $workerId,
                     'worker_email' => $workerEmails[$workerId] ?? '',
                     'worker_name' => $payrollWorker ? $payrollWorker->worker_name : $worker->wkr_name,
+                    'worker_passport' => $worker->wkr_passno ?? '',
                     'contractor_clab_no' => $clabNo,
                     'contractor_name' => $contractor ? $contractor->name : 'Unknown',
                     'contractor_state' => $contractor->state ?? '',
@@ -1111,6 +1112,7 @@ class Report extends Component
             $entry->contractor_state = $contractor->state ?? '';
             $entry->worker_email = $worker->wkr_email ?? '';
             $entry->worker_salary = $worker->wkr_salary ?? '';
+            $entry->worker_passport = $worker->wkr_passno ?? '';
 
             return $entry;
         });

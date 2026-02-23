@@ -38,6 +38,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'Employee ID',
             'Employee Email',
             'Employee Name',
+            'Passport No',
             'Location',
             'Department',
             'Salary',
@@ -79,6 +80,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             $entry->worker_id,
             $entry->worker_email ?? '',
             $entry->worker_name,
+            $entry->worker_passport ?? '',
             $entry->contractor_state ?? '',
             $entry->contractor_name ?? '',
             $entry->worker_salary ?? '',
@@ -108,19 +110,20 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'A' => 15, // Employee ID
             'B' => 30, // Employee Email
             'C' => 30, // Employee Name
-            'D' => 20, // Location
-            'E' => 30, // Department
-            'F' => 15, // Salary
-            'G' => 18, // OT Period
-            'H' => 15, // Normal OT
-            'I' => 15, // Rest Day OT
-            'J' => 18, // Public Holiday OT
-            'K' => 15, // Total OT
-            'L' => 15, // Allowance
-            'M' => 15, // Advance Salary
-            'N' => 15, // Deduction
-            'O' => 12, // Status
-            'P' => 18, // Submitted At
+            'D' => 18, // Passport No
+            'E' => 20, // Location
+            'F' => 30, // Department
+            'G' => 15, // Salary
+            'H' => 18, // OT Period
+            'I' => 15, // Normal OT
+            'J' => 15, // Rest Day OT
+            'K' => 18, // Public Holiday OT
+            'L' => 15, // Total OT
+            'M' => 15, // Allowance
+            'N' => 15, // Advance Salary
+            'O' => 15, // Deduction
+            'P' => 12, // Status
+            'Q' => 18, // Submitted At
         ];
     }
 }
