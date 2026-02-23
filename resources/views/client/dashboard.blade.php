@@ -442,7 +442,11 @@
                                     <tr>
                                         <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $payment->month_year }}</td>
                                         <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                            RM {{ number_format($payment->total_due, 2) }}
+                                            @if($payment->status !== 'submitted')
+                                                RM {{ number_format($payment->total_due, 2) }}
+                                            @else
+                                                <span class="text-zinc-400 dark:text-zinc-500">—</span>
+                                            @endif
                                         </td>
                                         <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $payment->total_workers }} {{ Str::plural('worker', $payment->total_workers) }}</td>
                                         <td class="py-3">
