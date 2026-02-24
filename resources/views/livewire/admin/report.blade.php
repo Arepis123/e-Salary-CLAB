@@ -395,6 +395,8 @@
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Allowance</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">NPL</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Accommodation</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
                                 </tr>
                             </thead>
@@ -447,6 +449,20 @@
                                                 -
                                             @endif
                                         </td>
+                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                            @if($entry['npl'] > 0)
+                                                {{ number_format($entry['npl'], 1) }}d
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-yellow-600 dark:text-yellow-400">
+                                            @if($entry['accommodation'] > 0)
+                                                RM {{ number_format($entry['accommodation'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
                                         <td class="py-3">
                                             <flux:badge color="{{ $entry['status'] === 'locked' ? 'green' : 'blue' }}" size="sm">
                                                 {{ ucfirst($entry['status']) }}
@@ -469,6 +485,8 @@
                             <span class="text-green-600 dark:text-green-400">Allowances: RM {{ number_format(collect($otTransactionData)->sum('allowance'), 2) }}</span>
                             <span class="text-amber-600 dark:text-amber-400">Advances: RM {{ number_format(collect($otTransactionData)->sum('advance_salary'), 2) }}</span>
                             <span class="text-red-600 dark:text-red-400">Deductions: RM {{ number_format(collect($otTransactionData)->sum('deduction'), 2) }}</span>
+                            <span class="text-red-600 dark:text-red-400">NPL: RM {{ number_format(collect($otTransactionData)->sum('npl'), 2) }}</span>
+                            <span class="text-yellow-600 dark:text-yellow-400">Accommodation: RM {{ number_format(collect($otTransactionData)->sum('accommodation'), 2) }}</span>
                         </div>
                     </div>
                 @else

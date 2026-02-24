@@ -77,6 +77,8 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'BACKPAY',
             'ADVANCE SALARY',
             'ACCOMODATION',
+            'NPL',
+            'Other Deduction',
             'Normal',
             'Rest Day',
             'Public holiday',
@@ -95,9 +97,12 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
 
     public function map($entry): array
     {
-        // Get allowance and advance from transactions
+        // Get allowance, advance, accommodation, NPL, and other deduction from transactions
         $allowance = 0;
         $advanceSalary = 0;
+        $accommodation = 0;
+        $npl = 0;
+        $otherDeduction = 0;
 
         if ($entry->transactions) {
             foreach ($entry->transactions as $transaction) {
@@ -105,6 +110,12 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
                     $allowance += $transaction->amount;
                 } elseif ($transaction->type === 'advance_payment') {
                     $advanceSalary += $transaction->amount;
+                } elseif ($transaction->type === 'accommodation') {
+                    $accommodation += $transaction->amount;
+                } elseif ($transaction->type === 'npl') {
+                    $npl += $transaction->amount;
+                } elseif ($transaction->type === 'deduction') {
+                    $otherDeduction += $transaction->amount;
                 }
             }
         }
@@ -123,7 +134,9 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             $allowance > 0 ? $allowance : '', // General Allowance
             '',
             $advanceSalary > 0 ? $advanceSalary : '', // ADVANCE SALARY
-            '',
+            $accommodation > 0 ? $accommodation : '', // ACCOMODATION
+            $npl > 0 ? $npl : '', // NPL
+            $otherDeduction > 0 ? $otherDeduction : '', // Other Deduction
             $entry->ot_normal_hours > 0 ? $entry->ot_normal_hours : '', // Normal OT
             $entry->ot_rest_hours > 0 ? $entry->ot_rest_hours : '', // Rest OT
             $entry->ot_public_hours > 0 ? $entry->ot_public_hours : '', // Public holiday OT
@@ -193,13 +206,15 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'K' => 10, // BACKPAY
             'L' => 12, // ADVANCE SALARY
             'M' => 10, // ACCOMODATION
-            'N' => 15, // Normal
-            'O' => 15, // Rest Day
-            'P' => 15, // Public holiday
+            'N' => 10, // NPL
+            'O' => 15, // Other Deduction
+            'P' => 15, // Normal
+            'Q' => 15, // Rest Day
+            'R' => 15, // Public holiday
         ];
 
-        // Add column widths for deduction templates (starting from column N)
-        $columnIndex = 13; // N = 14th column (0-indexed = 13)
+        // Add column widths for deduction templates (starting from column P)
+        $columnIndex = 15; // P = 16th column (0-indexed = 15)
         foreach ($this->deductionTemplates as $template) {
             $columnLetter = $this->getColumnLetter($columnIndex);
             $widths[$columnLetter] = max(15, strlen($template->name) + 2);

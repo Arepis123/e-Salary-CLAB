@@ -50,6 +50,8 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'Allowance',
             'Advance Salary',
             'Deduction',
+            'NPL',
+            'Accommodation',
             'Status',
             'Submitted At',
         ];
@@ -57,10 +59,12 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
 
     public function map($entry): array
     {
-        // Get allowance, advance, and deduction from transactions
+        // Get allowance, advance, deduction, NPL, and accommodation from transactions
         $allowance = 0;
         $advanceSalary = 0;
         $deduction = 0;
+        $npl = 0;
+        $accommodation = 0;
 
         if ($entry->transactions) {
             foreach ($entry->transactions as $transaction) {
@@ -70,6 +74,10 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
                     $advanceSalary += $transaction->amount;
                 } elseif ($transaction->type === 'deduction') {
                     $deduction += $transaction->amount;
+                } elseif ($transaction->type === 'npl') {
+                    $npl += $transaction->amount;
+                } elseif ($transaction->type === 'accommodation') {
+                    $accommodation += $transaction->amount;
                 }
             }
         }
@@ -92,6 +100,8 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             $allowance > 0 ? $allowance : '',
             $advanceSalary > 0 ? $advanceSalary : '',
             $deduction > 0 ? $deduction : '',
+            $npl > 0 ? $npl : '',
+            $accommodation > 0 ? $accommodation : '',
             ucfirst($entry->status),
             $entry->submitted_at ? $entry->submitted_at->format('d/m/Y H:i') : '',
         ];
@@ -122,8 +132,10 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'M' => 15, // Allowance
             'N' => 15, // Advance Salary
             'O' => 15, // Deduction
-            'P' => 12, // Status
-            'Q' => 18, // Submitted At
+            'P' => 15, // NPL
+            'Q' => 15, // Accommodation
+            'R' => 12, // Status
+            'S' => 18, // Submitted At
         ];
     }
 }

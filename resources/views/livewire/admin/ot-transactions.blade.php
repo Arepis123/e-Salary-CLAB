@@ -444,7 +444,7 @@
                         </div>
 
                         <!-- Transaction Summary -->
-                        <div class="grid gap-3 sm:grid-cols-4 mt-4">
+                        <div class="grid gap-3 sm:grid-cols-5 mt-4">
                             <flux:card class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                                 <p class="text-xs text-red-600 dark:text-red-400">Total Advance</p>
                                 <p class="text-lg font-bold text-red-600 dark:text-red-400">RM {{ number_format($allTransactions->where('type', 'advance_payment')->sum('amount'), 2) }}</p>
@@ -456,6 +456,10 @@
                             <flux:card class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                                 <p class="text-xs text-amber-600 dark:text-amber-400">Total NPL</p>
                                 <p class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ number_format($allTransactions->where('type', 'npl')->sum('amount'), 1) }} days</p>
+                            </flux:card>
+                            <flux:card class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-amber-800">
+                                <p class="text-xs text-yellow-600 dark:text-yellow-400">Total Accommodations</p>
+                                <p class="text-lg font-bold text-yellow-600 dark:text-yellow-400">RM {{ number_format($allTransactions->where('type', 'accommodation')->sum('amount'), 2) }}</p>
                             </flux:card>
                             <flux:card class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                                 <p class="text-xs text-green-600 dark:text-green-400">Total Allowances</p>

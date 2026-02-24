@@ -1032,10 +1032,12 @@ class Report extends Component
         $this->otTransactionData = $entries->map(function ($entry) use ($contractors, $workerEmails, $workerSalaries) {
             $contractor = $contractors[$entry->contractor_clab_no] ?? null;
 
-            // Get allowance, advance, and deduction from transactions
+            // Get allowance, advance, deduction, NPL, and accommodation from transactions
             $allowance = 0;
             $advanceSalary = 0;
             $deduction = 0;
+            $npl = 0;
+            $accommodation = 0;
 
             foreach ($entry->transactions as $transaction) {
                 if ($transaction->type === 'allowance') {
@@ -1044,6 +1046,10 @@ class Report extends Component
                     $advanceSalary += $transaction->amount;
                 } elseif ($transaction->type === 'deduction') {
                     $deduction += $transaction->amount;
+                } elseif ($transaction->type === 'npl') {
+                    $npl += $transaction->amount;
+                } elseif ($transaction->type === 'accommodation') {
+                    $accommodation += $transaction->amount;
                 }
             }
 
@@ -1062,6 +1068,8 @@ class Report extends Component
                 'allowance' => $allowance,
                 'advance_salary' => $advanceSalary,
                 'deduction' => $deduction,
+                'npl' => $npl,
+                'accommodation' => $accommodation,
                 'ot_normal' => $entry->ot_normal_hours,
                 'ot_rest' => $entry->ot_rest_hours,
                 'ot_public' => $entry->ot_public_hours,
