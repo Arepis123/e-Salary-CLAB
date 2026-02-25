@@ -78,11 +78,14 @@ class PayrollSubmission extends Model
     }
 
     /**
-     * Get the payment record for this submission (latest/active payment)
+     * Get the completed payment record for this submission
      */
     public function payment()
     {
-        return $this->hasOne(PayrollPayment::class)->latestOfMany();
+        return $this->hasOne(PayrollPayment::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->where('status', 'completed')
+        );
     }
 
     /**
