@@ -344,7 +344,7 @@
                         @endif
                         <div class="grand-total">
                             <span class="total-label">TOTAL AMOUNT (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
+                            <span class="total-value">{{ number_format($invoice->status === 'paid' && $invoice->payment ? $invoice->payment->amount : $invoice->total_due, 2) }}</span>
                         </div>
                         @if($invoice->has_penalty)
                         <div class="total-row" style="color: #dc3545; margin-top: 10px; font-size: 7px;">

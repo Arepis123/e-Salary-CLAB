@@ -153,7 +153,11 @@
                                 <span class="text-sm text-zinc-500 dark:text-zinc-400">In Process</span>
                             @elseif($invoice->hasAdminReview())
                                 <div class="font-semibold text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($invoice->total_due, 2) }}
+                                    @if($invoice->status === 'paid' && $invoice->payment)
+                                        RM {{ number_format($invoice->payment->amount, 2) }}
+                                    @else
+                                        RM {{ number_format($invoice->total_due, 2) }}
+                                    @endif
                                 </div>
                             @else
                                 <span class="text-sm text-zinc-500 dark:text-zinc-400">-</span>

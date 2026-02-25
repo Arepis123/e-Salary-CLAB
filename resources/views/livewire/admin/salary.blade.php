@@ -190,7 +190,11 @@
                         <flux:table.cell variant="strong">
                             @if($submission->hasAdminReview())
                                 <div class="font-semibold text-zinc-900 dark:text-zinc-100">
-                                    RM {{ number_format($submission->client_total, 2) }}
+                                    @if($submission->status === 'paid' && $submission->payment)
+                                        RM {{ number_format($submission->payment->amount, 2) }}
+                                    @else
+                                        RM {{ number_format($submission->client_total, 2) }}
+                                    @endif
                                 </div>
                             @else
                                 <span class="text-sm"></span>

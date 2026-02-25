@@ -345,7 +345,7 @@
                     <!-- Payment Information -->
                     <div class="payment-info-box">
                         <strong>PAYMENT CONFIRMATION</strong>
-                        <div>Amount Paid: <strong>RM {{ number_format($invoice->client_total, 2) }}</strong></div>
+                        <div>Amount Paid: <strong>RM {{ number_format($invoice->payment ? $invoice->payment->amount : $invoice->client_total, 2) }}</strong></div>
                         <div>Payment Date: {{ $invoice->payment->completed_at?->format('d/m/Y H:i') ?? 'N/A' }}</div>
                         <div>Payment Status: <strong>COMPLETED</strong></div>
                         @if($invoice->payment && $invoice->payment->transaction_id)
@@ -374,7 +374,7 @@
                         @endif
                         <div class="grand-total">
                             <span class="total-label">TOTAL PAID (RM):</span>
-                            <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
+                            <span class="total-value">{{ number_format($invoice->payment ? $invoice->payment->amount : $invoice->client_total, 2) }}</span>
                         </div>
                         @if($invoice->has_penalty)
                         <div class="total-row" style="color: #dc3545; margin-top: 5px; font-size: 7px;">
