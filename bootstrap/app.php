@@ -21,9 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'roles' => \App\Http\Middleware\CheckMultipleRoles::class,
         ]);
 
-        // Exclude logout from CSRF verification to prevent 419 errors on session expiration
+        // Exclude logout and Billplz callback from CSRF verification
+        // Billplz sends POST callbacks without CSRF tokens - must be excluded
         $middleware->validateCsrfTokens(except: [
             'logout',
+            'billplz/callback',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

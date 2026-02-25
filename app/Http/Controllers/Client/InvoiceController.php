@@ -78,7 +78,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Download Pro Forma Invoice as PDF (before payment)
+     * Download Invoice as PDF (before payment)
      */
     public function download($id)
     {

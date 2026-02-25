@@ -30,7 +30,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Download Pro Forma Invoice as PDF (Admin can download any invoice)
+     * Download Invoice as PDF (Admin can download any invoice)
      */
     public function download($id)
     {

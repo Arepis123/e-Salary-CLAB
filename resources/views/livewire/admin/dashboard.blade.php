@@ -1,4 +1,4 @@
-<div wire:init="loadInitialData">
+<div wire:init="loadInitialData" x-on:chart-section-clicked.window="$wire.loadSectionContractors($event.detail.index)">
     <div class="flex h-full w-full flex-1 flex-col gap-6">
         <!-- Page Header -->
         <div class="flex items-center justify-between">
@@ -374,6 +374,15 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onHover: function(event, elements) {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    },
+                    onClick: function(event, elements) {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            window.dispatchEvent(new CustomEvent('chart-section-clicked', { detail: { index: index } }));
+                        }
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -715,4 +724,55 @@
             attributeFilter: ['class']
         });
     </script>
+
+    <!-- Section Contractors Modal -->
+    <flux:modal name="section-contractors" class="w-full max-w-2xl">
+        <div class="p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $sectionTitle }}</h3>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                        {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}
+                        &mdash; {{ count($sectionContractors) }} {{ Str::plural('contractor', count($sectionContractors)) }}
+                    </p>
+                </div>
+            </div>
+
+            @if(count($sectionContractors) > 0)
+                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table class="w-full text-sm">
+                        <thead class="">
+                            <tr class="">
+                                <th class="pb-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Contractor</th>
+                                <th class="pb-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">CLAB No</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                            @foreach($sectionContractors as $contractor)
+                                <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                    <td class="py-2 font-medium text-zinc-900 dark:text-zinc-100">{{ $contractor['name'] }}</td>
+                                    <td class="py-2 text-zinc-500 dark:text-zinc-400">{{ $contractor['clab_no'] ?? '-' }}</td>
+                                    <td class="py-2">
+                                        @php
+                                            $color = match($contractor['status']) {
+                                                'Paid' => 'green',
+                                                'Overdue' => 'red',
+                                                'Pending Payment' => 'yellow',
+                                                'Not Submitted' => 'red',
+                                                default => 'blue',
+                                            };
+                                        @endphp
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                    No contractors in this category.
+                </div>
+            @endif
+        </div>
+    </flux:modal>
 </div>
