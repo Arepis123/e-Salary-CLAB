@@ -35,6 +35,10 @@ return [
         ],
     ],
 
+    'payslip_api' => [
+        'secret' => env('PAYSLIP_API_SECRET'),
+    ],
+
     'billplz' => [
         'api_key' => env('BILLPLZ_API_KEY'),
         'collection_id' => env('BILLPLZ_COLLECTION_ID'),

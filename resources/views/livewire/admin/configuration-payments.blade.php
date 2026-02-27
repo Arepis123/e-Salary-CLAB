@@ -13,7 +13,7 @@
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div class="flex-1">
                 <div class="flex items-center gap-3">
-                    <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3">
+                    <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3 hidden sm:inline">
                         <flux:icon.arrow-path class="size-6 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
@@ -43,7 +43,7 @@
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div class="flex-1">
                 <div class="flex items-center gap-3">
-                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3 hidden sm:inline">
                         <flux:icon.document-check class="size-6 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
@@ -71,7 +71,7 @@
     <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
         <div class="flex flex-col gap-4">
             <div class="flex items-center gap-3">
-                <div class="rounded-full bg-red-100 dark:bg-red-900/30 p-3">
+                <div class="rounded-full bg-red-100 dark:bg-red-900/30 p-3 hidden sm:inline">
                     <flux:icon.x-circle class="size-6 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
@@ -82,7 +82,7 @@
                 </div>
             </div>
 
-            <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4 pl-14">
+            <div class="flex flex-col items-start gap-4 pl-0 sm:pl-14">
                 <div class="flex gap-3">
                     <div class="w-32">
                         <flux:select wire:model="cancelledSyncMonth" label="Month" size="sm">

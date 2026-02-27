@@ -16,7 +16,7 @@
                     <!-- Pro Forma Invoice (still available) -->
                     <flux:button variant="outline" href="{{ route('invoices.download', $invoice->id) }}">
                         <flux:icon.arrow-down-tray class="size-4" />
-                        Download Pro Forma
+                        Download Invoice
                     </flux:button>
                 @else
                     <!-- Pro Forma Invoice only (for unpaid invoices) -->

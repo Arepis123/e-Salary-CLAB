@@ -19,6 +19,13 @@ Route::get('csrf-token', function () {
 })->middleware('web');
 
 // ============================================================================
+// EXTERNAL API ROUTES (No CSRF, authenticated via X-Payslip-Token header)
+// ============================================================================
+Route::post('api/payslip/notify', [\App\Http\Controllers\Api\PayslipNotifyController::class, 'notify'])
+    ->name('api.payslip.notify')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+// ============================================================================
 // TESTING ROUTES (Remove these in production)
 // ============================================================================
 if (config('app.env') !== 'production') {
@@ -89,7 +96,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Invoices - Unified route redirects to role-specific Livewire pages (real-time search & filtering)
     Route::get('invoices', function () {
         return match (auth()->user()->role) {
-            'admin', 'super_admin' => redirect()->route('invoices.admin'),
+            'admin', 'super_admin', 'finance' => redirect()->route('invoices.admin'),
             'client' => redirect()->route('invoices.client'),
             default => abort(403)
         };
@@ -98,7 +105,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Invoice Detail - Unified route
     Route::get('invoices/{id}', function ($id) {
         return match (auth()->user()->role) {
-            'admin', 'super_admin' => app(\App\Http\Controllers\Admin\InvoiceController::class)->show($id),
+            'admin', 'super_admin', 'finance' => app(\App\Http\Controllers\Admin\InvoiceController::class)->show($id),
             'client' => app(\App\Http\Controllers\Client\InvoiceController::class)->show($id),
             default => abort(403)
         };
@@ -107,7 +114,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Invoice Download - Unified route (Pro Forma Invoice)
     Route::get('invoices/{id}/download', function ($id) {
         return match (auth()->user()->role) {
-            'admin', 'super_admin' => app(\App\Http\Controllers\Admin\InvoiceController::class)->download($id),
+            'admin', 'super_admin', 'finance' => app(\App\Http\Controllers\Admin\InvoiceController::class)->download($id),
             'client' => app(\App\Http\Controllers\Client\InvoiceController::class)->download($id),
             default => abort(403)
         };
@@ -116,7 +123,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Tax Invoice Download - Unified route (Only for paid invoices)
     Route::get('invoices/{id}/download-tax-invoice', function ($id) {
         return match (auth()->user()->role) {
-            'admin', 'super_admin' => app(\App\Http\Controllers\Admin\InvoiceController::class)->downloadTaxInvoice($id),
+            'admin', 'super_admin', 'finance' => app(\App\Http\Controllers\Admin\InvoiceController::class)->downloadTaxInvoice($id),
             'client' => app(\App\Http\Controllers\Client\InvoiceController::class)->downloadTaxInvoice($id),
             default => abort(403)
         };
@@ -134,11 +141,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ADMIN-ONLY ROUTES (No client equivalent)
     // ========================================================================
 
-    // Payroll routes - accessible by admin and finance
+    // Payroll & Invoice routes - accessible by admin and finance
     Route::middleware(['auth', 'verified', 'roles:admin,finance'])->group(function () {
         Route::get('payroll', \App\Livewire\Admin\Salary::class)->name('payroll');
         Route::get('payroll/{id}', \App\Livewire\Admin\SalaryDetail::class)->name('payroll.detail');
         Route::get('ot-transactions', \App\Livewire\Admin\OtTransactions::class)->name('ot-transactions');
+        Route::get('invoices-admin', \App\Livewire\Admin\Invoices::class)->name('invoices.admin');
     });
 
     // Admin-only routes (no finance access)
@@ -149,7 +157,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('contractors/{clabNo}', \App\Livewire\Admin\ContractorDetail::class)->name('contractors.detail');
         Route::get('notifications', \App\Livewire\Admin\Notifications::class)->name('notifications');
         Route::get('news', \App\Livewire\Admin\NewsManagement::class)->name('news');
-        Route::get('invoices-admin', \App\Livewire\Admin\Invoices::class)->name('invoices.admin');
     });
 
     // ========================================================================

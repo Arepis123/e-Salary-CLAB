@@ -46,7 +46,8 @@
       "Bash(tasklist:*)",
       "Bash(ls:*)",
       "Bash(npm install:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

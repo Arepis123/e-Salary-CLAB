@@ -15,7 +15,7 @@
             <flux:button variant="filled" size="sm" wire:click="exportWorkerList" icon="arrow-down-tray" icon-variant="outline">
                 Export
             </flux:button>
-            @if($submission->hasAdminReview() && (!$submission->payment || $submission->payment->status !== 'completed'))
+            @if($submission->hasAdminReview() && (!$submission->payment || $submission->payment->status !== 'completed') && !auth()->user()->isFinance())
                 <flux:button variant="filled" size="sm" wire:click="openEditAmountModal" icon="pencil" icon-variant="outline">
                     Edit
                 </flux:button>
@@ -61,10 +61,12 @@
         <flux:callout.text>
             <p>This submission requires admin review before payment can be processed.</p>
         </flux:callout.text>
+        @if(!auth()->user()->isFinance())
         <x-slot name="actions">
             <flux:button wire:click="openReviewModal">Review & Approve</flux:button>
         </x-slot>
-    </flux:callout>    
+        @endif
+    </flux:callout>
     @endif
 
     <!-- Approved Info -->
@@ -99,10 +101,12 @@
                     <flux:button size="sm" variant="ghost" wire:click="downloadPayslip" icon="arrow-down-tray">
                         {{ $submission->payslip_file_name }}
                     </flux:button>
-                @else
+                @elseif(!auth()->user()->isFinance())
                     <flux:button size="sm" variant="filled" wire:click="openUploadPayslipModal" icon="arrow-up-tray">
                         Upload Payslip
                     </flux:button>
+                @else
+                    <p class="text-sm text-zinc-500">Not uploaded yet</p>
                 @endif
             </div>
         </div>

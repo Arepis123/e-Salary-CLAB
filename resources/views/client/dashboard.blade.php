@@ -420,13 +420,51 @@
                 </flux:card>
 
                 <!-- Payment History -->
-                <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <flux:card class="min-w-0 overflow-hidden p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
                     <div class="mb-4 flex items-center justify-between">
                         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Payment History</h2>
                         <flux:button variant="ghost" size="sm" href="{{ route('payments') }}" wire:navigate>View all</flux:button>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <!-- Mobile: card list -->
+                    <div class="sm:hidden space-y-3">
+                        @forelse($recentPayments as $payment)
+                            <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $payment->month_year }}</span>
+                                    @if($payment->status === 'paid')
+                                        <flux:badge color="green" size="sm">Paid</flux:badge>
+                                    @elseif($payment->status === 'pending_payment')
+                                        <flux:badge color="yellow" size="sm">Pending</flux:badge>
+                                    @elseif($payment->status === 'overdue')
+                                        <flux:badge color="red" size="sm">Overdue</flux:badge>
+                                    @else
+                                        <flux:badge color="zinc" size="sm">{{ ucfirst($payment->status) }}</flux:badge>
+                                    @endif
+                                </div>
+                                <div class="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+                                    <span>
+                                        @if($payment->status !== 'submitted')
+                                            RM {{ number_format($payment->total_due, 2) }}
+                                        @else
+                                            —
+                                        @endif
+                                    </span>
+                                    <span class="flex items-center gap-2">
+                                        {{ $payment->total_workers }} {{ Str::plural('worker', $payment->total_workers) }}
+                                        @if($payment->has_penalty)
+                                            <flux:badge color="red" size="sm">Late</flux:badge>
+                                        @endif
+                                    </span>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="py-4 text-center text-sm text-zinc-600 dark:text-zinc-400">No payment history available</p>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop: table -->
+                    <div class="hidden sm:block overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
@@ -440,15 +478,15 @@
                             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                                 @forelse($recentPayments as $payment)
                                     <tr>
-                                        <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">{{ $payment->month_year }}</td>
-                                        <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{{ $payment->month_year }}</td>
+                                        <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                                             @if($payment->status !== 'submitted')
                                                 RM {{ number_format($payment->total_due, 2) }}
                                             @else
                                                 <span class="text-zinc-400 dark:text-zinc-500">—</span>
                                             @endif
                                         </td>
-                                        <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $payment->total_workers }} {{ Str::plural('worker', $payment->total_workers) }}</td>
+                                        <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{{ $payment->total_workers }} {{ Str::plural('worker', $payment->total_workers) }}</td>
                                         <td class="py-3">
                                             @if($payment->has_penalty)
                                                 <flux:badge color="red" size="sm">Late</flux:badge>

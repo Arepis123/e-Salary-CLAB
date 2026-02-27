@@ -255,6 +255,9 @@
                                 <flux:menu>
                                     <flux:menu.item icon="eye" href="{{ route('invoices.show', $invoice->id) }}">View Invoice</flux:menu.item>
                                     <flux:menu.item icon="arrow-down-tray" href="{{ route('invoices.download', $invoice->id) }}">Download Invoice</flux:menu.item>
+                                    @if($invoice->status === 'paid')
+                                        <flux:menu.item icon="arrow-down-tray" href="{{ route('invoices.download-tax', $invoice->id) }}">Download Receipt</flux:menu.item>
+                                    @endif
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>

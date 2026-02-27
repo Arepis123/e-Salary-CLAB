@@ -11,41 +11,41 @@
 
     <!-- Tab Navigation -->
     <div class="border-b border-zinc-200 dark:border-zinc-700">
-        <nav class="flex space-x-8">
+        <nav class="flex space-x-2 sm:space-x-8">
             <button
                 wire:click="switchTab('salary')"
-                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'salary' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'salary' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
             >
-                <flux:icon.currency-dollar class="size-5 inline mr-2" />
-                Basic Salary
+                <flux:icon.currency-dollar class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Basic Salary</span>
             </button>
             <button
                 wire:click="switchTab('windows')"
-                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'windows' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'windows' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
             >
-                <flux:icon.clock class="size-5 inline mr-2" />
-                OT Entry Windows
+                <flux:icon.clock class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">OT Entry Windows</span>
             </button>
             <button
                 wire:click="switchTab('contractor-settings')"
-                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'contractor-settings' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'contractor-settings' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
             >
-                <flux:icon.cog class="size-5 inline mr-2" />
-                Contractor Settings
+                <flux:icon.cog class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Contractor Settings</span>
             </button>
             <button
                 wire:click="switchTab('payments')"
-                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'payments' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'payments' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
             >
-                <flux:icon.credit-card class="size-5 inline mr-2" />
-                Payments
+                <flux:icon.credit-card class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Payments</span>
             </button>
             <button
                 wire:click="switchTab('workers')"
-                class="py-4 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'workers' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'workers' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
             >
-                <flux:icon.users class="size-5 inline mr-2" />
-                Workers
+                <flux:icon.users class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Workers</span>
             </button>
         </nav>
     </div>
