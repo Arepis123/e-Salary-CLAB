@@ -23,6 +23,7 @@ Route::get('csrf-token', function () {
 // ============================================================================
 Route::post('api/payslip/notify', [\App\Http\Controllers\Api\PayslipNotifyController::class, 'notify'])
     ->name('api.payslip.notify')
+    ->middleware('api')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // ============================================================================
