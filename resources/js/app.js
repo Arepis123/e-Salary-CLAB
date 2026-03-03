@@ -317,7 +317,7 @@ const tutorialConfigs = {
                 element: 'body',
                 popover: {
                     title: 'OT & Transaction Entry Tutorial',
-                    description: 'Learn how to add overtime hours and transactions for your workers efficiently.',
+                    description: 'Learn how to add overtime hours and transactions for your workers. Everything is saved automatically — no manual submit needed!',
                     side: 'center',
                     align: 'center'
                 }
@@ -326,7 +326,7 @@ const tutorialConfigs = {
                 element: '#entry-window-status',
                 popover: {
                     title: 'Entry Window Status',
-                    description: 'OT entries can only be made between the 1st and 15th of each month. This shows the current window status and days remaining.',
+                    description: 'OT entries can only be made between the 1st and 15th of each month. This card shows whether the window is open and how many days you have left to enter your data.',
                     side: 'bottom'
                 }
             },
@@ -334,7 +334,7 @@ const tutorialConfigs = {
                 element: '#download-template-btn',
                 popover: {
                     title: 'Download Template',
-                    description: 'First, download the Excel template by clicking this button. The template shows the exact format needed for bulk importing OT hours and transactions.',
+                    description: 'Download the Excel template to see the required format for bulk importing OT hours and transactions. Fill it in and import it back using the "Import from File" button.',
                     side: 'bottom'
                 }
             },
@@ -342,7 +342,7 @@ const tutorialConfigs = {
                 element: '#import-file-btn',
                 popover: {
                     title: 'Import from File',
-                    description: 'After filling the template with your data, click "Import from File" to upload it. The system supports Excel (.xlsx, .xls) and CSV files up to 2MB.',
+                    description: 'Upload a filled Excel or CSV template to bulk-import OT hours and transactions for all workers at once. The system supports .xlsx, .xls, and .csv files up to 2MB. All imported data is saved automatically.',
                     side: 'bottom'
                 }
             },
@@ -350,7 +350,7 @@ const tutorialConfigs = {
                 element: '#ot-entry-table',
                 popover: {
                     title: 'OT Entry Table',
-                    description: 'Alternatively, you can manually enter OT hours here. The table shows all your workers and you can enter: Weekday OT (1.5x rate), Rest Day OT (2x rate), and Public Holiday OT (3x rate).',
+                    description: 'You can also enter OT hours directly in this table. Each row is a worker — enter Weekday OT (1.5× rate), Rest Day OT (2× rate), and Public Holiday OT (3× rate). Data is saved automatically when you move to the next field.',
                     side: 'top'
                 }
             },
@@ -358,39 +358,23 @@ const tutorialConfigs = {
                 element: '#ot-entry-table',
                 popover: {
                     title: 'Transaction Management',
-                    description: 'Each worker has a "Manage" button to add transactions like advances, deductions, allowances, or no-pay leave (NPL). These will be calculated automatically in the payroll.',
+                    description: 'Click the "Manage" button on any worker\'s row to add transactions such as advances, deductions, allowances, or no-pay leave (NPL). Transactions are saved to the database immediately when you click "Save Transactions".',
                     side: 'top'
                 }
             },
             {
                 element: '#ot-entry-actions',
                 popover: {
-                    title: 'Saving Your Work',
-                    description: 'After entering OT hours and transactions, you have two options at the bottom of the table. Let\'s understand what each button does.',
-                    side: 'top'
-                }
-            },
-            {
-                element: '#save-draft-btn',
-                popover: {
-                    title: '💾 Save Draft Button',
-                    description: 'Click "Save Draft" to save your OT entries without finalizing them. You can come back anytime before the 15th to edit, add more data, or delete entries. Draft entries are NOT included in payroll yet.',
-                    side: 'top'
-                }
-            },
-            {
-                element: '#submit-entries-btn',
-                popover: {
-                    title: '🚀 Submit All Entries Button',
-                    description: 'Click "Submit All Entries" when you\'re done entering all OT and transactions. This LOCKS all entries and they will be automatically included in your next month\'s payroll submission. Once submitted, you CANNOT edit them!',
+                    title: '✅ Auto-Save — No Action Needed',
+                    description: 'Every change you make is saved automatically to the database. You will see "Draft auto-saved" here after each save. There is no Submit button — just enter your data and the system handles the rest.',
                     side: 'top'
                 }
             },
             {
                 element: '#ot-entry-table',
                 popover: {
-                    title: '⚠️ Important Reminder',
-                    description: 'Remember: Save Draft = temporary (can edit later), Submit = final and locked. After the 15th of the month, all entries are automatically locked, so make sure to submit before then!',
+                    title: '⚠️ Auto-Submit on the 16th',
+                    description: 'On the 16th of each month, the system automatically submits and locks all draft OT entries. You do NOT need to do anything — just make sure your data is entered before the 15th ends.',
                     side: 'top'
                 }
             },
@@ -398,7 +382,7 @@ const tutorialConfigs = {
                 element: '#tutorial-button',
                 popover: {
                     title: 'Quick Workflow Recap',
-                    description: '1) Enter OT hours manually OR import from file, 2) Add transactions using "Manage" button, 3) Save Draft (optional), 4) Submit All Entries when ready. Click tutorial button anytime to replay!',
+                    description: '1) Enter OT hours manually OR import from file, 2) Add transactions via the "Manage" button, 3) All changes are saved automatically — done! The system auto-submits everything on the 16th. Click the tutorial button anytime to replay.',
                     side: 'bottom'
                 }
             }

@@ -1,4 +1,4 @@
-<div class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto">
+<div id="timesheet-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -754,4 +754,27 @@
             </div>
         </flux:modal>
     @endif
+
+    <!-- Floating Scroll-to-Bottom Button -->
+    <button
+        id="scroll-to-bottom-btn"
+        onclick="scrollPageToBottom()"
+        title="Scroll to bottom"
+        class="fixed bottom-6 right-6 z-50 flex items-center justify-center size-11 rounded-full bg-zinc-800 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-lg hover:bg-zinc-600 dark:hover:bg-zinc-300 transition-all duration-200"
+    >
+        <flux:icon.arrow-down class="size-5" />
+    </button>
+
+    <script>
+        window.scrollPageToBottom = function () {
+            [
+                document.getElementById('timesheet-scroll-container'),
+                document.querySelector('main'),
+                document.documentElement,
+                document.body,
+            ].forEach(function (el) {
+                if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+            });
+        };
+    </script>
 </div>

@@ -47,14 +47,20 @@ class PaymentController extends Controller
                 ->with('error', 'This submission must be approved by admin before payment can be created.');
         }
 
-        // Check if there's a recent pending payment (within last 2 hours)
+        // Check if there's a recent pending payment (within last 2 hours).
+        // NOTE: $submission->payment only returns completed payments, so we query directly.
         $recentPendingPayment = null;
-        if ($submission->payment && $submission->payment->status === 'pending') {
-            $paymentAge = $submission->payment->created_at->diffInMinutes(now());
+        $latestPendingPayment = PayrollPayment::where('payroll_submission_id', $submission->id)
+            ->where('status', 'pending')
+            ->latest()
+            ->first();
+
+        if ($latestPendingPayment) {
+            $paymentAge = $latestPendingPayment->created_at->diffInMinutes(now());
 
             if ($paymentAge < 120) {
                 // Payment is recent (less than 2 hours old), redirect to existing bill
-                $recentPendingPayment = $submission->payment;
+                $recentPendingPayment = $latestPendingPayment;
             }
         }
 
@@ -152,38 +158,42 @@ class PaymentController extends Controller
             }
         }
 
-        // If there's an old/expired payment (pending for >2 hours, failed, or cancelled),
-        // mark it as cancelled and create a new attempt
-        if ($submission->payment && in_array($submission->payment->status, ['failed', 'cancelled', 'pending'])) {
-            // Mark old payment as cancelled if it's pending
-            if ($submission->payment->status === 'pending') {
-                $submission->payment->update([
-                    'status' => 'cancelled',
-                    'payment_response' => json_encode([
-                        'reason' => 'Payment expired or user initiated new payment',
-                        'cancelled_at' => now()->toDateTimeString(),
-                    ]),
-                ]);
+        // If there's an old/expired pending payment (>2 hours old), cancel it and clean up.
+        // Also cancel any stale failed/cancelled payments to keep history clean.
+        // $latestPendingPayment is already set above; handle the expired case here.
+        $expiredPendingPayment = null;
+        if ($latestPendingPayment && ! $recentPendingPayment) {
+            // Pending payment exists but is older than 2 hours — treat as expired
+            $expiredPendingPayment = $latestPendingPayment;
+        }
 
-                Log::info('Marked old pending payment as cancelled', [
-                    'old_payment_id' => $submission->payment->id,
-                    'submission_id' => $submission->id,
-                ]);
-            }
+        if ($expiredPendingPayment) {
+            $expiredPendingPayment->update([
+                'status' => 'cancelled',
+                'payment_response' => json_encode([
+                    'reason' => 'Payment expired or user initiated new payment',
+                    'cancelled_at' => now()->toDateTimeString(),
+                ]),
+            ]);
+
+            Log::info('Marked old pending payment as cancelled', [
+                'old_payment_id' => $expiredPendingPayment->id,
+                'submission_id' => $submission->id,
+            ]);
 
             // Try to delete the old Billplz bill
             try {
-                if ($submission->payment->billplz_bill_id) {
-                    $this->billplzService->deleteBill($submission->payment->billplz_bill_id);
+                if ($expiredPendingPayment->billplz_bill_id) {
+                    $this->billplzService->deleteBill($expiredPendingPayment->billplz_bill_id);
                     Log::info('Deleted previous Billplz bill before retry', [
-                        'old_bill_id' => $submission->payment->billplz_bill_id,
-                        'old_payment_id' => $submission->payment->id,
+                        'old_bill_id' => $expiredPendingPayment->billplz_bill_id,
+                        'old_payment_id' => $expiredPendingPayment->id,
                         'submission_id' => $submission->id,
                     ]);
                 }
             } catch (\Exception $e) {
                 Log::warning('Could not delete previous Billplz bill', [
-                    'bill_id' => $submission->payment->billplz_bill_id ?? 'unknown',
+                    'bill_id' => $expiredPendingPayment->billplz_bill_id ?? 'unknown',
                     'error' => $e->getMessage(),
                 ]);
             }

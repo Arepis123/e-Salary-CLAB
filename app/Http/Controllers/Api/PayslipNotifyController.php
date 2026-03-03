@@ -21,7 +21,8 @@ class PayslipNotifyController extends Controller
      *   "contractor_name": "SYUKRAN MAJU SDN BHD",   ← name as known by Python
      *   "month":           2,
      *   "year":            2026,
-     *   "file_name":       "SyukranMaju_Feb2026.zip"  ← filename only, file must already exist in storage/app/payslips/
+     *   "file_name":       "SyukranMaju_Feb2026.zip", ← filename only, file must already exist in storage/app/payslips/
+     *   "force_reupload":  true                       ← optional, default false. If true, re-sends email even if file was already uploaded
      * }
      *
      * Required header:
@@ -41,6 +42,7 @@ class PayslipNotifyController extends Controller
             'month'           => 'required|integer|min:1|max:12',
             'year'            => 'required|integer|min:2020',
             'file_name'       => 'required|string',
+            'force_reupload'  => 'boolean',
         ]);
 
         $contractorName = trim($validated['contractor_name']);
@@ -48,6 +50,7 @@ class PayslipNotifyController extends Controller
         $year           = (int) $validated['year'];
         $fileName       = $validated['file_name'];
         $filePath       = 'payslips/'.$fileName;
+        $forceReupload  = (bool) ($validated['force_reupload'] ?? false);
 
         // --- Resolve contractor name → CLAB number ---
         // Try exact match first, then case-insensitive
@@ -103,6 +106,9 @@ class PayslipNotifyController extends Controller
             ], 404);
         }
 
+        // --- Check if this is a re-upload (file was already registered before) ---
+        $isReupload = ! is_null($submission->payslip_file_path);
+
         // --- Update the submission ---
         $submission->update([
             'payslip_file_path' => $filePath,
@@ -116,11 +122,15 @@ class PayslipNotifyController extends Controller
             'month'           => $month,
             'year'            => $year,
             'file'            => $filePath,
+            'is_reupload'     => $isReupload,
+            'force_reupload'  => $forceReupload,
         ]);
 
         // --- Send email notification to contractor ---
+        // Skip if re-upload, unless force_reupload is explicitly set to true
         $emailSent = false;
-        if ($submission->user && $submission->user->email) {
+        $shouldEmail = ! $isReupload || $forceReupload;
+        if ($shouldEmail && $submission->user && $submission->user->email) {
             Mail::to($submission->user->email)->send(new PayslipReady($submission)); // Comment this line if dont want sent email
             $emailSent = true;
         }
@@ -132,6 +142,7 @@ class PayslipNotifyController extends Controller
             'clab_no'         => $clabNo,
             'period'          => $month.'/'.$year,
             'file_path'       => $filePath,
+            'is_reupload'     => $isReupload,
             'email_sent'      => $emailSent,
         ]);
     }

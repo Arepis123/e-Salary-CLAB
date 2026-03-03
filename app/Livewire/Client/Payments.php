@@ -100,13 +100,36 @@ class Payments extends Component
             ]);
         }
 
-        // Get all payments for this contractor with submission details
+        // Get all payments for this contractor with submission details, then reduce
+        // to one payment per submission (most relevant: completed > pending > latest other).
+        // This prevents duplicate rows when a client made multiple payment attempts for
+        // the same payroll period (e.g. one Paid and one Pending for January).
         $allPayments = PayrollPayment::whereHas('submission', function ($query) use ($clabNo) {
             $query->where('contractor_clab_no', $clabNo)
                 ->whereYear('created_at', $this->year);
         })
             ->with(['submission'])
-            ->get();
+            ->whereNotIn('status', ['redirected']) // exclude internal tracking records
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy('payroll_submission_id')
+            ->map(function ($payments) {
+                // 1. Prefer completed payment
+                $completed = $payments->firstWhere('status', 'completed');
+                if ($completed) {
+                    return $completed;
+                }
+
+                // 2. Then most recent pending
+                $pending = $payments->where('status', 'pending')->first(); // already sorted desc
+                if ($pending) {
+                    return $pending;
+                }
+
+                // 3. Fallback: most recent of any remaining status
+                return $payments->first();
+            })
+            ->values();
 
         // Apply search filter
         if ($this->search) {

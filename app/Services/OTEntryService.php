@@ -238,6 +238,27 @@ class OTEntryService
     }
 
     /**
+     * Auto-submit all draft entries for a contractor for a specific period.
+     * Bypasses the window check — intended for scheduler/admin use only.
+     * Returns the number of entries submitted.
+     */
+    public function autoSubmitDraftEntries(string $clabNo, int $entryMonth, int $entryYear): int
+    {
+        $entries = MonthlyOTEntry::forContractorPeriod($clabNo, $entryMonth, $entryYear)
+            ->drafts()
+            ->get();
+
+        foreach ($entries as $entry) {
+            $entry->update([
+                'status' => 'submitted',
+                'submitted_at' => now(),
+            ]);
+        }
+
+        return $entries->count();
+    }
+
+    /**
      * Lock all entries after 15th (should be run by scheduler)
      */
     public function lockExpiredEntries(): int

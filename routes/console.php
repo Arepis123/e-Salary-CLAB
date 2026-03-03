@@ -21,6 +21,11 @@ Schedule::command('reminders:payment')->dailyAt('09:00');
 // Note: Penalties are now applied immediately when client submits late
 Schedule::command('penalties:apply-overdue')->dailyAt('00:01');
 
-// Auto-submit timesheets on the 16th of every month at 12:01 AM
+// Auto-submit OT entries on the 16th of every month at 12:01 AM
+// Submits draft OT entries for contractors who haven't submitted for the previous month
+Schedule::command('payroll:auto-submit-ot')->monthlyOn(16, '00:01');
+
+// Auto-submit timesheets on the 16th of every month at 12:02 AM
 // Creates submissions for contractors who haven't submitted yet, using basic salary + OT entries
-Schedule::command('payroll:auto-submit')->monthlyOn(16, '00:01');
+// Runs after auto-submit-ot so OT data is already submitted when payroll is built
+Schedule::command('payroll:auto-submit')->monthlyOn(16, '00:02');

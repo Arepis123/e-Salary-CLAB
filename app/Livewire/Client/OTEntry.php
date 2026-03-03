@@ -55,6 +55,8 @@ class OTEntry extends Component
 
     public $importMode = 'add'; // 'add' or 'override'
 
+    public string $autoSaveStatus = ''; // '', 'saved', 'error'
+
     protected $otEntryService;
 
     public function boot(OTEntryService $otEntryService)
@@ -265,6 +267,64 @@ class OTEntry extends Component
             } else {
                 $this->newTransactionType = 'allowance';
             }
+
+            return;
+        }
+
+        // Auto-save when an OT hours field loses focus (wire:model.blur)
+        if (preg_match('/^entries\.(\d+)\.ot_(normal|rest|public)_hours$/', $propertyName, $matches)) {
+            $this->autoSaveDraft((int) $matches[1]);
+        }
+    }
+
+    /**
+     * Silently save a single entry when its OT hours are changed.
+     * Also persists that entry's transactions so nothing is lost on page refresh.
+     */
+    public function autoSaveDraft(int $index): void
+    {
+        $clabNo = auth()->user()->contractor_clab_no;
+
+        if (! $this->isWithinWindow || $this->hasSubmitted) {
+            return;
+        }
+
+        if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
+            return;
+        }
+
+        $entry = $this->entries[$index] ?? null;
+
+        if (! $entry || $entry['is_locked']) {
+            return;
+        }
+
+        try {
+            $savedEntry = $this->otEntryService->saveEntry([
+                'contractor_clab_no' => $clabNo,
+                'worker_id' => $entry['worker_id'],
+                'worker_name' => $entry['worker_name'],
+                'worker_passport' => $entry['worker_passport'],
+                'ot_normal_hours' => $entry['ot_normal_hours'] ?? 0,
+                'ot_rest_hours' => $entry['ot_rest_hours'] ?? 0,
+                'ot_public_hours' => $entry['ot_public_hours'] ?? 0,
+            ]);
+
+            // Also persist the entry's transactions so they survive a page refresh
+            if (! empty($entry['transactions'])) {
+                $savedEntry->transactions()->delete();
+                foreach ($entry['transactions'] as $txn) {
+                    $savedEntry->transactions()->create([
+                        'type' => $txn['type'],
+                        'amount' => $txn['amount'],
+                        'remarks' => $txn['remarks'],
+                    ]);
+                }
+            }
+
+            $this->autoSaveStatus = 'saved';
+        } catch (\Exception $e) {
+            $this->autoSaveStatus = 'error';
         }
     }
 
@@ -409,6 +469,9 @@ class OTEntry extends Component
 
         // Save transactions to the worker
         $this->entries[$this->currentWorkerIndex]['transactions'] = array_values($this->transactions);
+
+        // Persist to database immediately
+        $this->autoSaveDraft($this->currentWorkerIndex);
 
         // Close modal
         $this->closeTransactionModal();
@@ -946,6 +1009,13 @@ class OTEntry extends Component
             // Force Livewire reactivity
             $this->entries = $this->entries;
 
+            // Persist all affected entries to database immediately
+            foreach ($this->entries as $index => $entry) {
+                if (isset($groupedData[$entry['worker_passport']])) {
+                    $this->autoSaveDraft($index);
+                }
+            }
+
             $this->closeImportModal();
 
             // Log activity
@@ -962,7 +1032,7 @@ class OTEntry extends Component
             Flux::toast(
                 variant: 'success',
                 heading: 'Import Successful',
-                text: "Imported data for {$importedWorkers} workers with {$importedTransactions} transactions. Don't forget to save your changes!"
+                text: "Imported data for {$importedWorkers} workers with {$importedTransactions} transactions."
             );
 
         } catch (\Exception $e) {

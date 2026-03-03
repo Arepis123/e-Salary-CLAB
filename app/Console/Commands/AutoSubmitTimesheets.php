@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\InactiveWorker;
 use App\Models\MonthlyOTEntry;
 use App\Models\PayrollSubmission;
 use App\Models\User;
@@ -203,6 +204,17 @@ class AutoSubmitTimesheets extends Command
         );
 
         $activeWorkers = $activeWorkers->merge($workersWithPendingOT)->unique('wkr_id')->values();
+
+        // Filter out workers marked as inactive for this contractor
+        $inactiveWorkerIds = InactiveWorker::where('contractor_clab_no', $clabNo)
+            ->pluck('worker_id')
+            ->all();
+
+        if (! empty($inactiveWorkerIds)) {
+            $activeWorkers = $activeWorkers->filter(
+                fn ($worker) => ! in_array($worker->wkr_id, $inactiveWorkerIds)
+            )->values();
+        }
 
         // Get IDs of workers already in any submission this month (including drafts)
         $submittedWorkerIds = PayrollSubmission::where('contractor_clab_no', $clabNo)

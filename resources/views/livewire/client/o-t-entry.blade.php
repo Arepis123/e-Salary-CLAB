@@ -1,4 +1,4 @@
-<div class="flex h-full w-full flex-1 flex-col gap-6">
+<div id="ot-entry-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto">
         <!-- Page Header -->
         <div class="flex items-center justify-between">
             <div>
@@ -155,7 +155,7 @@
                                                 type="number"
                                                 step="0.01"
                                                 min="0"
-                                                wire:model="entries.{{ $index }}.ot_normal_hours"
+                                                wire:model.blur="entries.{{ $index }}.ot_normal_hours"
                                                 class="w-24 text-center"
                                             />
                                         @endif
@@ -172,7 +172,7 @@
                                                 type="number"
                                                 step="0.01"
                                                 min="0"
-                                                wire:model="entries.{{ $index }}.ot_rest_hours"
+                                                wire:model.blur="entries.{{ $index }}.ot_rest_hours"
                                                 class="w-24 text-center"
                                             />
                                         @endif
@@ -189,7 +189,7 @@
                                                 type="number"
                                                 step="0.01"
                                                 min="0"
-                                                wire:model="entries.{{ $index }}.ot_public_hours"
+                                                wire:model.blur="entries.{{ $index }}.ot_public_hours"
                                                 class="w-24 text-center"
                                             />
                                         @endif
@@ -252,13 +252,35 @@
 
                 <!-- Bottom Actions -->
                 @if(!$hasSubmitted && $isWithinWindow && count($entries) > 0)
-                    <div id="ot-entry-actions" class="mt-6 flex justify-end gap-2 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                        <flux:button id="save-draft-btn" wire:click="saveDraft" variant="outline" icon="document-text">
-                            Save Draft
-                        </flux:button>
-                        <flux:button id="submit-entries-btn" wire:click="submitEntries" variant="primary" icon="paper-airplane">
-                            Submit All Entries
-                        </flux:button>
+                    <div id="ot-entry-actions" class="mt-6 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                        <!-- Auto-save status indicator -->
+                        <div class="flex items-center gap-1.5 text-xs">
+                            <div wire:loading wire:target="autoSaveDraft" class="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
+                                <flux:icon.arrow-path class="size-3.5 animate-spin" />
+                                <span>Saving...</span>
+                            </div>
+                            <div wire:loading.remove wire:target="autoSaveDraft">
+                                @if($autoSaveStatus === 'saved')
+                                    <span class="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                                        <flux:icon.check-circle class="size-3.5" />
+                                        Draft auto-saved
+                                    </span>
+                                @elseif($autoSaveStatus === 'error')
+                                    <span class="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                                        <flux:icon.exclamation-circle class="size-3.5" />
+                                        Auto-save failed — please save manually
+                                    </span>
+                                @else
+                                    <span class="text-zinc-400 dark:text-zinc-500">Changes are saved automatically</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        @if($autoSaveStatus === 'error')
+                            <flux:button id="save-draft-btn" wire:click="saveDraft" variant="outline" icon="document-text">
+                                Save Draft
+                            </flux:button>
+                        @endif
                     </div>
                 @endif
             @endif
@@ -271,9 +293,9 @@
                 <ul class="list-disc list-inside space-y-1 text-sm">
                     <li>OT and transaction entries can only be made between the <strong>1st and 15th</strong> of each month</li>
                     <li>Entries are for the <strong>previous month's</strong> overtime hours and transactions</li>
-                    <li>You can save as draft multiple times before submitting</li>
-                    <li>Once submitted, entries will be <strong>locked</strong> and automatically included in your next payroll</li>
-                    <li>After the 15th, all entries are automatically locked</li>
+                    <li>All changes are <strong>saved automatically</strong> as you type</li>
+                    <li>On the <strong>16th</strong>, all entries are automatically submitted and locked</li>
+                    <li>Locked entries will be automatically included in your next payroll</li>
                 </ul>
             </flux:callout.text>
         </flux:callout>
@@ -406,6 +428,29 @@
                 </div>
             </flux:modal>
         @endif
+
+        <!-- Floating Scroll-to-Bottom Button -->
+        <button
+            id="scroll-to-bottom-btn"
+            onclick="scrollPageToBottom()"
+            title="Scroll to bottom"
+            class="fixed bottom-6 right-6 z-50 flex items-center justify-center size-11 rounded-full bg-zinc-800 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-lg hover:bg-zinc-600 dark:hover:bg-zinc-300 transition-all duration-200"
+        >
+            <flux:icon.arrow-down class="size-5" />
+        </button>
+
+        <script>
+            window.scrollPageToBottom = function () {
+                [
+                    document.getElementById('ot-entry-scroll-container'),
+                    document.querySelector('main'),
+                    document.documentElement,
+                    document.body,
+                ].forEach(function (el) {
+                    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                });
+            };
+        </script>
 
         <!-- Import Modal -->
         @if($showImportModal)
