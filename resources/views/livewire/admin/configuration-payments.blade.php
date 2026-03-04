@@ -19,7 +19,7 @@
                     <div>
                         <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Sync Pending Payments</h3>
                         <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                            Check all pending payments with Billplz API to update their status if they have been paid.
+                            Check all pending payments with Billplz API to update their status if they have been paid. Bills older than 30 days are automatically cancelled on Billplz and marked as cancelled.
                         </p>
                     </div>
                 </div>

@@ -1035,6 +1035,8 @@ class Configuration extends Component
         $this->syncResults = [];
 
         try {
+            $cutoff = now()->subDays(30);
+
             // Find all pending payments with Billplz bill IDs
             $pendingPayments = \App\Models\PayrollPayment::where('status', 'pending')
                 ->whereNotNull('billplz_bill_id')
@@ -1054,11 +1056,36 @@ class Configuration extends Component
 
             $totalPending = $pendingPayments->count();
             $updated = 0;
+            $cancelled = 0;
             $failed = 0;
             $stillPending = 0;
 
             foreach ($pendingPayments as $payment) {
                 try {
+                    // Cancel bills older than 30 days — they are unlikely to be paid
+                    if ($payment->created_at->lt($cutoff)) {
+                        $this->billplzService->deleteBill($payment->billplz_bill_id);
+
+                        $payment->update(['status' => 'cancelled']);
+
+                        $this->syncResults[] = [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'status' => 'cancelled',
+                            'message' => 'Bill cancelled — older than 30 days',
+                        ];
+                        $cancelled++;
+
+                        \Log::info('Expired Billplz bill cancelled during sync', [
+                            'payment_id' => $payment->id,
+                            'bill_id' => $payment->billplz_bill_id,
+                            'created_at' => $payment->created_at,
+                            'synced_by' => auth()->user()->name,
+                        ]);
+
+                        continue;
+                    }
+
                     // Fetch bill status from Billplz
                     $bill = $this->billplzService->getBill($payment->billplz_bill_id);
 
@@ -1147,7 +1174,7 @@ class Configuration extends Component
             Flux::toast(
                 variant: $updated > 0 ? 'success' : 'warning',
                 heading: 'Sync Complete',
-                text: "Synced {$totalPending} payments: {$updated} updated, {$stillPending} still pending, {$failed} failed"
+                text: "Synced {$totalPending} payments: {$updated} updated, {$stillPending} still pending, {$cancelled} cancelled (expired), {$failed} failed"
             );
         } catch (\Exception $e) {
             Flux::toast(
