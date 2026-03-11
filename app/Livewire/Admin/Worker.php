@@ -87,7 +87,7 @@ class Worker extends Component
     {
         // Get filtered worker IDs
         $workerData = $this->getWorkersData();
-        $workerIds = $workerData->pluck('id')->toArray();
+        $workerIds = $workerData->pluck('id')->unique()->toArray();
 
         // Load actual Worker models with relationships for export
         $allWorkers = \App\Models\Worker::with(['country', 'workTrade', 'activeContract'])
@@ -163,20 +163,29 @@ class Worker extends Component
 
     protected function loadStats()
     {
-        // Get total contracted workers
-        $totalWorkers = ContractWorker::distinct('con_wkr_id')->count('con_wkr_id');
+        $allWorkerIds = ContractWorker::distinct('con_wkr_id')->pluck('con_wkr_id');
+        $totalWorkers = $allWorkerIds->count();
 
-        // Active workers have contracts that haven't expired yet
-        $activeWorkers = ContractWorker::active()->distinct('con_wkr_id')->count('con_wkr_id');
+        // Workers with at least one active (non-expired) contract
+        $activeContractWorkerIds = ContractWorker::active()
+            ->distinct('con_wkr_id')
+            ->pluck('con_wkr_id');
 
-        // Inactive workers have expired contracts
-        $inactiveWorkers = ContractWorker::expired()->distinct('con_wkr_id')->count('con_wkr_id');
+        // Workers manually deactivated
+        $manuallyInactiveIds = collect(\App\Models\InactiveWorker::getInactiveWorkerIds());
+
+        // Inactive = no active contract at all OR manually deactivated (union, no double-count)
+        $noActiveContractIds = $allWorkerIds->diff($activeContractWorkerIds);
+        $inactiveCount = $noActiveContractIds->merge($manuallyInactiveIds)->unique()->count();
+
+        // Active = has active contract AND not manually deactivated
+        $trueActiveCount = $activeContractWorkerIds->diff($manuallyInactiveIds)->count();
 
         $this->stats = [
-            'total' => $totalWorkers,
-            'active' => $activeWorkers,
-            'on_leave' => 0, // TODO: Add worker status tracking
-            'inactive' => $inactiveWorkers,
+            'total'    => $totalWorkers,
+            'active'   => $trueActiveCount,
+            'on_leave' => 0,
+            'inactive' => $inactiveCount,
         ];
     }
 
@@ -224,16 +233,22 @@ class Worker extends Component
         // Get the contracted workers
         $contractWorkers = $query->get();
 
-        // Transform the data
-        $transformedWorkers = $contractWorkers->map(function ($contractWorker) {
+        // Pre-fetch manually deactivated worker IDs to factor into status
+        $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+
+        // Transform the data — one row per contract (no unique filter)
+        // This correctly shows a worker multiple times if they have overlapping contracts
+        $transformedWorkers = $contractWorkers->map(function ($contractWorker) use ($manuallyInactiveIds) {
             $worker = $contractWorker->worker;
             $contractor = $contractWorker->contractor;
 
-            // Determine status based on contract expiry
-            $status = $contractWorker->isActive() ? 'Active' : 'Inactive';
+            // Inactive if contract expired OR manually deactivated
+            $isManuallyInactive = in_array($contractWorker->con_wkr_id, $manuallyInactiveIds);
+            $status = ($contractWorker->isActive() && ! $isManuallyInactive) ? 'Active' : 'Inactive';
 
             return [
-                'id' => $contractWorker->con_wkr_id,
+                'id' => $contractWorker->con_wkr_id,            // worker ID (used for route & export)
+                'contract_id' => $contractWorker->con_id,       // contract ID (used as row key)
                 'employee_id' => $contractWorker->con_wkr_id,
                 'name' => $worker ? $worker->wkr_name : 'N/A',
                 'passport' => $contractWorker->con_wkr_passno,
@@ -253,7 +268,7 @@ class Worker extends Component
                 'contract_start' => $contractWorker->con_start ? $contractWorker->con_start->format('d/m/Y') : 'N/A',
                 'contract_end' => $contractWorker->con_end ? $contractWorker->con_end->format('d/m/Y') : 'N/A',
             ];
-        })->unique('employee_id');
+        });
 
         // Apply status filter after transformation
         if ($this->statusFilter) {

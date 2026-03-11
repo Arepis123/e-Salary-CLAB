@@ -261,12 +261,27 @@ class ContractWorkerService
     }
 
     /**
-     * Get worker's active contract
+     * Get worker's active contract (any contractor)
      */
     public function getWorkerActiveContract(int $workerId): ?ContractWorker
     {
         return ContractWorker::where('con_wkr_id', $workerId)
             ->active()
+            ->with(['contractor', 'worker'])
+            ->first();
+    }
+
+    /**
+     * Get worker's active contract scoped to a specific contractor.
+     * Use this instead of getWorkerActiveContract() when a worker may have
+     * overlapping contracts with different contractors.
+     */
+    public function getWorkerActiveContractForContractor(int $workerId, string $clabNo): ?ContractWorker
+    {
+        return ContractWorker::where('con_wkr_id', $workerId)
+            ->where('con_ctr_clab_no', $clabNo)
+            ->active()
+            ->orderBy('con_start', 'desc')
             ->with(['contractor', 'worker'])
             ->first();
     }

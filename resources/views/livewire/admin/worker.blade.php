@@ -156,7 +156,7 @@
                                 }
                             }
                         @endphp
-                        <flux:table.rows :key="$worker['id']">
+                        <flux:table.rows :key="$worker['contract_id']">
                             <flux:table.cell>{{ $pagination['from'] + $index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong" class="flex items-center gap-3">

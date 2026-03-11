@@ -1005,6 +1005,7 @@ class OTEntry extends Component
                     $importedWorkers++;
                 }
             }
+            unset($entry); // Break the &$entry reference from the loop above to prevent last-entry corruption
 
             // Force Livewire reactivity
             $this->entries = $this->entries;
