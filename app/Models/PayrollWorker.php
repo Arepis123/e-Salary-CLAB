@@ -147,7 +147,7 @@ class PayrollWorker extends Model
     public function getTotalAllowanceAttribute(): float
     {
         return $this->transactions()
-            ->where('type', 'allowance')
+            ->whereIn('type', ['allowance', 'backpay'])
             ->sum('amount') ?? 0;
     }
 

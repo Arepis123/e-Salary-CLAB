@@ -248,6 +248,8 @@
                                             <div class="text-xs text-zinc-900 dark:text-zinc-100">
                                                 @if($txn['type'] === 'allowance')
                                                     +RM {{ number_format($txn['amount'], 2) }} (Allowance)
+                                                @elseif($txn['type'] === 'backpay')
+                                                    +RM {{ number_format($txn['amount'], 2) }} (Backpay)
                                                 @elseif($txn['type'] === 'npl')
                                                     {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
                                                 @elseif($txn['type'] === 'advance_payment')
@@ -441,6 +443,7 @@
                                     <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
                                 @else
                                     <flux:select.option value="allowance">Allowance</flux:select.option>
+                                    <flux:select.option value="backpay">Backpay</flux:select.option>
                                 @endif
                             </flux:select>
                             @error('newTransactionType') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
@@ -504,6 +507,8 @@
                                                 <flux:badge color="purple" size="sm">No-Pay Leave</flux:badge>
                                             @elseif($transaction['type'] === 'allowance')
                                                 <flux:badge color="green" size="sm">Allowance</flux:badge>
+                                            @elseif($transaction['type'] === 'backpay')
+                                                <flux:badge color="cyan" size="sm">Backpay</flux:badge>
                                             @endif
                                         </div>
                                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{{ $transaction['remarks'] }}</p>
@@ -520,7 +525,7 @@
                             $totalAdvance = collect($currentTransactions)->where('type', 'advance_payment')->sum('amount');
                             $totalDeduction = collect($currentTransactions)->where('type', 'deduction')->sum('amount');
                             $totalNPLDays = collect($currentTransactions)->where('type', 'npl')->sum('amount');
-                            $totalAllowance = collect($currentTransactions)->where('type', 'allowance')->sum('amount');
+                            $totalAllowance = collect($currentTransactions)->whereIn('type', ['allowance', 'backpay'])->sum('amount');
                             $totalDeductions = $totalAdvance + $totalDeduction;
                         @endphp
 

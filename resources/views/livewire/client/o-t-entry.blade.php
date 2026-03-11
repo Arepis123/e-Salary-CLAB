@@ -206,6 +206,8 @@
                                                     <div class="text-xs text-zinc-900 dark:text-zinc-100">
                                                         @if($txn['type'] === 'allowance')
                                                             +RM {{ number_format($txn['amount'], 2) }}
+                                                        @elseif($txn['type'] === 'backpay')
+                                                            +RM {{ number_format($txn['amount'], 2) }}                                                            
                                                         @elseif($txn['type'] === 'npl')
                                                             {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
                                                         @else
@@ -339,6 +341,7 @@
                                         <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
                                     @else
                                         <flux:select.option value="allowance">Allowance</flux:select.option>
+                                        <flux:select.option value="backpay">Backpay</flux:select.option>
                                     @endif
                                 </flux:select>
                                 @error('newTransactionType') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
@@ -348,13 +351,11 @@
                                 <!-- NPL Days Input -->
                                 <div>
                                     <flux:input wire:model.live="newTransactionAmount" type="number" step="0.5" min="0" label="No-Pay Leave Days" placeholder="0.0" />
-                                    @error('newTransactionAmount') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
                                 </div>
                             @else
                                 <!-- Amount Input -->
                                 <div>
                                     <flux:input wire:model.live="newTransactionAmount" type="number" step="0.01" min="0" label="Amount (RM)" placeholder="0.00" />
-                                    @error('newTransactionAmount') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
                                 </div>
                             @endif
 
@@ -402,6 +403,8 @@
                                                     <flux:badge color="purple" size="sm">No-Pay Leave</flux:badge>
                                                 @elseif($transaction['type'] === 'allowance')
                                                     <flux:badge color="green" size="sm">Allowance</flux:badge>
+                                                @elseif($transaction['type'] === 'backpay')
+                                                    <flux:badge color="cyan" size="sm">Backpay</flux:badge>
                                                 @endif
                                             </div>
                                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{{ $transaction['remarks'] }}</p>
@@ -491,7 +494,7 @@
                                         <li>Download the template file to see the required format</li>
                                         <li>Fill in worker passport, name, OT hours, and transactions</li>
                                         <li>Deduction types: <strong class="text-zinc-900 dark:text-zinc-100">accommodation</strong>, <strong class="text-zinc-900 dark:text-zinc-100">advance_payment</strong>, <strong class="text-zinc-900 dark:text-zinc-100">deduction</strong>, <strong class="text-zinc-900 dark:text-zinc-100">npl</strong></li>
-                                        <li>Earning types: <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong></li>
+                                        <li>Earning types: <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong>, <strong class="text-zinc-900 dark:text-zinc-100">backpay</strong></li>
                                         <li>You can have multiple rows for the same worker (for multiple transactions)</li>
                                         <li>Leave OT columns empty if you're only adding transactions</li>
                                         <li>Workers must already exist in your contractor worker list</li>
@@ -602,6 +605,8 @@
                                                                         <flux:badge color="green" size="sm">Allowance</flux:badge>
                                                                     @elseif($item['transaction_type'] === 'accommodation')
                                                                         <flux:badge color="amber" size="sm">Accommodation</flux:badge>
+                                                                    @elseif($item['transaction_type'] === 'backpay')
+                                                                        <flux:badge color="cyan" size="sm">Backpay</flux:badge>
                                                                     @endif
                                                                     <span class="text-xs text-zinc-600 dark:text-zinc-400">
                                                                         {{ $item['transaction_type'] === 'npl' ? $item['transaction_amount'] . ' days' : 'RM ' . number_format($item['transaction_amount'], 2) }}

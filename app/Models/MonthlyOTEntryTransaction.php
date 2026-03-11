@@ -40,6 +40,6 @@ class MonthlyOTEntryTransaction extends Model
      */
     public function isEarning(): bool
     {
-        return $this->type === 'allowance';
+        return in_array($this->type, ['allowance', 'backpay']);
     }
 }

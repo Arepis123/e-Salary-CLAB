@@ -365,7 +365,7 @@ class OTEntry extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance',
+            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance,backpay',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [
@@ -489,7 +489,7 @@ class OTEntry extends Component
         $sheet = $spreadsheet->getActiveSheet();
 
         // Row 1: Instructions (will be skipped during import)
-        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, deduction, npl, allowance. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
+        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, deduction, npl, allowance, backpay. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
         $sheet->mergeCells('A1:H1');
         $sheet->getStyle('A1')->getFont()->setItalic(true)->setBold(true);
         $sheet->getStyle('A1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('FFFFCC');
@@ -563,8 +563,18 @@ class OTEntry extends Component
         $sheet->setCellValue('G7', '150.00');
         $sheet->setCellValue('H7', 'Transportation allowance');
 
+        // Example - Backpay (Earning)
+        $sheet->setCellValue('A8', 'AB012346');
+        $sheet->setCellValue('B8', 'JANE DOE');
+        $sheet->setCellValue('C8', '');
+        $sheet->setCellValue('D8', '');
+        $sheet->setCellValue('E8', '');
+        $sheet->setCellValue('F8', 'backpay');
+        $sheet->setCellValue('G8', '200.00');
+        $sheet->setCellValue('H8', 'Backpay for previous month underpayment');
+
         // Style example rows with light gray background
-        $sheet->getStyle('A3:H7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
+        $sheet->getStyle('A3:H8')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
 
         // Auto-size columns
         foreach (range('A', 'H') as $col) {
@@ -656,8 +666,20 @@ class OTEntry extends Component
                 $rawOtPublic = trim($row[4] ?? '');
                 $rawTxnAmount = trim($row[6] ?? '');
 
-                $passport = trim($row[0] ?? '');
-                $name = trim($row[1] ?? '');
+                // Auto-detect column order: support both (Passport | Name) and (Name | Passport)
+                // A passport typically has no spaces and matches alphanumeric patterns (e.g. A12345678)
+                $colA = trim($row[0] ?? '');
+                $colB = trim($row[1] ?? '');
+                $colALooksLikePassport = strlen($colA) > 0 && !str_contains($colA, ' ');
+                $colBLooksLikePassport = strlen($colB) > 0 && !str_contains($colB, ' ');
+                if (!$colALooksLikePassport && $colBLooksLikePassport) {
+                    // File has Name | Passport order — swap them
+                    $passport = $colB;
+                    $name = $colA;
+                } else {
+                    $passport = $colA;
+                    $name = $colB;
+                }
                 $otNormal = $this->sanitizeNumericValue($row[2] ?? '');
                 $otRest = $this->sanitizeNumericValue($row[3] ?? '');
                 $otPublic = $this->sanitizeNumericValue($row[4] ?? '');
@@ -741,7 +763,7 @@ class OTEntry extends Component
 
                 // Validate transaction type if provided
                 if (! empty($txnType)) {
-                    $validTypes = ['accommodation', 'advance_payment', 'deduction', 'npl', 'allowance'];
+                    $validTypes = ['accommodation', 'advance_payment', 'deduction', 'npl', 'allowance', 'backpay'];
                     if (! in_array($txnType, $validTypes)) {
                         $this->importErrors[] = "Row {$rowNumber}: Invalid transaction type '{$txnType}'. Must be one of: " . implode(', ', $validTypes);
                         $rowHasError = true;
