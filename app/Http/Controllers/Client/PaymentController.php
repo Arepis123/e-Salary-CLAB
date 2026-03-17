@@ -207,6 +207,9 @@ class PaymentController extends Controller
         // This ensures consistency across the application
         $totalAmount = $submission->total_due;
 
+        // TESTING OVERRIDE: Use RM1.00 for payment testing — REMOVE AFTER TEST
+        // $totalAmount = 1.00;
+
         // Create Billplz bill
         // Set expiry based on whether penalty has been applied:
         // - Before deadline: expire at deadline (prevents paying late without penalty)
@@ -216,7 +219,7 @@ class PaymentController extends Controller
             : $submission->payment_deadline->format('Y-m-d');  // No penalty, expire at deadline
 
         $billData = [
-            'email' => $request->user()->email,
+            'email' => $request->user()->email,  // TESTING OVERRIDE — 'email' => 'hafiz@clab.com.my',
             'name' => $request->user()->name ?? $request->user()->company_name,
             'amount' => $totalAmount,
             'callback_url' => route('billplz.callback'),
@@ -493,9 +496,13 @@ class PaymentController extends Controller
 
         // Check if user is authenticated
         if (! auth()->check()) {
-            // User session expired, show guest views without requiring login
-            if ($payment && $payment->status === 'completed') {
-                return view('client.payment-success-guest', compact('submission'));
+            // Session was lost during the BillPlz redirect (cross-site POST drops SameSite=lax cookies).
+            // Redirect to login with appropriate message; after login, go to dashboard.
+            session()->put('url.intended', route('dashboard'));
+
+            if ($payment && ($payment->status === 'completed' || $billPaid)) {
+                return redirect()->route('login')
+                    ->with('success', 'Your payment was successful! Please login to view your dashboard.');
             } elseif ($payment && $payment->status === 'cancelled') {
                 return redirect()->route('login')
                     ->with('warning', 'This payment was cancelled. Please login to check details and make a new payment if required.');
@@ -503,7 +510,6 @@ class PaymentController extends Controller
                 return redirect()->route('login')
                     ->with('error', 'Payment failed. Please login to try again.');
             } elseif ($payment && $payment->status === 'pending' && ! $billPaid) {
-                // User returned without paying (cancelled)
                 return redirect()->route('login')
                     ->with('warning', 'Payment was not completed. Please login to try again.');
             } else {

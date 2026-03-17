@@ -47,7 +47,8 @@
       "Bash(ls:*)",
       "Bash(npm install:*)",
       "Bash(git log:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

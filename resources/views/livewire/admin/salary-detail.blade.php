@@ -88,7 +88,7 @@
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Breakdown File:</p>
                 @if($submission->hasBreakdownFile())
-                    <flux:button size="sm" variant="ghost" wire:click="downloadBreakdown" icon="arrow-down-tray">
+                    <flux:button size="sm" class="mt-2" variant="filled" wire:click="downloadBreakdown" icon="arrow-down-tray">
                         {{ $submission->breakdown_file_name }}
                     </flux:button>
                 @else
@@ -98,11 +98,11 @@
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Payslip File (ZIP):</p>
                 @if($submission->hasPayslipFile())
-                    <flux:button size="sm" variant="ghost" wire:click="downloadPayslip" icon="arrow-down-tray">
+                    <flux:button size="sm" class="mt-2" variant="filled" wire:click="downloadPayslip" icon="arrow-down-tray">
                         {{ $submission->payslip_file_name }}
                     </flux:button>
                 @elseif(!auth()->user()->isFinance())
-                    <flux:button size="sm" variant="filled" wire:click="openUploadPayslipModal" icon="arrow-up-tray">
+                    <flux:button size="sm" class="mt-2" variant="filled" wire:click="openUploadPayslipModal" icon="arrow-up-tray">
                         Upload Payslip
                     </flux:button>
                 @else
