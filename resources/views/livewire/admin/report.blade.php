@@ -393,6 +393,7 @@
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Public OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Allowance</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Backpay</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">NPL</th>
@@ -431,6 +432,13 @@
                                         <td class="py-3 text-sm text-green-600 dark:text-green-400">
                                             @if($entry['allowance'] > 0)
                                                 RM {{ number_format($entry['allowance'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-green-600 dark:text-green-400">
+                                            @if($entry['backpay'] > 0)
+                                                RM {{ number_format($entry['backpay'], 2) }}
                                             @else
                                                 -
                                             @endif
@@ -483,6 +491,7 @@
                             <span>Total Rest OT: {{ number_format(collect($otTransactionData)->sum('ot_rest'), 1) }}h</span>
                             <span>Total Public OT: {{ number_format(collect($otTransactionData)->sum('ot_public'), 1) }}h</span>
                             <span class="text-green-600 dark:text-green-400">Allowances: RM {{ number_format(collect($otTransactionData)->sum('allowance'), 2) }}</span>
+                            <span class="text-green-600 dark:text-green-400">Backpay: RM {{ number_format(collect($otTransactionData)->sum('backpay'), 2) }}</span>
                             <span class="text-amber-600 dark:text-amber-400">Advances: RM {{ number_format(collect($otTransactionData)->sum('advance_salary'), 2) }}</span>
                             <span class="text-red-600 dark:text-red-400">Deductions: RM {{ number_format(collect($otTransactionData)->sum('deduction'), 2) }}</span>
                             <span class="text-red-600 dark:text-red-400">NPL: RM {{ number_format(collect($otTransactionData)->sum('npl'), 2) }}</span>

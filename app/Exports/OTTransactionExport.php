@@ -48,6 +48,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'Public Holiday OT (hrs)',
             'Total OT (hrs)',
             'Allowance',
+            'Backpay',
             'Advance Salary',
             'Deduction',
             'NPL',
@@ -59,8 +60,9 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
 
     public function map($entry): array
     {
-        // Get allowance, advance, deduction, NPL, and accommodation from transactions
+        // Get allowance, backpay, advance, deduction, NPL, and accommodation from transactions
         $allowance = 0;
+        $backpay = 0;
         $advanceSalary = 0;
         $deduction = 0;
         $npl = 0;
@@ -70,6 +72,8 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             foreach ($entry->transactions as $transaction) {
                 if ($transaction->type === 'allowance') {
                     $allowance += $transaction->amount;
+                } elseif ($transaction->type === 'backpay') {
+                    $backpay += $transaction->amount;
                 } elseif ($transaction->type === 'advance_payment') {
                     $advanceSalary += $transaction->amount;
                 } elseif ($transaction->type === 'deduction') {
@@ -98,6 +102,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             $entry->ot_public_hours > 0 ? $entry->ot_public_hours : '',
             $totalOT > 0 ? $totalOT : '',
             $allowance > 0 ? $allowance : '',
+            $backpay > 0 ? $backpay : '',
             $advanceSalary > 0 ? $advanceSalary : '',
             $deduction > 0 ? $deduction : '',
             $npl > 0 ? $npl : '',
@@ -130,12 +135,13 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'K' => 18, // Public Holiday OT
             'L' => 15, // Total OT
             'M' => 15, // Allowance
-            'N' => 15, // Advance Salary
-            'O' => 15, // Deduction
-            'P' => 15, // NPL
-            'Q' => 15, // Accommodation
-            'R' => 12, // Status
-            'S' => 18, // Submitted At
+            'N' => 15, // Backpay
+            'O' => 15, // Advance Salary
+            'P' => 15, // Deduction
+            'Q' => 15, // NPL
+            'R' => 15, // Accommodation
+            'S' => 12, // Status
+            'T' => 18, // Submitted At
         ];
     }
 }

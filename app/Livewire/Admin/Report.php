@@ -1032,8 +1032,9 @@ class Report extends Component
         $this->otTransactionData = $entries->map(function ($entry) use ($contractors, $workerEmails, $workerSalaries) {
             $contractor = $contractors[$entry->contractor_clab_no] ?? null;
 
-            // Get allowance, advance, deduction, NPL, and accommodation from transactions
+            // Get allowance, backpay, advance, deduction, NPL, and accommodation from transactions
             $allowance = 0;
+            $backpay = 0;
             $advanceSalary = 0;
             $deduction = 0;
             $npl = 0;
@@ -1042,6 +1043,8 @@ class Report extends Component
             foreach ($entry->transactions as $transaction) {
                 if ($transaction->type === 'allowance') {
                     $allowance += $transaction->amount;
+                } elseif ($transaction->type === 'backpay') {
+                    $backpay += $transaction->amount;
                 } elseif ($transaction->type === 'advance_payment') {
                     $advanceSalary += $transaction->amount;
                 } elseif ($transaction->type === 'deduction') {
@@ -1066,6 +1069,7 @@ class Report extends Component
                 'entry_year' => $entry->entry_year,
                 'entry_period' => $entry->entry_period,
                 'allowance' => $allowance,
+                'backpay' => $backpay,
                 'advance_salary' => $advanceSalary,
                 'deduction' => $deduction,
                 'npl' => $npl,
