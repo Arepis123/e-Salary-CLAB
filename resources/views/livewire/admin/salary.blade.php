@@ -180,7 +180,7 @@
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong" align="center">
-                            {{ $submission->total_workers }}
+                            {{ $submission->workers_count }}
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -312,7 +312,7 @@
                                 {{ $selectedSubmission->user ? $selectedSubmission->user->name : 'Client ' . $selectedSubmission->contractor_clab_no }}
                             </p>
                             <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                                Period: {{ \Carbon\Carbon::parse($selectedSubmission->month_year)->format('M Y') }} | Workers: {{ $selectedSubmission->total_workers }}
+                                Period: {{ \Carbon\Carbon::parse($selectedSubmission->month_year)->format('M Y') }} | Workers: {{ $selectedSubmission->workers_count }}
                             </p>
                             <div class="mt-2 flex flex-wrap gap-2 items-center hidden">
                                 <flux:badge color="blue" size="sm">

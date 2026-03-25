@@ -63,6 +63,7 @@ class MissingSubmissionsDetail extends Component
         // Get all active workers for this contractor with worker and country relationships
         $allActiveWorkers = ContractWorker::active()
             ->where('con_ctr_clab_no', $this->clabNo)
+            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
             ->with(['worker.country'])
             ->get();
 

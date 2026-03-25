@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Mail\PayrollReminderMail;
 use App\Models\Contractor;
 use App\Models\ContractWorker;
+use App\Models\MonthlyOTEntry;
 use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
@@ -166,7 +167,19 @@ class MissingSubmissions extends Component
 
         if ($this->bulkSubmitContractor) {
             $periodLabel = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, 1)->format('F Y');
-            $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for the period of <strong>{$periodLabel}</strong>.<br><br>This will include all their active workers with basic salary and zero overtime. This action is final for this submission period and will move directly to the approval stage.<br><br>Are you sure you want to proceed?";
+            $existingSubmission = \App\Models\PayrollSubmission::where('contractor_clab_no', $clabNo)
+                ->where('month', $this->selectedMonth)
+                ->where('year', $this->selectedYear)
+                ->first();
+
+            if ($existingSubmission) {
+                $statusNote = $existingSubmission->status === 'approved'
+                    ? "<br><br><strong>Note:</strong> This submission is currently <strong>Approved</strong>. Adding new workers will revert its status to <strong>Under Review</strong> so the Final Amount can be re-confirmed by admin."
+                    : '';
+                $this->bulkSubmitMessage = "A submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for <strong>{$periodLabel}</strong> already exists. The newly added workers that are not yet included will be <strong>appended</strong> to the existing submission with basic salary and zero overtime.{$statusNote}<br><br>Are you sure you want to proceed?";
+            } else {
+                $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for the period of <strong>{$periodLabel}</strong>.<br><br>This will include all their active workers with basic salary and zero overtime. This action is final for this submission period and will move directly to the approval stage.<br><br>Are you sure you want to proceed?";
+            }
             $this->showBulkSubmitModal = true;
         }
     }
@@ -190,27 +203,93 @@ class MissingSubmissions extends Component
 
         try {
             DB::transaction(function () use ($clabNo, $month, $year) {
-                $existingSubmission = PayrollSubmission::where('contractor_clab_no', $clabNo)
-                    ->where('month', $month)
-                    ->where('year', $year)
-                    ->first();
-
-                if ($existingSubmission) {
-                    throw new \Exception('A submission for this period already exists.');
-                }
-
                 $targetDate = \Carbon\Carbon::create($year, $month, 1);
                 $activeContractWorkers = ContractWorker::with('worker')
                     ->where('con_ctr_clab_no', $clabNo)
                     ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
                     ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
+                    ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
                     ->get();
 
                 if ($activeContractWorkers->isEmpty()) {
                     throw new \Exception('No active workers found for this contractor for the selected period.');
                 }
 
-                // Find the Client User to assign ownership (so they see it in their dashboard)
+                // Load submitted OT entries for this payroll period.
+                // OT for payroll month M is entered the previous month (entry_month = M-1).
+                $otEntryMonth = $month - 1;
+                $otEntryYear = $year;
+                if ($otEntryMonth < 1) {
+                    $otEntryMonth = 12;
+                    $otEntryYear--;
+                }
+                $otEntries = MonthlyOTEntry::where('contractor_clab_no', $clabNo)
+                    ->where('entry_month', $otEntryMonth)
+                    ->where('entry_year', $otEntryYear)
+                    ->whereIn('status', ['submitted', 'locked'])
+                    ->get()
+                    ->keyBy('worker_id');
+
+                $existingSubmission = PayrollSubmission::where('contractor_clab_no', $clabNo)
+                    ->where('month', $month)
+                    ->where('year', $year)
+                    ->first();
+
+                if ($existingSubmission) {
+                    // Submission already exists — add only workers not yet in it
+                    $alreadySubmittedWorkerIds = PayrollWorker::where('payroll_submission_id', $existingSubmission->id)
+                        ->pluck('worker_id')
+                        ->toArray();
+
+                    $newContractWorkers = $activeContractWorkers->filter(function ($contractWorker) use ($alreadySubmittedWorkerIds) {
+                        return $contractWorker->worker && ! in_array($contractWorker->worker->wkr_id, $alreadySubmittedWorkerIds);
+                    });
+
+                    if ($newContractWorkers->isEmpty()) {
+                        throw new \Exception('All active workers are already included in the existing submission for this period.');
+                    }
+
+                    $addedAmount = 0;
+                    foreach ($newContractWorkers as $contractWorker) {
+                        $worker = $contractWorker->worker;
+                        $otEntry = $otEntries->get($worker->wkr_id);
+                        $payrollWorker = new PayrollWorker([
+                            'worker_id' => $worker->wkr_id,
+                            'worker_name' => $worker->wkr_name,
+                            'worker_passport' => $worker->wkr_passno,
+                            'basic_salary' => $worker->wkr_salary ?? 1700,
+                            'ot_normal_hours' => $otEntry ? $otEntry->ot_normal_hours : 0,
+                            'ot_rest_hours' => $otEntry ? $otEntry->ot_rest_hours : 0,
+                            'ot_public_hours' => $otEntry ? $otEntry->ot_public_hours : 0,
+                        ]);
+                        $payrollWorker->payroll_submission_id = $existingSubmission->id;
+                        $payrollWorker->calculateSalary(0);
+                        $payrollWorker->save();
+                        $addedAmount += $payrollWorker->total_payment;
+                    }
+
+                    $newTotalWorkers = $existingSubmission->total_workers + $newContractWorkers->count();
+                    $newServiceCharge = $newTotalWorkers * 200;
+                    $newSst = $newServiceCharge * 0.08;
+
+                    $updateData = [
+                        'total_workers' => $newTotalWorkers,
+                        'admin_final_amount' => ($existingSubmission->admin_final_amount ?? 0) + $addedAmount,
+                        'service_charge' => $newServiceCharge,
+                        'sst' => $newSst,
+                    ];
+
+                    // Revert approved submissions back to under_review so admin re-confirms the new amount
+                    if ($existingSubmission->status === 'approved') {
+                        $updateData['status'] = 'under_review';
+                    }
+
+                    $existingSubmission->update($updateData);
+
+                    return;
+                }
+
+                // No existing submission — find or create the client user
                 $user = User::where('contractor_clab_no', $clabNo)
                     ->where('role', 'client')
                     ->first();
@@ -252,7 +331,16 @@ class MissingSubmissions extends Component
                         continue;
                     }
 
-                    $payrollWorker = new PayrollWorker(['worker_id' => $worker->wkr_id, 'worker_name' => $worker->wkr_name, 'worker_passport' => $worker->wkr_passno, 'basic_salary' => $worker->wkr_salary ?? 1700, 'ot_normal_hours' => 0, 'ot_rest_hours' => 0, 'ot_public_hours' => 0]);
+                    $otEntry = $otEntries->get($worker->wkr_id);
+                    $payrollWorker = new PayrollWorker([
+                        'worker_id' => $worker->wkr_id,
+                        'worker_name' => $worker->wkr_name,
+                        'worker_passport' => $worker->wkr_passno,
+                        'basic_salary' => $worker->wkr_salary ?? 1700,
+                        'ot_normal_hours' => $otEntry ? $otEntry->ot_normal_hours : 0,
+                        'ot_rest_hours' => $otEntry ? $otEntry->ot_rest_hours : 0,
+                        'ot_public_hours' => $otEntry ? $otEntry->ot_public_hours : 0,
+                    ]);
                     $payrollWorker->payroll_submission_id = $submission->id;
                     $payrollWorker->calculateSalary(0);
                     $payrollWorker->save();
@@ -264,14 +352,13 @@ class MissingSubmissions extends Component
 
                 $submission->update([
                     'total_workers' => $activeContractWorkers->count(),
-                    'admin_final_amount' => $totalAmount, // Set payroll amount directly
+                    'admin_final_amount' => $totalAmount,
                     'service_charge' => $serviceCharge,
                     'sst' => $sst,
-                    // Note: total_amount, grand_total, and total_with_penalty are deprecated
                 ]);
             });
 
-            Flux::toast(variant: 'success', heading: 'Submission Created', text: 'Payroll for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y')." submitted successfully on behalf of {$this->bulkSubmitContractor['name']}.");
+            Flux::toast(variant: 'success', heading: 'Submission Updated', text: 'Payroll for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y')." updated successfully on behalf of {$this->bulkSubmitContractor['name']}.");
             $this->closeBulkSubmitModal();
             $this->loadMissingContractors();
         } catch (\Exception $e) {
@@ -538,7 +625,8 @@ class MissingSubmissions extends Component
         $activeWorkers = ContractWorker::where('con_ctr_clab_no', $clabNo)
             ->where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->with('worker') // Eager load worker relationship
+            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->with('worker')
             ->get();
 
         $result = collect();
@@ -696,6 +784,7 @@ class MissingSubmissions extends Component
         // Get all contractors with workers who had active contracts during this period
         $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
+            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
@@ -703,6 +792,7 @@ class MissingSubmissions extends Component
         // Count total active workers per contractor for this period
         $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
+            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
             ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
             ->groupBy('con_ctr_clab_no')
             ->pluck('count', 'con_ctr_clab_no');
@@ -728,6 +818,7 @@ class MissingSubmissions extends Component
         // Count workers by issue type per contractor
         $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
+            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
             ->select('con_ctr_clab_no')
             ->groupBy('con_ctr_clab_no')
             ->get();
@@ -741,6 +832,7 @@ class MissingSubmissions extends Component
             $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                 ->where('con_start', '<=', $periodEnd->toDateString())
                 ->where('con_end', '>=', $periodStart->toDateString())
+                ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
                 ->pluck('con_wkr_id');
 
             if ($activeWorkerIds->isEmpty()) {
@@ -819,7 +911,10 @@ class MissingSubmissions extends Component
             ]);
         }
 
-        $this->missingContractors = $result->sortBy('name');
+        $this->missingContractors = $result->sortBy([
+            fn ($a, $b) => ($b['not_submitted'] > 0 ? 1 : 0) <=> ($a['not_submitted'] > 0 ? 1 : 0),
+            fn ($a, $b) => strcmp($a['name'], $b['name']),
+        ]);
     }
 
     protected function loadHistoricalSummary()
@@ -883,6 +978,7 @@ class MissingSubmissions extends Component
                 $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                     ->where('con_start', '<=', $periodEnd->toDateString())
                     ->where('con_end', '>=', $periodStart->toDateString())
+                    ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
                     ->pluck('con_wkr_id');
 
                 if ($activeWorkerIds->isNotEmpty()) {

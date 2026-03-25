@@ -79,6 +79,7 @@ class SalaryDetail extends Component
     {
         $this->workers = $this->submission->workers()
             ->with(['worker', 'transactions'])
+            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
             ->get();
     }
 

@@ -132,6 +132,7 @@ class Salary extends Component
     public function openPaymentLog($submissionId)
     {
         $this->selectedSubmission = PayrollSubmission::with(['user', 'payment', 'payments'])
+            ->withCount('workers')
             ->findOrFail($submissionId);
         $this->showPaymentLog = true;
     }
@@ -239,7 +240,7 @@ class Salary extends Component
 
     protected function getSubmissionsQuery()
     {
-        $query = PayrollSubmission::with(['user', 'payment']);
+        $query = PayrollSubmission::with(['user', 'payment'])->withCount('workers');
 
         // Apply search filter
         if ($this->search) {

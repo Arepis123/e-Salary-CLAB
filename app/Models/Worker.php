@@ -86,7 +86,7 @@ class Worker extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('wkr_status', '2');
+        return $query->where('wkr_status', '1');
     }
 
     /**
@@ -184,7 +184,7 @@ class Worker extends Model
      */
     public function getStatusAttribute()
     {
-        return $this->wkr_status == '2' ? 'active' : 'inactive';
+        return $this->wkr_status == '1' ? 'active' : 'inactive';
     }
 
     /**
