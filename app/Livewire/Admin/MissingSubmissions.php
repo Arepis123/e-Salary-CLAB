@@ -6,7 +6,6 @@ use App\Mail\PayrollReminderMail;
 use App\Models\Contractor;
 use App\Models\ContractWorker;
 use App\Models\MonthlyOTEntry;
-use App\Models\Worker;
 use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
@@ -20,6 +19,8 @@ use Livewire\Component;
 class MissingSubmissions extends Component
 {
     public $missingContractors = [];
+
+    protected $activeWorkerSubquery = null;
 
     public $showRemindModal = false;
 
@@ -204,13 +205,12 @@ class MissingSubmissions extends Component
 
         try {
             DB::transaction(function () use ($clabNo, $month, $year) {
-                $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
                 $targetDate = \Carbon\Carbon::create($year, $month, 1);
                 $activeContractWorkers = ContractWorker::with('worker')
                     ->where('con_ctr_clab_no', $clabNo)
                     ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
                     ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
-                    ->whereIn('con_wkr_id', $activeWorkerIds)
+                    ->whereRaw($this->getActiveWorkerIds())
                     ->get();
 
                 if ($activeContractWorkers->isEmpty()) {
@@ -623,12 +623,10 @@ class MissingSubmissions extends Component
         // Get workers with active contracts during this specific period
         $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
         $periodEnd = $periodStart->copy()->endOfMonth();
-        $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
-
         $activeWorkers = ContractWorker::where('con_ctr_clab_no', $clabNo)
             ->where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereIn('con_wkr_id', $activeWorkerIds)
+            ->whereRaw($this->getActiveWorkerIds())
             ->with('worker')
             ->get();
 
@@ -775,6 +773,16 @@ class MissingSubmissions extends Component
         $this->loadHistoricalSummary();
     }
 
+    protected function getActiveWorkerIds(): string
+    {
+        if ($this->activeWorkerSubquery === null) {
+            $workerDb = config('database.connections.worker_db.database');
+            $this->activeWorkerSubquery = "EXISTS (SELECT 1 FROM `{$workerDb}`.`workers` WHERE `{$workerDb}`.`workers`.`wkr_id` = `contract_worker`.`con_wkr_id` AND `{$workerDb}`.`workers`.`wkr_status` = '1')";
+        }
+
+        return $this->activeWorkerSubquery;
+    }
+
     protected function loadMissingContractors()
     {
         $currentMonth = $this->selectedMonth;
@@ -784,12 +792,10 @@ class MissingSubmissions extends Component
         $periodStart = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
         $periodEnd = $periodStart->copy()->endOfMonth();
 
-        $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
-
         // Get all contractors with workers who had active contracts during this period
         $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereIn('con_wkr_id', $activeWorkerIds)
+            ->whereRaw($this->getActiveWorkerIds())
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
@@ -797,7 +803,7 @@ class MissingSubmissions extends Component
         // Count total active workers per contractor for this period
         $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereIn('con_wkr_id', $activeWorkerIds)
+            ->whereRaw($this->getActiveWorkerIds())
             ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
             ->groupBy('con_ctr_clab_no')
             ->pluck('count', 'con_ctr_clab_no');
@@ -823,7 +829,7 @@ class MissingSubmissions extends Component
         // Count workers by issue type per contractor
         $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereIn('con_wkr_id', $activeWorkerIds)
+            ->whereRaw($this->getActiveWorkerIds())
             ->select('con_ctr_clab_no')
             ->groupBy('con_ctr_clab_no')
             ->get();
@@ -837,7 +843,7 @@ class MissingSubmissions extends Component
             $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                 ->where('con_start', '<=', $periodEnd->toDateString())
                 ->where('con_end', '>=', $periodStart->toDateString())
-                ->whereIn('con_wkr_id', $activeWorkerIds)
+                ->whereRaw($this->getActiveWorkerIds())
                 ->pluck('con_wkr_id');
 
             if ($activeWorkerIds->isEmpty()) {
@@ -979,37 +985,37 @@ class MissingSubmissions extends Component
                 // Get workers with active contracts during this specific period
                 $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
                 $periodEnd = $periodStart->copy()->endOfMonth();
-
-                $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
+                
+                $periodWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                     ->where('con_start', '<=', $periodEnd->toDateString())
                     ->where('con_end', '>=', $periodStart->toDateString())
-                    ->whereIn('con_wkr_id', $activeWorkerIds)
+                    ->whereRaw($this->getActiveWorkerIds())
                     ->pluck('con_wkr_id');
 
-                if ($activeWorkerIds->isNotEmpty()) {
+                if ($periodWorkerIds->isNotEmpty()) {
                     // Check workers that were submitted AND paid
                     $submittedAndPaidWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($month, $year) {
                         $query->where('month', $month)
                             ->where('year', $year)
                             ->where('status', 'paid'); // Only count if paid
                     })
-                        ->whereIn('worker_id', $activeWorkerIds)
+                        ->whereIn('worker_id', $periodWorkerIds)
                         ->pluck('worker_id')
                         ->unique();
 
                     // If not all workers were submitted and paid, mark as having issues
-                    if ($submittedAndPaidWorkerIds->count() < $activeWorkerIds->count()) {
+                    if ($submittedAndPaidWorkerIds->count() < $periodWorkerIds->count()) {
                         // Count workers submitted but not paid
                         $submittedButUnpaidWorkerIds = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($month, $year) {
                             $query->where('month', $month)
                                 ->where('year', $year)
                                 ->where('status', '!=', 'paid');
                         })
-                            ->whereIn('worker_id', $activeWorkerIds)
+                            ->whereIn('worker_id', $periodWorkerIds)
                             ->pluck('worker_id')
                             ->unique();
 
-                        $notSubmittedCount = $activeWorkerIds->diff($submittedAndPaidWorkerIds)
+                        $notSubmittedCount = $periodWorkerIds->diff($submittedAndPaidWorkerIds)
                             ->diff($submittedButUnpaidWorkerIds)
                             ->count();
                         $notPaidCount = $submittedButUnpaidWorkerIds->count();
@@ -1018,8 +1024,8 @@ class MissingSubmissions extends Component
                             'month' => $month,
                             'year' => $year,
                             'label' => $currentPeriod->format('M Y'),
-                            'missing_count' => $activeWorkerIds->count() - $submittedAndPaidWorkerIds->count(),
-                            'total_count' => $activeWorkerIds->count(),
+                            'missing_count' => $periodWorkerIds->count() - $submittedAndPaidWorkerIds->count(),
+                            'total_count' => $periodWorkerIds->count(),
                             'not_submitted' => $notSubmittedCount,
                             'not_paid' => $notPaidCount,
                         ];
