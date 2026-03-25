@@ -168,11 +168,23 @@ class SalaryDetail extends Component
         }
 
         $contractor = $this->submission->user;
+        $contractorRecord = \App\Models\Contractor::find($this->submission->contractor_clab_no);
+
+        $contractorState = null;
+        if ($contractorRecord && $contractorRecord->ctr_state) {
+            $state = \DB::connection('worker_db')
+                ->table('mst_states')
+                ->where('state_id', $contractorRecord->ctr_state)
+                ->value('state_name');
+            $contractorState = $state ?? null;
+        }
 
         $pdf = \PDF::loadView('admin.tax-invoice-pdf', [
             'invoice' => $this->submission,
             'contractor' => $contractor,
-        ])->setPaper('a4', 'landscape');
+            'contractorRecord' => $contractorRecord,
+            'contractorState' => $contractorState,
+        ])->setPaper('a4', 'portrait');
 
         $filename = 'Official-Receipt-'.$this->submission->tax_invoice_number.'-'.$this->submission->month_year.'.pdf';
 
