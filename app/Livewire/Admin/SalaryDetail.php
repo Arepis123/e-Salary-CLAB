@@ -77,9 +77,10 @@ class SalaryDetail extends Component
 
     protected function loadWorkers()
     {
+        $activeWorkerIds = \App\Models\Worker::where('wkr_status', '1')->pluck('wkr_id');
         $this->workers = $this->submission->workers()
             ->with(['worker', 'transactions'])
-            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->whereIn('worker_id', $activeWorkerIds)
             ->get();
     }
 

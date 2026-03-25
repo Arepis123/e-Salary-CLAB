@@ -6,6 +6,7 @@ use App\Models\Contractor;
 use App\Models\ContractWorker;
 use App\Models\PayrollWorker;
 use App\Models\User;
+use App\Models\Worker;
 use Livewire\Component;
 
 class MissingSubmissionsDetail extends Component
@@ -61,9 +62,10 @@ class MissingSubmissionsDetail extends Component
         $currentYear = now()->year;
 
         // Get all active workers for this contractor with worker and country relationships
+        $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
         $allActiveWorkers = ContractWorker::active()
             ->where('con_ctr_clab_no', $this->clabNo)
-            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->whereIn('con_wkr_id', $activeWorkerIds)
             ->with(['worker.country'])
             ->get();
 

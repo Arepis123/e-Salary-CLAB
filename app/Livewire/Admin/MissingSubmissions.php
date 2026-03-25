@@ -6,6 +6,7 @@ use App\Mail\PayrollReminderMail;
 use App\Models\Contractor;
 use App\Models\ContractWorker;
 use App\Models\MonthlyOTEntry;
+use App\Models\Worker;
 use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
@@ -203,12 +204,13 @@ class MissingSubmissions extends Component
 
         try {
             DB::transaction(function () use ($clabNo, $month, $year) {
+                $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
                 $targetDate = \Carbon\Carbon::create($year, $month, 1);
                 $activeContractWorkers = ContractWorker::with('worker')
                     ->where('con_ctr_clab_no', $clabNo)
                     ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
                     ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
-                    ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+                    ->whereIn('con_wkr_id', $activeWorkerIds)
                     ->get();
 
                 if ($activeContractWorkers->isEmpty()) {
@@ -621,11 +623,12 @@ class MissingSubmissions extends Component
         // Get workers with active contracts during this specific period
         $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
         $periodEnd = $periodStart->copy()->endOfMonth();
+        $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
 
         $activeWorkers = ContractWorker::where('con_ctr_clab_no', $clabNo)
             ->where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->whereIn('con_wkr_id', $activeWorkerIds)
             ->with('worker')
             ->get();
 
@@ -781,10 +784,12 @@ class MissingSubmissions extends Component
         $periodStart = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
         $periodEnd = $periodStart->copy()->endOfMonth();
 
+        $activeWorkerIds = Worker::where('wkr_status', '1')->pluck('wkr_id');
+
         // Get all contractors with workers who had active contracts during this period
         $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->whereIn('con_wkr_id', $activeWorkerIds)
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
@@ -792,7 +797,7 @@ class MissingSubmissions extends Component
         // Count total active workers per contractor for this period
         $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->whereIn('con_wkr_id', $activeWorkerIds)
             ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
             ->groupBy('con_ctr_clab_no')
             ->pluck('count', 'con_ctr_clab_no');
@@ -818,7 +823,7 @@ class MissingSubmissions extends Component
         // Count workers by issue type per contractor
         $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
-            ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+            ->whereIn('con_wkr_id', $activeWorkerIds)
             ->select('con_ctr_clab_no')
             ->groupBy('con_ctr_clab_no')
             ->get();
@@ -832,7 +837,7 @@ class MissingSubmissions extends Component
             $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                 ->where('con_start', '<=', $periodEnd->toDateString())
                 ->where('con_end', '>=', $periodStart->toDateString())
-                ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+                ->whereIn('con_wkr_id', $activeWorkerIds)
                 ->pluck('con_wkr_id');
 
             if ($activeWorkerIds->isEmpty()) {
@@ -978,7 +983,7 @@ class MissingSubmissions extends Component
                 $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                     ->where('con_start', '<=', $periodEnd->toDateString())
                     ->where('con_end', '>=', $periodStart->toDateString())
-                    ->whereHas('worker', fn ($q) => $q->where('wkr_status', '1'))
+                    ->whereIn('con_wkr_id', $activeWorkerIds)
                     ->pluck('con_wkr_id');
 
                 if ($activeWorkerIds->isNotEmpty()) {
