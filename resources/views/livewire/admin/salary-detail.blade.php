@@ -540,6 +540,12 @@
                             <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_accomodation'], 2) }}</span>
                         </div>
                         @endif
+                        @if(isset($calculatedBreakdown['custom_npl']) && $calculatedBreakdown['custom_npl'] > 0)
+                        <div class="flex justify-between">
+                            <span class="text-red-600 dark:text-red-400">Custom Npl:</span>
+                            <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_npl'], 2) }}</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between border-t border-green-300 dark:border-green-600 pt-1">
                             <span class="font-bold text-green-900 dark:text-green-100">Total Payroll:</span>
                             <span class="font-bold text-lg text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['total'], 2) }}</span>
@@ -677,6 +683,12 @@
                         <div class="flex justify-between">
                             <span class="text-red-600 dark:text-red-400">Custom Accomodation:</span>
                             <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_accomodation'], 2) }}</span>
+                        </div>
+                        @endif
+                        @if(isset($calculatedBreakdown['custom_npl']) && $calculatedBreakdown['custom_npl'] > 0)
+                        <div class="flex justify-between">
+                            <span class="text-red-600 dark:text-red-400">Custom Npl:</span>
+                            <span class="font-medium text-red-600 dark:text-red-400">- RM {{ number_format($calculatedBreakdown['custom_npl'], 2) }}</span>
                         </div>
                         @endif
                         <div class="flex justify-between border-t border-green-300 dark:border-green-600 pt-1">

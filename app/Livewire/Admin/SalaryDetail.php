@@ -487,7 +487,7 @@ class SalaryDetail extends Component
             // Note: HRDF is optional as some Excel formats don't have it
             $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
             $optionalColumns = ['HRDF', 'Backpay'];
-            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation'];
+            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation', 'Custom Npl'];
             $columnIndices = [];
             $missingColumns = [];
 
@@ -589,6 +589,7 @@ class SalaryDetail extends Component
                 'backpay' => $totals['Backpay'],
                 'custom_advance_salary' => $deductions['Custom Advance Salary'],
                 'custom_accomodation' => $deductions['Custom Accomodation'],
+                'custom_npl' => $deductions['Custom Npl'],
                 'total' => $totalAmount,
             ];
 
@@ -1104,7 +1105,7 @@ class SalaryDetail extends Component
             // Note: HRDF is optional as some Excel formats don't have it
             $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
             $optionalColumns = ['HRDF', 'Backpay'];
-            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation'];
+            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation', 'Custom Npl'];
             $columnIndices = [];
             $missingColumns = [];
 
@@ -1206,6 +1207,7 @@ class SalaryDetail extends Component
                 'backpay' => $totals['Backpay'],
                 'custom_advance_salary' => $deductions['Custom Advance Salary'],
                 'custom_accomodation' => $deductions['Custom Accomodation'],
+                'custom_npl' => $deductions['Custom Npl'],
                 'total' => $totalAmount,
             ];
 
