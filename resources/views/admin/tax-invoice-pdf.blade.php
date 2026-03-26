@@ -88,8 +88,8 @@
 
         /* ── Table ── */
         .table-container {
-            padding: 14px 0;
-            border-bottom: 1px solid #ccc;
+            padding: 14px 0px 10px 0;
+            /* border-bottom: 1px solid #ccc; */
         }
 
         .transaction-table {
@@ -131,7 +131,7 @@
 
         /* ── Amount in Words ── */
         .amount-words {
-            padding: 10px 0;
+            padding-bottom: 15px 0;
             border-bottom: 1px solid #ccc;
             font-size: 10px;
         }
@@ -143,7 +143,7 @@
 
         /* ── Footer ── */
         .footer-note {
-            padding: 10px 0 0 0;
+            padding: 20px 0 0 0;
             font-size: 9px;
             color: #555;
             font-style: italic;
@@ -209,7 +209,7 @@
     <table class="header-table">
         <tr>
             <td style="width:70px; vertical-align:middle; padding-right:12px; padding-bottom:20px;">
-                <img src="{{ public_path('logo-clab.png') }}" alt="CLAB Logo" style="width:65px; height:auto;">
+                <img src="{{ public_path('logo-clab.png') }}" alt="CLAB Logo" style="width:60px; height:auto;">
             </td>
             <td style="vertical-align:middle; padding-bottom:20px;">
                 <div class="company-name">CONSTRUCTION LABOUR EXCHANGE CENTRE BERHAD (CLAB)</div>
@@ -223,7 +223,10 @@
     </table>
 
     {{-- Title --}}
-    <div class="receipt-title">OFFICIAL RECEIPT / INVOICE</div>
+    <div class="receipt-title">
+        OFFICIAL RECEIPT / INVOICE
+        <div style="font-size:9px; font-weight:normal; letter-spacing:0; margin-top:3px; color:#555;">e-Salary CLAB</div>
+    </div>
 
     {{-- Receipt Info --}}
     <table class="receipt-info-table">
@@ -274,7 +277,7 @@
                 <tr>
                     <td></td>
                     <td>
-                        <div><strong>Admin Fees — {{ $periodLabel }}</strong></div>
+                        <div><strong>Admin Fees</strong></div>
                         <div style="color:#555; margin-top:2px;">RM 200.00 × {{ $workerCount }} Workers</div>
                     </td>
                     <td class="text-right">{{ number_format($serviceCharge, 2) }}</td>
@@ -312,7 +315,7 @@
     </div>
 
     {{-- Amount in Words --}}
-    <div class="amount-words">
+    <div class="amount-words" style="vertical-align:top; padding-bottom:10px;">
         <span class="amount-words-label">Amount in words (RM):</span>
         <span>{{ strtoupper($amountInWords) }} RINGGIT MALAYSIA ONLY</span>
     </div>
