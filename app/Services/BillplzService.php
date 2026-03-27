@@ -134,6 +134,11 @@ class BillplzService
      */
     public function validateSignature(string $billplzId, string $xSignature): bool
     {
+        // If X Signature is not configured or not sent, skip validation
+        if (empty($xSignature) || empty($this->xSignatureKey)) {
+            return true;
+        }
+
         $computedSignature = hash_hmac('sha256', $this->xSignatureKey.'|'.$billplzId, $this->apiKey);
 
         return hash_equals($computedSignature, $xSignature);

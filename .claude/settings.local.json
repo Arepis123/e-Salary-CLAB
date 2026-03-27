@@ -49,7 +49,12 @@
       "Bash(git log:*)",
       "Bash(cd:*)",
       "Bash(grep:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "WebFetch(domain:developer.billplz.com)",
+      "WebSearch",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:billplz.github.io)"
     ],
     "deny": [],
     "ask": []

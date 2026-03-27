@@ -304,9 +304,9 @@ class PaymentController extends Controller
      */
     public function callback(Request $request)
     {
-        // Validate signature
-        $billplzId = $request->input('id');
-        $xSignature = $request->header('X-Signature');
+        // Validate signature — Billplz sends x_signature in the POST body, not as an HTTP header
+        $billplzId  = $request->input('id');
+        $xSignature = $request->input('x_signature') ?? $request->header('X-Signature') ?? '';
 
         if (! $this->billplzService->validateSignature($billplzId, $xSignature)) {
             Log::warning('Billplz callback signature validation failed', [
@@ -356,7 +356,7 @@ class PaymentController extends Controller
         // If no bank_code provided or empty, default to B2C (most common for individuals)
         $paymentType = $bankCode && in_array($bankCode, $b2bBankCodes) ? 'B2B' : 'B2C';
 
-        if ($paid && $state === 'active' && $transactionStatus === 'completed') {
+        if ($paid && $state === 'paid') {
             // Payment successful - update all fields at once to ensure transaction_id is saved
             $payment->update([
                 'status' => 'completed',
