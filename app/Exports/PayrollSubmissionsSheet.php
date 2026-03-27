@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithCustomStartCell;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -12,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithHeadings, WithMapping, WithStyles, WithTitle
+class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithCustomStartCell, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected $submissions;
 
@@ -38,6 +39,14 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
     public function title(): string
     {
         return 'Payroll Submissions';
+    }
+
+    /**
+     * Start headings and data at row 3 (rows 1-2 are title + empty)
+     */
+    public function startCell(): string
+    {
+        return 'A3';
     }
 
     /**
@@ -127,29 +136,45 @@ class PayrollSubmissionsSheet implements FromCollection, WithColumnWidths, WithH
      */
     public function styles(Worksheet $sheet)
     {
-        // Style the header row
-        $sheet->getStyle('1:1')->applyFromArray([
+        // Row 1: title
+        $sheet->setCellValue('A1', 'eSalary CLAB');
+        $sheet->mergeCells('A1:S1');
+        $sheet->getStyle('A1')->applyFromArray([
             'font' => [
                 'bold' => true,
-                'size' => 12,
+                'size' => 10,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_LEFT,
+                'vertical'   => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        // Row 2: empty spacer
+        $sheet->getRowDimension(2)->setRowHeight(8);
+
+        // Row 3: column headings
+        $sheet->getStyle('3:3')->applyFromArray([
+            'font' => [
+                'bold'  => true,
+                'size'  => 12,
                 'color' => ['rgb' => 'FFFFFF'],
             ],
             'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '6366F1'], // Indigo color
+                'fillType'   => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '6366F1'],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER,
+                'vertical'   => Alignment::VERTICAL_CENTER,
             ],
         ]);
+        $sheet->getRowDimension(3)->setRowHeight(25);
 
-        // Set row height for header
-        $sheet->getRowDimension(1)->setRowHeight(25);
-
-        // Format currency columns (H, I, J, K, L, M) - shifted due to Transaction ID column
-        $lastRow = $this->submissions->count() + 1;
-        $sheet->getStyle('H2:M'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        // Format currency columns — data starts at row 4
+        $lastRow = $this->submissions->count() + 3;
+        $sheet->getStyle('H4:M'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
 
         return [];
     }

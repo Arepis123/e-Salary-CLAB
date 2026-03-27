@@ -1,43 +1,20 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6">
         <!-- Download Progress Overlay -->
-        @if($downloadingReceipts)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" wire:loading.class="opacity-100" wire:loading.class.remove="opacity-0">
+        <!-- Download Progress Overlay — shown/hidden via JS, no Livewire round-trip needed -->
+        <div id="receipt-download-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" style="display:none;">
             <div class="bg-white dark:bg-zinc-800 rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
                 <div class="flex flex-col items-center text-center">
-                    <!-- Spinner -->
-                    {{-- <svg class="animate-spin h-16 w-16 text-lime-600 dark:text-lime-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg> --}}
                     <flux:icon.loading />
-
-                    <!-- Message -->
-                    <h3 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+                    <h3 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2 mt-3">
                         Generating Receipts
                     </h3>
-                    <p class="text-zinc-600 dark:text-zinc-400 mb-1">
-                        Preparing {{ $downloadCount }} {{ Str::plural('receipt', $downloadCount) }}...
-                    </p>
+                    <p id="receipt-download-count" class="text-zinc-600 dark:text-zinc-400 mb-1"></p>
                     <p class="text-sm text-zinc-500 dark:text-zinc-500">
                         This may take a moment. Please don't close this page.
                     </p>
-
-                    <!-- Estimated time -->
-                    @php
-                        $estimatedSeconds = $downloadCount * 3;
-                        $estimatedTime = $estimatedSeconds < 60
-                            ? "{$estimatedSeconds} seconds"
-                            : round($estimatedSeconds / 60, 1) . " minutes";
-                    @endphp
-                    <div class="mt-4 px-4 py-2 bg-lime-50 dark:bg-lime-900/20 rounded-lg">
-                        <p class="text-xs text-lime-700 dark:text-lime-400">
-                            Estimated time: ~{{ $estimatedTime }}
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
-        @endif
 
         <!-- Page Header -->
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1163,59 +1140,59 @@
     <script>
         // Handle receipt download event from Livewire
         document.addEventListener('livewire:init', () => {
-            Livewire.on('download-receipts', (data) => {
-                const params = data[0]; // Get first element which contains our parameters
+            Livewire.on('download-receipts', async (data) => {
+                const params = data[0];
 
-                // Create a temporary form to submit the download request
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '{{ route('report.download-receipts') }}';
-                form.style.display = 'none';
+                // Show modal immediately via DOM (no Livewire round-trip)
+                const modal   = document.getElementById('receipt-download-modal');
+                const countEl = document.getElementById('receipt-download-count');
+                const n = params.invoices.length;
+                countEl.textContent = 'Preparing ' + n + ' ' + (n === 1 ? 'receipt' : 'receipts') + '...';
+                modal.style.display = 'flex';
 
-                // Add CSRF token
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_token';
-                csrfInput.value = '{{ csrf_token() }}';
-                form.appendChild(csrfInput);
-
-                // Add invoice IDs
-                params.invoices.forEach((id) => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'invoices[]';
-                    input.value = id;
-                    form.appendChild(input);
-                });
-
-                // Add month and year
-                const monthInput = document.createElement('input');
-                monthInput.type = 'hidden';
-                monthInput.name = 'month';
-                monthInput.value = params.month;
-                form.appendChild(monthInput);
-
-                const yearInput = document.createElement('input');
-                yearInput.type = 'hidden';
-                yearInput.name = 'year';
-                yearInput.value = params.year;
-                form.appendChild(yearInput);
-
-                // Append form to body and submit
-                document.body.appendChild(form);
-                form.submit();
-
-                // Clean up form
-                setTimeout(() => {
-                    document.body.removeChild(form);
-                }, 100);
-
-                // Hide loading indicator after download starts
-                // Estimate: give it time based on number of receipts (3 seconds per receipt + 5 second buffer)
-                const estimatedTime = (params.invoices.length * 3 + 5) * 1000;
-                setTimeout(() => {
+                const closeModal = () => {
+                    modal.style.display = 'none';
                     @this.set('downloadingReceipts', false);
-                }, estimatedTime);
+                };
+
+                try {
+                    // Build form data
+                    const formData = new FormData();
+                    formData.append('_token', '{{ csrf_token() }}');
+                    formData.append('month', params.month);
+                    formData.append('year', params.year);
+                    params.invoices.forEach(id => formData.append('invoices[]', id));
+
+                    // Fetch the PDF — modal stays open until response arrives
+                    const response = await fetch('{{ route('report.download-receipts') }}', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) throw new Error('Server error ' + response.status);
+
+                    // Get filename from Content-Disposition header
+                    const disposition = response.headers.get('Content-Disposition') || '';
+                    const match = disposition.match(/filename[^;=\n]*=(['"]?)([^\n;"']+)\1/);
+                    const filename = match ? match[2] : 'receipts.pdf';
+
+                    // Convert to blob and trigger browser download
+                    const blob = await response.blob();
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                } catch (err) {
+                    console.error('Receipt download failed:', err);
+                } finally {
+                    // Close modal the instant we're done — no polling, no guessing
+                    closeModal();
+                }
             });
         });
     </script>

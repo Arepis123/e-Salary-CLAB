@@ -1,305 +1,319 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Official Receipts - Bulk Download</title>
+    <meta charset="UTF-8">
+    <title>Official Receipts — Bulk Download</title>
     <style>
-        @page {
-            margin: 20px;
-            size: A4 landscape;
-        }
-        body {
-            font-family: 'DejaVu Sans', sans-serif;
-            font-size: 9px;
-            line-height: 1.3;
-            color: #000;
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
+
+        @page {
+            margin: 15mm 15mm;
+            size: A4 portrait;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
+            background-color: #fff;
+            color: #000;
+        }
+
         .receipt-page {
-            padding: 15px 20px;
             page-break-after: always;
-            position: relative;
-            min-height: 90vh;
+            padding: 0;
         }
+
         .receipt-page:last-child {
             page-break-after: avoid;
         }
-        .invoice-container {
-            max-width: 100%;
-            margin: 0 auto;
-        }
-        .header {
-            margin-bottom: 8px;
+
+        /* ── Header ── */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
             border-bottom: 2px solid #000;
-            padding-bottom: 8px;
         }
-        .tax-invoice-title {
-            font-size: 16px;
+
+        .company-name {
+            font-size: 13px;
             font-weight: bold;
-            color: #000;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
-        .bill-to-section {
-            margin-bottom: 8px;
-        }
-        .bill-to-label {
-            font-weight: bold;
+
+        .company-details {
             font-size: 9px;
-            margin-bottom: 3px;
+            line-height: 1.6;
         }
-        .bill-to-content {
+
+        /* ── Title ── */
+        .receipt-title {
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 10px 0;
+            border-bottom: 1px solid #ccc;
+            letter-spacing: 1px;
+        }
+
+        /* ── Receipt Info ── */
+        .receipt-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            padding: 12px 0;
+        }
+
+        .to-name {
+            font-weight: bold;
+            margin-bottom: 2px;
+            font-size: 10px;
+        }
+
+        .to-address {
             font-size: 9px;
             line-height: 1.5;
+            margin-bottom: 1px;
         }
-        .totals-section {
-            margin-top: 5px;
+
+        .receipt-meta {
             text-align: right;
-        }
-        .total-row {
-            margin-bottom: 2px;
-            font-size: 8px;
-        }
-        .total-label {
-            display: inline-block;
-            width: 200px;
-            text-align: right;
-            padding-right: 10px;
             white-space: nowrap;
-        }
-        .total-value {
-            display: inline-block;
-            width: 90px;
-            text-align: right;
-        }
-        .grand-total {
-            background-color: #4CAF50;
-            color: #fff;
-            padding: 6px 10px;
-            margin-top: 3px;
-            display: inline-block;
-            min-width: 305px;
-        }
-        .grand-total .total-label {
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .grand-total .total-value {
-            font-weight: bold;
-            font-size: 9px;
-        }
-        .payment-info-box {
-            background-color: #e8f5e9;
-            border-left: 4px solid #4CAF50;
-            padding: 6px 8px;
-            margin: 8px 0;
-            font-size: 8px;
-            border-top-right-radius: 2px;
-            border-bottom-right-radius: 2px;
-        }
-        .payment-info-box strong {
-            display: block;
-            margin-bottom: 3px;
-            font-size: 9px;
-        }
-        .footer {
-            position: absolute;
-            bottom: 15px;
-            left: 30px;
-            right: 30px;
-            font-size: 8px;
-            color: #666;
-            border-top: 1px solid #e0e0e0;
-            padding-top: 8px;
-        }
-        .paid-stamp {
-            display: inline-block;
-            border: 3px solid #4CAF50;
-            color: #4CAF50;
-            padding: 4px 12px;
             font-size: 10px;
+            line-height: 1.8;
+            vertical-align: top;
+        }
+
+        /* ── Table ── */
+        .table-container {
+            padding: 14px 0 10px 0;
+        }
+
+        .transaction-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .transaction-table th {
+            background-color: #f0f0f0;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            padding: 7px 6px;
+            text-align: center;
             font-weight: bold;
-            letter-spacing: 2px;
-            transform: rotate(-10deg);
-            margin-left: 10px;
-            margin-top: 10px;
+            font-size: 9px;
+        }
+
+        .transaction-table td {
+            padding: 6px 6px;
+            font-size: 9px;
+            vertical-align: top;
+            border-bottom: 1px solid #eee;
+        }
+
+        .text-center { text-align: center; }
+        .text-right  { text-align: right; }
+
+        .summary-row td { border-bottom: none; }
+        .summary-row td strong { font-size: 9px; }
+
+        .grand-total-row td {
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            padding: 7px 6px;
+        }
+
+        /* ── Amount in Words ── */
+        .amount-words {
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+            font-size: 10px;
+        }
+
+        .amount-words-label {
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        /* ── Footer ── */
+        .footer-note {
+            padding: 10px 0 0 0;
+            font-size: 9px;
+            color: #555;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
+@php
+function bulkNumberToWords(float $amount): string {
+    $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+             'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen',
+             'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    $intPart  = (int) floor($amount);
+    $censPart = (int) round(($amount - $intPart) * 100);
+    $convert = function (int $n) use (&$convert, $ones, $tens): string {
+        if ($n === 0) return '';
+        if ($n < 20)  return $ones[$n];
+        if ($n < 100) return $tens[(int)($n / 10)] . ($n % 10 ? ' ' . $ones[$n % 10] : '');
+        if ($n < 1000) return $ones[(int)($n / 100)] . ' Hundred' . ($n % 100 ? ' ' . $convert($n % 100) : '');
+        if ($n < 1000000) return $convert((int)($n / 1000)) . ' Thousand' . ($n % 1000 ? ' ' . $convert($n % 1000) : '');
+        return $convert((int)($n / 1000000)) . ' Million' . ($n % 1000000 ? ' ' . $convert($n % 1000000) : '');
+    };
+    $words = $intPart === 0 ? 'Zero' : $convert($intPart);
+    if ($censPart > 0) $words .= ' And ' . $convert($censPart) . ' Cents';
+    return $words;
+}
+@endphp
+
 @foreach($invoices as $invoice)
-    @php $contractor = $invoice->user; @endphp
-    <div class="receipt-page">
-        <div class="invoice-container">
-            <!-- Header with Logo -->
-            <table style="width: 100%; margin-bottom: 5px;">
-                <tr>
-                    <td style="width: 50%; vertical-align: top;">
-                        <div class="tax-invoice-title">OFFICIAL RECEIPT</div>
-                        <div style="font-size: 10px; color: #666;">e-Salary CLAB</div>
-                    </td>
-                    <td style="width: 50%; vertical-align: top; text-align: right;">
-                        <img src="{{ public_path('images/company-logo.png') }}" alt="Company Logo" style="max-width: 140px; height: auto;">
-                    </td>
-                </tr>
-            </table>
+@php
+    $contractor       = $invoice->user;
+    $contractorRecord = $invoice->_contractorRecord ?? null;
+    $contractorState  = $invoice->_contractorState ?? null;
 
-            <div class="header"></div>
+    $payrollAmount  = $invoice->admin_final_amount ?? 0;
+    $serviceCharge  = $invoice->calculated_service_charge;
+    $sstAmount      = $invoice->calculated_sst;
+    $grandTotal     = $invoice->payment ? $invoice->payment->amount : $invoice->client_total;
+    $workerCount    = $invoice->billable_workers_count;
+    $transactionId  = $invoice->payment->transaction_id ?? 'N/A';
+    $paidAt         = $invoice->payment?->completed_at?->format('d M Y') ?? now()->format('d M Y');
+    $receiptNo      = $invoice->tax_invoice_number ?? 'PENDING';
+    $periodLabel    = \Carbon\Carbon::create($invoice->year, $invoice->month, 1)->format('F Y');
+    $contractorName = $contractor ? ($contractor->company_name ?? $contractor->name) : $invoice->contractor_clab_no;
 
-            <!-- Company Information -->
-            <table style="width: 100%; margin-bottom: 5px;">
-                <tr>
-                    <td style="width: 50%; vertical-align: top;">
-                        <div style="line-height: 1.3;">
-                            <strong>CONSTRUCTION LABOUR EXCHANGE CENTRE BERHAD</strong><br>
-                            Level 2, Annexe Block, Menara Milenium, Jln Damanlela, Pusat Bandar Damansara, 50490 Kuala Lumpur<br>
-                            ROC: 200301031975  |  SST Reg: W10-1808-32001604<br>
-                        </div>
-                    </td>
-                    <td style="width: 50%; vertical-align: top; text-align: right;">
-                        <table style="font-size: 9px; line-height: 1.3; margin-left: auto; display: inline-table;">
-                            <tr>
-                                <td style="text-align: right; font-weight: bold; padding: 1px 8px 1px 0; white-space: nowrap;">Official Receipt No:</td>
-                                <td style="text-align: left; padding: 1px 0;">{{ $invoice->tax_invoice_number }}</td>
-                            </tr>
-                            <tr>
-                                <td style="text-align: right; font-weight: bold; padding: 1px 8px 1px 0; white-space: nowrap;">Invoice Date:</td>
-                                <td style="text-align: left; padding: 1px 0;">{{ $invoice->tax_invoice_generated_at ? $invoice->tax_invoice_generated_at->format('d/m/Y') : now()->format('d/m/Y') }}</td>
-                            </tr>
-                            <tr>
-                                <td style="text-align: right; font-weight: bold; padding: 1px 8px 1px 0; white-space: nowrap;">Payment Date:</td>
-                                <td style="text-align: left; padding: 1px 0;">{{ $invoice->payment->completed_at?->format('d/m/Y H:i') ?? 'N/A' }}</td>
-                            </tr>
-                            <tr>
-                                <td style="text-align: right; font-weight: bold; padding: 1px 8px 1px 0; white-space: nowrap;">Payment Method:</td>
-                                <td style="text-align: left; padding: 1px 0;">{{ $invoice->payment->payment_method ?? 'Online Payment' }}</td>
-                            </tr>
-                            <tr>
-                                <td style="text-align: right; font-weight: bold; padding: 1px 8px 1px 0; white-space: nowrap;">Transaction ID:</td>
-                                <td style="text-align: left; padding: 1px 0;">{{ $invoice->payment->transaction_id ?? 'N/A' }}</td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
+    $addComma  = fn($s) => $s ? (str_ends_with(trim($s), ',') ? trim($s) : trim($s) . ',') : null;
+    $pcodeLine = trim(($contractorRecord->ctr_pcode ?? '') . ' ' . ($contractorRecord->ctr_addr3 ?? '')) ?: null;
+    $addressParts = array_values(array_filter([
+        $addComma($contractorRecord->ctr_addr1 ?? null),
+        $addComma($contractorRecord->ctr_addr2 ?? null),
+        $addComma($pcodeLine),
+        $contractorState ?? null,
+    ]));
+    $contractorPhone  = $contractor?->phone ?? ($contractorRecord->ctr_contact_mobileno ?? $contractorRecord->ctr_telno ?? '');
+    $amountInWords    = bulkNumberToWords((float) $grandTotal);
+@endphp
 
-            <!-- Bill To Section -->
-            <table style="width: 100%; margin-bottom: 8px;">
-                <tr>
-                    <td style="width: 60%; vertical-align: top;">
-                        <div class="bill-to-section">
-                            <div class="bill-to-label">Invoiced To:</div>
-                            <div class="bill-to-content">
-                                <strong>{{ $contractor ? ($contractor->company_name ?? $contractor->name) : $invoice->contractor_clab_no }}</strong><br>
-                                CLAB No: {{ $invoice->contractor_clab_no }}<br>
-                                @if($contractor && $contractor->address)
-                                    {{ $contractor->address }}<br>
-                                    @if($contractor->postcode || $contractor->city || $contractor->state)
-                                        {{ $contractor->postcode }} {{ $contractor->city }}@if($contractor->state), {{ $contractor->state }}@endif<br>
-                                    @endif
-                                @endif
-                                @if($contractor && $contractor->phone)
-                                    Tel: {{ $contractor->phone }}<br>
-                                @endif
-                                {{ $contractor ? $contractor->email : '' }}
-                            </div>
-                        </div>
-                    </td>
-                    <td style="width: 40%; vertical-align: top; text-align: right;">
-                        <div class="paid-stamp">PAID</div>
-                    </td>
-                </tr>
-            </table>
+<div class="receipt-page">
 
-            <!-- Simplified Payroll Summary -->
-            <div style="background-color: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 4px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 12px;">Payroll Summary:</h3>
-                <table style="width: 100%; font-size: 10px;">
-                    <tr>
-                        <td style="width: 50%;"><strong>Total Workers:</strong></td>
-                        <td>{{ $invoice->total_workers }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Payroll Period:</strong></td>
-                        <td>{{ $invoice->month_year }}</td>
-                    </tr>
-                    @if($invoice->hasBreakdownFile())
-                    <tr>
-                        <td><strong>Detailed Breakdown:</strong></td>
-                        <td style="color: #0066cc;">
-                            Available for download ({{ $invoice->breakdown_file_name }})
-                        </td>
-                    </tr>
-                    @endif
-                </table>
-                <p style="margin-top: 10px; font-size: 9px; color: #666; font-style: italic;">
-                    Detailed payroll breakdown is available as a separate file from our certified payroll system.
-                </p>
-            </div>
-
-            <!-- Payment Info and Totals Side by Side -->
-            <table style="width: 100%; margin-top: 8px;">
-                <tr>
-                    <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-                        <!-- Payment Information -->
-                        <div class="payment-info-box">
-                            <strong>PAYMENT CONFIRMATION</strong>
-                            <div>Amount Paid: <strong>RM {{ number_format($invoice->client_total, 2) }}</strong></div>
-                            <div>Payment Date: {{ $invoice->payment->completed_at?->format('d/m/Y H:i') ?? 'N/A' }}</div>
-                            <div>Payment Status: <strong>COMPLETED</strong></div>
-                            @if($invoice->payment && $invoice->payment->transaction_id)
-                            <div>Reference: {{ $invoice->payment->transaction_id }}</div>
-                            @endif
-                        </div>
-                    </td>
-                    <td style="width: 50%; vertical-align: top;">
-                        <!-- Totals with Breakdown -->
-                        <div class="totals-section">
-                            @if($invoice->hasAdminReview())
-                            <div style="text-align: right; margin-bottom: 5px;">
-                                <div class="total-row">
-                                    <span class="total-label">Payroll Amount:</span>
-                                    <span class="total-value">{{ number_format($invoice->admin_final_amount, 2) }}</span>
-                                </div>
-                                <div class="total-row">
-                                    <span class="total-label">Service Charge (RM 200 × {{ $invoice->billable_workers_count }}):</span>
-                                    <span class="total-value">{{ number_format($invoice->calculated_service_charge, 2) }}</span>
-                                </div>
-                                <div class="total-row">
-                                    <span class="total-label">SST (8%):</span>
-                                    <span class="total-value">{{ number_format($invoice->calculated_sst, 2) }}</span>
-                                </div>
-                            </div>
-                            @endif
-                            <div class="grand-total">
-                                <span class="total-label">TOTAL PAID (RM):</span>
-                                <span class="total-value">{{ number_format($invoice->client_total, 2) }}</span>
-                            </div>
-                            @if($invoice->has_penalty)
-                            <div class="total-row" style="color: #dc3545; margin-top: 5px; font-size: 7px;">
-                                <span class="total-label">* Includes 8% late payment penalty</span>
-                            </div>
-                            @endif
-                        </div>
-                    </td>
-                </tr>
-            </table>
-
-            <!-- Signature -->
-            <div style="margin-top: 25px; text-align: right;">
-                <div style="font-size: 9px; color: #666; font-style: italic;">
-                    This is a computer-generated official receipt. No signature required.<br>
-                    This document serves as official proof of payment.
+    {{-- Header --}}
+    <table class="header-table">
+        <tr>
+            <td style="width:70px; vertical-align:middle; padding-right:12px; padding-bottom:20px;">
+                <img src="{{ public_path('logo-clab.png') }}" alt="CLAB Logo" style="width:60px; height:auto;">
+            </td>
+            <td style="vertical-align:middle; padding-bottom:20px;">
+                <div class="company-name">CONSTRUCTION LABOUR EXCHANGE CENTRE BERHAD (CLAB)</div>
+                <div class="company-details">
+                    <div>Level 2, Annexe Block, Menara Millenium, No. 8, Jalan Damanlela, Bukit Damansara, 50490 Kuala Lumpur</div>
+                    <div>Tel: 03-2095 9559 &nbsp;|&nbsp; Fax: 03-2095 9566 &nbsp;|&nbsp; Email: info@clab.com.my</div>
+                    <div>Website: www.clab.com.my &nbsp;|&nbsp; No Daftar Kastam: W10-1808-32001804</div>
                 </div>
-            </div>
+            </td>
+        </tr>
+    </table>
 
-            <!-- Footer -->
-            <div class="footer">
-                <strong>{{ config('app.name') }}</strong> | Official Receipt Generated: {{ $invoice->tax_invoice_generated_at ? $invoice->tax_invoice_generated_at->format('d/m/Y H:i') : now()->format('d/m/Y H:i') }}<br>
-                For inquiries, please contact: 03-2095 9599
-            </div>
-        </div>
+    {{-- Title --}}
+    <div class="receipt-title">
+        OFFICIAL RECEIPT / INVOICE
+        <div style="font-size:9px; font-weight:normal; letter-spacing:0; margin-top:3px; color:#555;">e-Salary CLAB</div>
     </div>
+
+    {{-- Receipt Info --}}
+    <table class="receipt-info-table">
+        <tr>
+            <td style="vertical-align:top; padding-right:10px; padding-bottom:7px;">
+                <div class="to-name">{{ $contractorName }}</div>
+                @foreach($addressParts as $line)
+                    <div class="to-address">{{ $line }}</div>
+                @endforeach
+                @if($contractorPhone)
+                    <div class="to-address">{{ $contractorPhone }}</div>
+                @endif
+                @if($contractor && $contractor->email)
+                    <div class="to-address">{{ $contractor->email }}</div>
+                @endif
+            </td>
+            <td class="receipt-meta" style="width:170px;">
+                <div>Official Receipt No &nbsp;: <strong>{{ $receiptNo }}</strong></div>
+                <div>Invoice No &nbsp;: <strong>#PAY{{ str_pad($invoice->id, 6, '0', STR_PAD_LEFT) }}</strong></div>
+                <div>Date : {{ $paidAt }}</div>
+            </td>
+        </tr>
+    </table>
+
+    {{-- Table --}}
+    <div class="table-container">
+        <table class="transaction-table">
+            <thead>
+                <tr>
+                    <th style="width:16%">TRANSACTION NO.</th>
+                    <th>PAYROLL SUMMARY</th>
+                    <th style="width:14%">TOTAL (RM)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center">{{ $transactionId }}</td>
+                    <td>
+                        <div><strong>Payroll Payment — {{ $periodLabel }}</strong></div>
+                        <div style="color:#555; margin-top:2px;">Workers: {{ $workerCount }} pax</div>
+                        <div style="color:#555;">Payroll Amount for {{ $periodLabel }}</div>
+                    </td>
+                    <td class="text-right">{{ number_format($payrollAmount, 2) }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>
+                        <div><strong>Admin Fees</strong></div>
+                        <div style="color:#555; margin-top:2px;">RM 200.00 × {{ $workerCount }} Workers</div>
+                    </td>
+                    <td class="text-right">{{ number_format($serviceCharge, 2) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="1"></td>
+                    <td>Service Tax (SST) 8%</td>
+                    <td class="text-right">{{ number_format($sstAmount, 2) }}</td>
+                </tr>
+                @if($invoice->has_penalty && $invoice->penalty_amount > 0)
+                <tr class="summary-row">
+                    <td colspan="1"></td>
+                    <td><strong>Total (RM)</strong></td>
+                    <td class="text-right"><strong>{{ number_format($invoice->client_total, 2) }}</strong></td>
+                </tr>
+                <tr>
+                    <td colspan="1"></td>
+                    <td>Late Payment Penalty (8%)</td>
+                    <td class="text-right">{{ number_format($invoice->penalty_amount, 2) }}</td>
+                </tr>
+                @endif
+                <tr class="grand-total-row">
+                    <td colspan="1"></td>
+                    <td><strong>Grand Total (RM)</strong></td>
+                    <td class="text-right"><strong>{{ number_format($grandTotal, 2) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {{-- Amount in Words --}}
+    <div class="amount-words">
+        <span class="amount-words-label">Amount in words (RM):</span>
+        <span>{{ strtoupper($amountInWords) }} RINGGIT MALAYSIA ONLY</span>
+    </div>
+
+    {{-- Footer --}}
+    <div class="footer-note">
+        This is a computer generated receipt, no signature required.<br>
+        This document serves as official proof of payment. For inquiries: 03-2095 9559 | esalary@clab.com.my
+    </div>
+
+</div>
 @endforeach
 </body>
 </html>
