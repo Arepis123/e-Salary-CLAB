@@ -149,9 +149,9 @@
                                             </flux:button>
                                         </flux:modal.trigger>
                                         <flux:button wire:click="deleteTemplate({{ $template->id }})"
-                                            wire:confirm="Are you sure?"
-                                            variant="ghost" size="sm" icon="eye" icon-variant="outline">
-                                            View Details
+                                            wire:confirm="Are you sure you want to delete this template?"
+                                            variant="ghost" size="sm" icon="trash" icon-variant="outline">
+                                            Delete
                                         </flux:button>
                                     </div>                                   
                                 </td>
@@ -276,7 +276,7 @@
                                         {{ $recipients[0]->recipient ? $recipients[0]->recipient->name : $recipients[0]->recipient_email }}
                                     @else
                                         <div class="space-y-1">
-                                            @foreach($recipients->take(3) as $log)
+                                            @foreach(array_slice($recipients, 0, 3) as $log)
                                                 <div class="text-xs">{{ $log->recipient ? $log->recipient->name : $log->recipient_email }}</div>
                                             @endforeach
                                             @if($recipientCount > 3)
@@ -363,12 +363,39 @@
 
         <flux:input wire:model="templateForm.subject" label="Subject" placeholder="Email subject" />
 
-        <div>
+        <div x-data>
             <flux:label>Body</flux:label>
-            <flux:textarea wire:model="templateForm.body" rows="10" placeholder="Use @{{client_name}} for variables" />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                Available variables: @{{client_name}}, @{{message}}
-            </p>
+            <flux:textarea wire:model="templateForm.body" rows="10" placeholder="Use @{{client_name}} for variables" x-ref="bodyTextarea" />
+            <div class="mt-2">
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">Click to insert variable:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach([
+                        'client_name'  => 'Client Name',
+                        'client_email' => 'Client Email',
+                        'client_phone' => 'Client Phone',
+                        'date'         => "Today's Date",
+                        'month'        => 'Current Month',
+                        'message'      => 'Custom Message',
+                    ] as $varKey => $label)
+                        @php $tag = '{{' . $varKey . '}}'; @endphp
+                        <button type="button"
+                            class="inline-flex items-center gap-1 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                            x-on:click="
+                                const tag = '{{ $tag }}';
+                                const el = $refs.bodyTextarea.querySelector('textarea') ?? $refs.bodyTextarea;
+                                const start = el.selectionStart;
+                                const end = el.selectionEnd;
+                                el.value = el.value.slice(0, start) + tag + el.value.slice(end);
+                                el.selectionStart = el.selectionEnd = start + tag.length;
+                                el.dispatchEvent(new Event('input'));
+                                el.focus();
+                            ">
+                            {{ $tag }}
+                            <span class="text-blue-400 dark:text-blue-500 font-sans not-italic font-normal">{{ $label }}</span>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
         </div>
 
         <flux:separator />

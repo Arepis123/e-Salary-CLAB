@@ -75,6 +75,10 @@ class NotificationTemplate extends Model
             ],
             'manual' => [
                 'client_name' => 'Client Name',
+                'client_email' => 'Client Email',
+                'client_phone' => 'Client Phone',
+                'date' => 'Today\'s Date',
+                'month' => 'Current Month',
                 'message' => 'Custom Message',
             ],
             default => [],

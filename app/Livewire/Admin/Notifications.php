@@ -198,7 +198,13 @@ class Notifications extends Component
             $this->notificationService->sendFromTemplate(
                 $template,
                 $recipient,
-                ['client_name' => $recipient->name],
+                [
+                    'client_name'  => $recipient->name,
+                    'client_email' => $recipient->email,
+                    'client_phone' => $recipient->phone ?? '-',
+                    'date'         => now()->format('d M Y'),
+                    'month'        => now()->format('F Y'),
+                ],
                 null,
                 null,
                 null,
