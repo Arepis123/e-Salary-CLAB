@@ -1112,11 +1112,16 @@ class Configuration extends Component
                             'status' => 'completed',
                             'completed_at' => $paidAt,
                             'payment_response' => json_encode($bill),
-                            'transaction_id' => $bill['id'],
+                            'transaction_id' => $bill['id'] ?? $payment->billplz_bill_id,
                         ]);
 
                         // Update submission status
                         $submission = $payment->payrollSubmission;
+
+                        if (! $submission) {
+                            throw new \Exception("Submission not found for payment {$payment->id}");
+                        }
+
                         $submission->update([
                             'status' => 'paid',
                             'paid_at' => $paidAt,
@@ -1154,6 +1159,10 @@ class Configuration extends Component
                         $stillPending++;
                     }
                 } catch (\Exception $e) {
+                    if (DB::transactionLevel() > 0) {
+                        DB::rollBack();
+                    }
+
                     $this->syncResults[] = [
                         'payment_id' => $payment->id,
                         'bill_id' => $payment->billplz_bill_id,
@@ -1260,7 +1269,7 @@ class Configuration extends Component
                             'status' => 'completed',
                             'completed_at' => $paidAt,
                             'payment_response' => json_encode($bill),
-                            'transaction_id' => $bill['id'],
+                            'transaction_id' => $bill['id'] ?? $payment->billplz_bill_id,
                         ]);
 
                         // Update submission status
@@ -1307,7 +1316,9 @@ class Configuration extends Component
                         $stillUnpaid++;
                     }
                 } catch (\Exception $e) {
-                    DB::rollBack();
+                    if (DB::transactionLevel() > 0) {
+                        DB::rollBack();
+                    }
 
                     $this->cancelledSyncResults[] = [
                         'payment_id' => $payment->id,
