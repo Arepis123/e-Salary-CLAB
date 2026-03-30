@@ -224,8 +224,9 @@ class Dashboard extends Component
         $numberOfPayments = [];
 
         // Get data for last 5 months + current month (6 months total)
+        $startOfMonth = now()->startOfMonth();
         for ($i = 5; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
+            $date = $startOfMonth->copy()->subMonths($i);
             $month = $date->month;
             $year = $date->year;
 

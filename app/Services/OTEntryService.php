@@ -73,7 +73,7 @@ class OTEntryService
     public function getEntryPeriod(?Carbon $date = null): array
     {
         $today = $date ?? now();
-        $entryFor = $today->copy()->subMonth();
+        $entryFor = $today->copy()->startOfMonth()->subMonth();
 
         $windowStart = $today->copy()->startOfMonth();
         $windowEnd = $today->copy()->startOfMonth()->addDays(14)->endOfDay(); // 15th 23:59:59
@@ -271,7 +271,7 @@ class OTEntryService
         }
 
         // Get last month's entry period
-        $lastMonth = $today->copy()->subMonth();
+        $lastMonth = $today->copy()->startOfMonth()->subMonth();
 
         // Lock all entries for last month that are still in draft or submitted status
         $count = MonthlyOTEntry::where('entry_month', $lastMonth->month)

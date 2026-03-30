@@ -904,7 +904,7 @@ class Timesheet extends Component
     {
         $currentMonth = now()->month;
         $currentYear = now()->year;
-        $currentDate = now();
+        $currentDate = now()->startOfMonth();
 
         // Always allow current month
         if ($month == $currentMonth && $year == $currentYear) {
@@ -1012,7 +1012,7 @@ class Timesheet extends Component
     {
         $currentMonth = now()->month;
         $currentYear = now()->year;
-        $currentDate = now();
+        $currentDate = now()->startOfMonth();
 
         // Reset state
         $this->isBlocked = false;

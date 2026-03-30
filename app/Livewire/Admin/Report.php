@@ -118,8 +118,9 @@ class Report extends Component
     protected function generateAvailableMonths()
     {
         $months = [];
+        $startOfMonth = now()->startOfMonth();
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
+            $date = $startOfMonth->copy()->subMonths($i);
             $months[] = [
                 'value' => $date->format('Y-m'),
                 'label' => $date->format('F Y'),
@@ -339,8 +340,9 @@ class Report extends Component
         $trendLabels = [];
         $trendData = [];
 
+        $startOfMonth = now()->startOfMonth();
         for ($i = 5; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
+            $date = $startOfMonth->copy()->subMonths($i);
             $month = $date->month;
             $year = $date->year;
 

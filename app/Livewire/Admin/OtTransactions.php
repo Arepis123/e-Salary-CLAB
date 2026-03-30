@@ -60,8 +60,9 @@ class OtTransactions extends Component
     protected function generateAvailableMonths()
     {
         $months = [];
+        $startOfMonth = now()->startOfMonth();
         for ($i = 0; $i < 12; $i++) {
-            $date = now()->subMonths($i);
+            $date = $startOfMonth->copy()->subMonths($i);
             $months[] = [
                 'value' => $date->format('Y-m'),
                 'label' => $date->format('F Y'),
