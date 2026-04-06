@@ -365,7 +365,7 @@ class OTEntry extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance,backpay',
+            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance,backpay,medical_claim',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [
@@ -489,7 +489,7 @@ class OTEntry extends Component
         $sheet = $spreadsheet->getActiveSheet();
 
         // Row 1: Instructions (will be skipped during import)
-        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, deduction, npl, allowance, backpay. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
+        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, deduction, npl, allowance, backpay, medical_claim. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
         $sheet->mergeCells('A1:H1');
         $sheet->getStyle('A1')->getFont()->setItalic(true)->setBold(true);
         $sheet->getStyle('A1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('FFFFCC');
@@ -763,7 +763,7 @@ class OTEntry extends Component
 
                 // Validate transaction type if provided
                 if (! empty($txnType)) {
-                    $validTypes = ['accommodation', 'advance_payment', 'deduction', 'npl', 'allowance', 'backpay'];
+                    $validTypes = ['accommodation', 'advance_payment', 'deduction', 'npl', 'allowance', 'backpay', 'medical_claim'];
                     if (! in_array($txnType, $validTypes)) {
                         $this->importErrors[] = "Row {$rowNumber}: Invalid transaction type '{$txnType}'. Must be one of: " . implode(', ', $validTypes);
                         $rowHasError = true;

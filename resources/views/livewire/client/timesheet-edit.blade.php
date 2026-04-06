@@ -142,6 +142,8 @@
                                                 <span>
                                                     @if($txn['type'] === 'allowance')
                                                         +RM {{ number_format($txn['amount'], 2) }} (Allowance)
+                                                    @elseif($txn['type'] === 'medical_claim')
+                                                        +RM {{ number_format($txn['amount'], 2) }} (Medical Claim)
                                                     @elseif($txn['type'] === 'npl')
                                                         {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
                                                     @elseif($txn['type'] === 'advance_payment')
@@ -313,6 +315,7 @@
                                     <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
                                 @else
                                     <flux:select.option value="allowance">Allowance</flux:select.option>
+                                    <flux:select.option value="medical_claim">Medical Claim</flux:select.option>
                                 @endif
                             </flux:select>
                             @error('newTransactionType') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
@@ -376,6 +379,8 @@
                                                 <flux:badge color="purple" size="sm">No-Pay Leave</flux:badge>
                                             @elseif($transaction['type'] === 'allowance')
                                                 <flux:badge color="green" size="sm">Allowance</flux:badge>
+                                            @elseif($transaction['type'] === 'medical_claim')
+                                                <flux:badge color="lime" size="sm">Medical Claim</flux:badge>
                                             @endif
                                         </div>
                                         <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{{ $transaction['remarks'] }}</p>

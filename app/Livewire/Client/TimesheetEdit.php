@@ -312,7 +312,7 @@ class TimesheetEdit extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance',
+            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance,medical_claim',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [

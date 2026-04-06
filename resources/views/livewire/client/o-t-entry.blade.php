@@ -342,6 +342,7 @@
                                     @else
                                         <flux:select.option value="allowance">Allowance</flux:select.option>
                                         <flux:select.option value="backpay">Backpay</flux:select.option>
+                                        <flux:select.option value="medical_claim">Medical Claim</flux:select.option>
                                     @endif
                                 </flux:select>
                                 @error('newTransactionType') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
@@ -405,6 +406,8 @@
                                                     <flux:badge color="green" size="sm">Allowance</flux:badge>
                                                 @elseif($transaction['type'] === 'backpay')
                                                     <flux:badge color="cyan" size="sm">Backpay</flux:badge>
+                                                @elseif($transaction['type'] === 'medical_claim')
+                                                    <flux:badge color="lime" size="sm">Medical Claim</flux:badge>
                                                 @endif
                                             </div>
                                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{{ $transaction['remarks'] }}</p>
@@ -494,7 +497,7 @@
                                         <li>Download the template file to see the required format</li>
                                         <li>Fill in worker passport, name, OT hours, and transactions</li>
                                         <li>Deduction types: <strong class="text-zinc-900 dark:text-zinc-100">accommodation</strong>, <strong class="text-zinc-900 dark:text-zinc-100">advance_payment</strong>, <strong class="text-zinc-900 dark:text-zinc-100">deduction</strong>, <strong class="text-zinc-900 dark:text-zinc-100">npl</strong></li>
-                                        <li>Earning types: <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong>, <strong class="text-zinc-900 dark:text-zinc-100">backpay</strong></li>
+                                        <li>Earning types: <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong>, <strong class="text-zinc-900 dark:text-zinc-100">backpay</strong>, <strong class="text-zinc-900 dark:text-zinc-100">medical_claim</strong></li>
                                         <li>You can have multiple rows for the same worker (for multiple transactions)</li>
                                         <li>Leave OT columns empty if you're only adding transactions</li>
                                         <li>Workers must already exist in your contractor worker list</li>
@@ -607,6 +610,8 @@
                                                                         <flux:badge color="amber" size="sm">Accommodation</flux:badge>
                                                                     @elseif($item['transaction_type'] === 'backpay')
                                                                         <flux:badge color="cyan" size="sm">Backpay</flux:badge>
+                                                                    @elseif($item['transaction_type'] === 'medical_claim')
+                                                                        <flux:badge color="lime" size="sm">Medical Claim</flux:badge>
                                                                     @endif
                                                                     <span class="text-xs text-zinc-600 dark:text-zinc-400">
                                                                         {{ $item['transaction_type'] === 'npl' ? $item['transaction_amount'] . ' days' : 'RM ' . number_format($item['transaction_amount'], 2) }}

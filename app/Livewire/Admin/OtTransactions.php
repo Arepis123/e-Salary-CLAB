@@ -230,6 +230,7 @@ class OtTransactions extends Component
             'total_npl_days' => $transactionStats['npl']->total_amount ?? 0,
             'total_allowance' => $transactionStats['allowance']->total_amount ?? 0,
             'total_backpay' => $transactionStats['backpay']->total_amount ?? 0,
+            'total_medical_claim' => $transactionStats['medical_claim']->total_amount ?? 0,
             'contractors_submitted' => $contractorsSubmitted,
             'contractors_draft' => $contractorsDraft,
         ];
@@ -327,6 +328,7 @@ class OtTransactions extends Component
             $item->total_npl = $transactions->where('type', 'npl')->sum('amount');
             $item->total_allowance = $transactions->where('type', 'allowance')->sum('amount');
             $item->total_backpay = $transactions->where('type', 'backpay')->sum('amount');
+            $item->total_medical_claim = $transactions->where('type', 'medical_claim')->sum('amount');
             $item->has_transactions = $transactions->count() > 0;
 
             return $item;

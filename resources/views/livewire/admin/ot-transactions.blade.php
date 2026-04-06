@@ -44,9 +44,9 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Earnings</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">RM {{ number_format(($stats['total_allowance'] ?? 0) + ($stats['total_backpay'] ?? 0), 2) }}</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">RM {{ number_format(($stats['total_allowance'] ?? 0) + ($stats['total_backpay'] ?? 0) + ($stats['total_medical_claim'] ?? 0), 2) }}</p>
                     <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        Allowances + Backpay
+                        Allowances + Backpay + Medical Claim
                     </div>
                 </div>
                 <flux:icon.plus-circle class="size-8 text-green-600 dark:text-green-400" />
@@ -124,6 +124,7 @@
                         <flux:select.option value="npl">NPL (No-Pay Leave)</flux:select.option>
                         <flux:select.option value="allowance">Allowance</flux:select.option>
                         <flux:select.option value="backpay">Backpay</flux:select.option>
+                        <flux:select.option value="medical_claim">Medical Claim</flux:select.option>
                     </flux:select>
                 </div>
                 <div>
@@ -208,6 +209,9 @@
                                     @endif
                                     @if($submission->total_backpay > 0)
                                         <div class="text-cyan-600 dark:text-cyan-400">Bpay: +RM {{ number_format($submission->total_backpay, 2) }}</div>
+                                    @endif
+                                    @if(($submission->total_medical_claim ?? 0) > 0)
+                                        <div class="text-lime-600 dark:text-lime-400">Med: +RM {{ number_format($submission->total_medical_claim, 2) }}</div>
                                     @endif
                                 </div>
                             @else
@@ -431,6 +435,8 @@
                                                     <flux:badge color="green" size="sm">Allowance</flux:badge>
                                                 @elseif($transaction->type === 'backpay')
                                                     <flux:badge color="cyan" size="sm">Backpay</flux:badge>
+                                                @elseif($transaction->type === 'medical_claim')
+                                                    <flux:badge color="lime" size="sm">Medical Claim</flux:badge>
                                                 @endif
                                             </td>
                                             <td class="px-3 py-2 text-right font-medium">
@@ -440,6 +446,8 @@
                                                     <span class="text-green-600 dark:text-green-400">+RM {{ number_format($transaction->amount, 2) }}</span>
                                                 @elseif($transaction->type === 'backpay')
                                                     <span class="text-cyan-600 dark:text-cyan-400">+RM {{ number_format($transaction->amount, 2) }}</span>
+                                                @elseif($transaction->type === 'medical_claim')
+                                                    <span class="text-lime-600 dark:text-lime-400">+RM {{ number_format($transaction->amount, 2) }}</span>
                                                 @else
                                                     <span class="text-red-600 dark:text-red-400">-RM {{ number_format($transaction->amount, 2) }}</span>
                                                 @endif
@@ -476,6 +484,10 @@
                             <flux:card class="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800">
                                 <p class="text-xs text-cyan-600 dark:text-cyan-400">Total Backpay</p>
                                 <p class="text-lg font-bold text-cyan-600 dark:text-cyan-400">RM {{ number_format($allTransactions->where('type', 'backpay')->sum('amount'), 2) }}</p>
+                            </flux:card>
+                            <flux:card class="p-3 bg-lime-50 dark:bg-lime-900/20 border border-lime-200 dark:border-lime-800">
+                                <p class="text-xs text-lime-600 dark:text-lime-400">Total Medical Claim</p>
+                                <p class="text-lg font-bold text-lime-600 dark:text-lime-400">RM {{ number_format($allTransactions->where('type', 'medical_claim')->sum('amount'), 2) }}</p>
                             </flux:card>
                         </div>
                     @else
