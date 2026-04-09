@@ -310,16 +310,14 @@ class OTEntry extends Component
                 'ot_public_hours' => $entry['ot_public_hours'] ?? 0,
             ]);
 
-            // Also persist the entry's transactions so they survive a page refresh
-            if (! empty($entry['transactions'])) {
-                $savedEntry->transactions()->delete();
-                foreach ($entry['transactions'] as $txn) {
-                    $savedEntry->transactions()->create([
-                        'type' => $txn['type'],
-                        'amount' => $txn['amount'],
-                        'remarks' => $txn['remarks'],
-                    ]);
-                }
+            // Always sync transactions (handles deletions, including removing all)
+            $savedEntry->transactions()->delete();
+            foreach ($entry['transactions'] ?? [] as $txn) {
+                $savedEntry->transactions()->create([
+                    'type' => $txn['type'],
+                    'amount' => $txn['amount'],
+                    'remarks' => $txn['remarks'],
+                ]);
             }
 
             $this->autoSaveStatus = 'saved';
@@ -458,6 +456,9 @@ class OTEntry extends Component
 
             // Update modal's local transactions
             $this->transactions = $currentTransactions;
+
+            // Persist removal to database immediately
+            $this->autoSaveDraft($this->currentWorkerIndex);
         }
     }
 
