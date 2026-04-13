@@ -123,6 +123,7 @@ class Dashboard extends Component
         ];
 
         $this->isLoadingStats = false;
+        $this->dispatch('stats-loaded');
     }
 
     public function loadDeferredData(): void
