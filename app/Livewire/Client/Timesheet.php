@@ -91,6 +91,9 @@ class Timesheet extends Component
 
     public $pendingDraftSubmissionId = null;
 
+    // Loading state
+    public bool $isLoading = true;
+
     public function boot(PayrollService $payrollService, ContractWorkerService $contractWorkerService)
     {
         $this->payrollService = $payrollService;
@@ -103,7 +106,23 @@ class Timesheet extends Component
         $this->targetMonth = request()->query('month');
         $this->targetYear = request()->query('year');
 
-        $this->loadData();
+        // Initialize default stats and collections — loadData() runs via wire:init
+        $this->stats = [
+            'total_submissions' => 0,
+            'paid_submissions' => 0,
+            'pending_submissions' => 0,
+            'overdue_submissions' => 0,
+            'total_paid_amount' => 0,
+            'total_pending_amount' => 0,
+            'unsubmitted_workers' => 0,
+        ];
+        $this->recentSubmissions = collect();
+        $this->period = [
+            'month_name' => now()->format('F'),
+            'year' => now()->year,
+            'deadline' => now()->endOfMonth(),
+            'days_until_deadline' => now()->diffInDays(now()->endOfMonth(), false),
+        ];
     }
 
     public function loadData()
@@ -117,6 +136,7 @@ class Timesheet extends Component
                 heading: 'Configuration Error',
                 text: 'No contractor CLAB number assigned to your account. Please contact administrator.'
             );
+            $this->isLoading = false;
 
             return;
         }
@@ -388,6 +408,8 @@ class Timesheet extends Component
 
         // Get statistics
         $this->stats = $this->payrollService->getContractorStatistics($clabNo, $remainingWorkers->count());
+
+        $this->isLoading = false;
     }
 
     public function updated($propertyName)

@@ -1,4 +1,4 @@
-<div class="flex h-full w-full flex-1 flex-col gap-6">
+<div class="flex h-full w-full flex-1 flex-col gap-6" wire:init="loadData">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -33,7 +33,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Invoices</p>
-                    <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending_invoices'] }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-12 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending_invoices'] }}</p>
+                    @endif
                 </div>
                 <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
                     <flux:icon.clock class="size-6 text-orange-600 dark:text-orange-400" />
@@ -45,7 +49,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Paid Invoices</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['paid_invoices'] }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-12 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['paid_invoices'] }}</p>
+                    @endif
                 </div>
                 <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
                     <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400" />
@@ -56,8 +64,12 @@
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Invoiced</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['total_invoiced'], 2) }}</p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ $invoiceMonthLabel ?: (now()->day < 16 ? 'Last Month Invoice ('.now()->subMonth()->format('F').')' : 'This Month Invoice ('.now()->format('F').')') }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-32 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['total_invoiced'], 2) }}</p>
+                    @endif
                 </div>
                 <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3">
                     <flux:icon.document-text class="size-6 text-blue-600 dark:text-blue-400" />
@@ -67,6 +79,7 @@
     </div>
 
     <!-- Search and Filters -->
+    @if(!$isLoading)
     <div class="p-0" id="invoice-filters-section">
 
         <!-- Filters Row -->
@@ -105,6 +118,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Invoices Table -->
     <flux:card id="all-invoices-table" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
@@ -132,6 +146,23 @@
             </flux:table.columns>
 
             <flux:table.rows>
+                @if($isLoading)
+                    <flux:skeleton.group>
+                        @for($i = 0; $i < 8; $i++)
+                        <flux:table.rows>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-8 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-5 w-24 rounded-full" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-7 w-7 rounded" /></flux:table.cell>
+                        </flux:table.rows>
+                        @endfor
+                    </flux:skeleton.group>
+                @else
                 @forelse($invoices as $invoice)
                     <flux:table.rows
                         :key="$invoice->id"
@@ -229,6 +260,7 @@
                         </flux:table.cell>
                     </flux:table.rows>
                 @endforelse
+                @endif
             </flux:table.rows>
         </flux:table>
 

@@ -28,6 +28,8 @@ class Invoices extends Component
 
     public $highlightId = null;
 
+    public bool $isLoading = true;
+
     public function mount($highlight = null)
     {
         if (! $this->year) {
@@ -39,6 +41,11 @@ class Invoices extends Component
         if ($highlight) {
             $this->highlightId = $highlight;
         }
+    }
+
+    public function loadData(): void
+    {
+        $this->isLoading = false;
     }
 
     public function updatedSearch()
@@ -110,6 +117,16 @@ class Invoices extends Component
 
     public function render()
     {
+        if ($this->isLoading) {
+            return view('livewire.client.invoices', [
+                'invoices' => collect([]),
+                'stats' => ['pending_invoices' => 0, 'paid_invoices' => 0, 'total_invoiced' => 0],
+                'pagination' => ['current_page' => 1, 'per_page' => 10, 'total' => 0, 'last_page' => 1, 'from' => 0, 'to' => 0],
+                'availableYears' => collect([]),
+                'invoiceMonthLabel' => '',
+            ])->layout('components.layouts.app', ['title' => __('Invoices')]);
+        }
+
         $clabNo = auth()->user()->contractor_clab_no;
 
         if (! $clabNo) {
@@ -217,16 +234,17 @@ class Invoices extends Component
         $pendingInvoices = $allSubmissions->whereIn('status', ['draft', 'pending_payment', 'overdue'])->count();
         $paidInvoices = $allSubmissions->where('status', 'paid')->count();
 
-        // Total Invoiced: Only include submissions that have been reviewed (have admin_final_amount)
-        // Exclude drafts and submitted (under review) submissions
+        // Before 16th: show last month's invoice. From 16th onwards: show this month's.
+        $isBeforeAutoSubmit = now()->day < 16;
+        $displayDate = $isBeforeAutoSubmit ? now()->subMonth() : now();
+        $displayMonth = $displayDate->month;
+        $displayYear = $displayDate->year;
+
         $totalInvoiced = $allSubmissions
-            ->filter(function ($submission) {
-                // Only include if admin has reviewed (has admin_final_amount set)
-                return $submission->hasAdminReview();
-            })
-            ->sum(function ($submission) {
-                return $submission->total_due;
-            });
+            ->where('month', $displayMonth)
+            ->where('year', $displayYear)
+            ->filter(fn ($s) => $s->hasAdminReview())
+            ->sum(fn ($s) => $s->total_due);
 
         // Available years for filter
         $availableYears = PayrollSubmission::where('contractor_clab_no', $clabNo)
@@ -259,6 +277,7 @@ class Invoices extends Component
             'stats' => $stats,
             'pagination' => $pagination,
             'availableYears' => $availableYears,
+            'invoiceMonthLabel' => ($isBeforeAutoSubmit ? 'Last Month Invoice' : 'This Month Invoice').' ('.$displayDate->format('F').')',
         ])->layout('components.layouts.app', ['title' => __('Invoices')]);
     }
 

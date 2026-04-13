@@ -1,4 +1,4 @@
-<div id="timesheet-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto">
+<div id="timesheet-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto" wire:init="loadData">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
@@ -10,7 +10,7 @@
 
 
     <!-- Sequential Payroll Queue Notice -->
-    @if($isBlocked && count($blockReasons) > 0)
+    @if(!$isLoading && $isBlocked && count($blockReasons) > 0)
         <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-2 border-orange-200 dark:border-orange-800">
             <div class="flex items-start gap-3">
                 <flux:icon.queue-list class="size-6 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
@@ -40,13 +40,17 @@
     @endif
 
     <!-- Statistics Cards (only show for current month and when not blocked) -->
-    @if(!$targetMonth && !$targetYear && !$isBlocked)
+    @if(!$targetMonth && !$targetYear && ($isLoading || !$isBlocked))
     <div id="timesheet-stats" class="grid gap-4 md:grid-cols-4">
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Submissions</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['total_submissions'] }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-12 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['total_submissions'] }}</p>
+                    @endif
                 </div>
                 <flux:icon.document-text class="size-8 text-blue-600 dark:text-blue-400" />
             </div>
@@ -56,7 +60,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Paid</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['paid_submissions'] }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-12 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['paid_submissions'] }}</p>
+                    @endif
                 </div>
                 <flux:icon.check-circle class="size-8 text-green-600 dark:text-green-400" />
             </div>
@@ -66,7 +74,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Payment</p>
-                    <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending_submissions'] }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-12 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending_submissions'] }}</p>
+                    @endif
                 </div>
                 <flux:icon.clock class="size-8 text-orange-600 dark:text-orange-400" />
             </div>
@@ -76,7 +88,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Unsubmitted Workers</p>
-                    <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ $stats['unsubmitted_workers'] }}</p>
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-8 w-12 rounded mt-1" />
+                    @else
+                        <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ $stats['unsubmitted_workers'] }}</p>
+                    @endif
                 </div>
                 <flux:icon.users class="size-8 text-purple-600 dark:text-purple-400" />
             </div>
@@ -84,27 +100,32 @@
     </div>
     @endif
 
-    @if(!$errorMessage && !$isBlocked && !$targetMonth && !$targetYear)
+    @if(!$targetMonth && !$targetYear && ($isLoading || (!$errorMessage && !$isBlocked)))
     <!-- Current Month Info -->
     <flux:card id="current-period-info" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
         <div class="flex items-center justify-between">
             <div>
-                <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} Payroll</h3>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                    Payment deadline: <span class="font-semibold {{ $period['days_until_deadline'] < 7 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400' }}">
-                        {{ $period['deadline']->format('F d, Y') }} ({{ floor($period['days_until_deadline']) }} days remaining)
-                    </span>
-                </p>
-            </div>            
+                @if($isLoading)
+                    <flux:skeleton animate="shimmer" class="h-6 w-48 rounded mb-2" />
+                    <flux:skeleton animate="shimmer" class="h-4 w-72 rounded" />
+                @else
+                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} Payroll</h3>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        Payment deadline: <span class="font-semibold {{ $period['days_until_deadline'] < 7 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400' }}">
+                            {{ $period['deadline']->format('F d, Y') }} ({{ floor($period['days_until_deadline']) }} days remaining)
+                        </span>
+                    </p>
+                @endif
+            </div>
         </div>
     </flux:card>
     @endif
 
     <!-- Deduction Preview Section (only show for current month, not overdue months) -->
     @php
-        $activeDeductions = array_filter($applicableDeductions, fn($d) => $d['status'] === 'active');
+        $activeDeductions = !$isLoading ? array_filter($applicableDeductions, fn($d) => $d['status'] === 'active') : [];
     @endphp
-    @if(!$errorMessage && !$isBlocked && count($activeDeductions) > 0 && !$targetMonth && !$targetYear)
+    @if(!$isLoading && !$errorMessage && !$isBlocked && count($activeDeductions) > 0 && !$targetMonth && !$targetYear)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="flex items-start gap-3">
             <flux:icon.currency-dollar class="size-6 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
@@ -159,13 +180,62 @@
     @endif
 
     <!-- Payroll Entry Form -->
-    @if(!$errorMessage && !$isBlocked)
+    @if($isLoading || (!$errorMessage && !$isBlocked))
     <flux:card id="worker-verification-table" class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                @if($isLoading)
+                    <flux:skeleton animate="shimmer" class="h-6 w-64 rounded inline-block" />
+                @else
+                    {{ $period['month_name'] }} {{ $period['year'] }} - Worker Hours & Overtime
+                @endif
+            </h2>
         </div>
 
-        @if(count($workers) > 0)
+        @if($isLoading)
+            <!-- Skeleton table while loading -->
+            <div class="mb-4">
+                <flux:skeleton animate="shimmer" class="h-4 w-20 rounded" />
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                            <th class="pb-3 w-10"></th>
+                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[20%]">Worker</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[120px]">Basic Salary</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]">OT Normal (hrs)</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]">OT Rest (hrs)</th>
+                            <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[100px]">OT Public (hrs)</th>
+                            <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 w-[180px]">Transactions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                        <flux:skeleton.group>
+                            @for($i = 0; $i < 5; $i++)
+                            <tr>
+                                <td class="py-3 text-center"><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></td>
+                                <td class="py-3 pr-4">
+                                    <div class="flex items-center gap-2">
+                                        <flux:skeleton animate="shimmer" class="size-8 rounded-full flex-shrink-0" />
+                                        <div class="space-y-1">
+                                            <flux:skeleton animate="shimmer" class="h-4 w-28 rounded" />
+                                            <flux:skeleton animate="shimmer" class="h-3 w-20 rounded" />
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3 text-center"><flux:skeleton animate="shimmer" class="h-4 w-16 rounded mx-auto" /></td>
+                                <td class="py-3 text-center"><flux:skeleton animate="shimmer" class="h-4 w-10 rounded mx-auto" /></td>
+                                <td class="py-3 text-center"><flux:skeleton animate="shimmer" class="h-4 w-10 rounded mx-auto" /></td>
+                                <td class="py-3 text-center"><flux:skeleton animate="shimmer" class="h-4 w-10 rounded mx-auto" /></td>
+                                <td class="py-3"><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></td>
+                            </tr>
+                            @endfor
+                        </flux:skeleton.group>
+                    </tbody>
+                </table>
+            </div>
+        @elseif(count($workers) > 0)
             <!-- Worker Count -->
             <div class="mb-4">
                 <span class="text-sm text-zinc-600 dark:text-zinc-400">
@@ -333,6 +403,22 @@
             </flux:table.columns>
 
             <flux:table.rows>
+                @if($isLoading)
+                    <flux:skeleton.group>
+                        @for($i = 0; $i < 5; $i++)
+                        <flux:table.rows>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-24 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-8 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-5 w-20 rounded-full" /></flux:table.cell>
+                            <flux:table.cell><flux:skeleton animate="shimmer" class="h-7 w-7 rounded" /></flux:table.cell>
+                        </flux:table.rows>
+                        @endfor
+                    </flux:skeleton.group>
+                @else
                 @forelse($recentSubmissions as $submission)
                     <flux:table.rows :key="$submission->id">
                         <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
@@ -401,6 +487,7 @@
                         </flux:table.cell>
                     </flux:table.rows>
                 @endforelse
+                @endif
             </flux:table.rows>
         </flux:table>
     </flux:card>

@@ -20,7 +20,7 @@
                         <div>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Submissions</p>
                             @if($isLoadingStats)
-                                <div class="h-8 w-16 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                                <flux:skeleton animate="shimmer" class="h-8 w-16 rounded" />
                             @else
                                 <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['clients_without_submission'] }}</p>
                             @endif
@@ -31,7 +31,7 @@
                     </div>
                     <div class="flex items-center gap-2 text-xs">
                         @if($isLoadingStats)
-                            <div class="h-4 w-32 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                            <flux:skeleton animate="shimmer" class="h-4 w-32 rounded" />
                         @else
                             <span class="text-zinc-600 dark:text-zinc-400">{{ $stats['clients_with_submission_count'] }} of {{ $stats['total_clients'] }} submitted</span>
                         @endif
@@ -45,7 +45,7 @@
                     <div>
                         <p class="text-sm text-zinc-600 dark:text-zinc-400">Active Workers</p>
                         @if($isLoadingStats)
-                            <div class="h-8 w-16 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                            <flux:skeleton animate="shimmer" class="h-8 w-16 rounded" />
                         @else
                             <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['active_workers'] }}</p>
                         @endif
@@ -56,24 +56,38 @@
                 </div>
                 <div class="flex items-center gap-2 text-xs">
                     @if($isLoadingStats)
-                        <div class="h-4 w-24 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                        <flux:skeleton animate="shimmer" class="h-4 w-24 rounded" />
                     @else
-                        <span class="text-green-600 dark:text-green-400">+{{ $stats['workers_growth'] }}</span>
+                        @if($stats['workers_growth'] > 0)
+                            <span class="text-green-600 dark:text-green-400">+{{ $stats['workers_growth'] }} workers</span>
+                        @elseif($stats['workers_growth'] < 0)
+                            <span class="text-red-600 dark:text-red-400">{{ $stats['workers_growth'] }} workers</span>
+                        @else
+                            <span class="text-zinc-500 dark:text-zinc-400">no change</span>
+                        @endif
                         <span class="text-zinc-600 dark:text-zinc-400">from last month</span>
                     @endif
                 </div>
             </flux:card>
 
-            <!-- This Month Payments -->
+            <!-- This Month / Last Month Payments (switches on the 16th) -->
             <a href="{{ route('payroll') }}" wire:navigate>
                 <flux:card class="space-y-2 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg cursor-pointer transition-[transform,box-shadow] duration-300 ease-in-out hover:scale-103 hover:shadow-lg">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400">This Month Payments</p>
-                            @if($isLoadingStats)
-                                <div class="h-8 w-24 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                            @if(now()->day >= 16)
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400">This Month Payments</p>
                             @else
-                                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['this_month_payments']) }}</p>
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400">Last Month Payments</p>
+                            @endif
+                            @if($isLoadingStats)
+                                <flux:skeleton animate="shimmer" class="h-8 w-24 rounded" />
+                            @else
+                                @if(now()->day >= 16)
+                                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['this_month_payments']) }}</p>
+                                @else
+                                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['last_month_payments']) }}</p>
+                                @endif
                             @endif
                         </div>
                         <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-3">
@@ -82,7 +96,7 @@
                     </div>
                     <div class="flex items-center gap-2 text-xs">
                         @if($isLoadingStats)
-                            <div class="h-4 w-28 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                            <flux:skeleton animate="shimmer" class="h-4 w-28 rounded" />
                         @else
                             <span class="text-green-600 dark:text-green-400">+{{ $stats['payments_growth'] }}%</span>
                             <span class="text-zinc-600 dark:text-zinc-400">from last month</span>
@@ -97,7 +111,7 @@
                     <div>
                         <p class="text-sm text-zinc-600 dark:text-zinc-400">Outstanding Balance</p>
                         @if($isLoadingStats)
-                            <div class="h-8 w-24 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
+                            <flux:skeleton animate="shimmer" class="h-8 w-24 rounded" />
                         @else
                             <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['outstanding_balance']) }}</p>
                         @endif
@@ -122,16 +136,15 @@
                 </div>
 
                 @if($isLoadingRecentPayments)
-                    <!-- Loading skeleton -->
-                    <div class="space-y-3">
+                    <flux:skeleton.group animate="shimmer" class="space-y-3">
                         @for($i = 0; $i < 5; $i++)
                             <div class="flex items-center gap-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-                                <div class="h-4 w-32 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
-                                <div class="h-4 w-20 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse"></div>
-                                <div class="h-5 w-16 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse"></div>
+                                <flux:skeleton class="h-4 w-32 rounded" />
+                                <flux:skeleton class="h-4 w-20 rounded" />
+                                <flux:skeleton class="h-5 w-16 rounded-full" />
                             </div>
                         @endfor
-                    </div>
+                    </flux:skeleton.group>
                 @elseif(count($recentPayments) > 0)
                     <!-- Mobile: card list -->
                     <div class="sm:hidden space-y-3">
@@ -216,17 +229,27 @@
                 <flux:card class="p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg">
                     <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Alerts</h2>
                     <div class="space-y-3">
-                        <div class="flex gap-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 p-3">
-                            <flux:icon.exclamation-triangle class="size-5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
-                            <div>
-                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Outstanding Balance</p>
-                                @if($isLoadingStats)
-                                    <div class="h-4 w-32 bg-orange-200 dark:bg-orange-800/50 rounded animate-pulse mt-1"></div>
-                                @else
-                                    <p class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($stats['outstanding_balance']) }} in unpaid invoices</p>
-                                @endif
+                        @if(now()->day >= 16)
+                            <div class="flex gap-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 p-3">
+                                <flux:icon.exclamation-triangle class="size-5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+                                <div>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Outstanding Balance</p>
+                                    @if($isLoadingStats)
+                                        <flux:skeleton animate="shimmer" class="h-4 w-32 rounded mt-1" />
+                                    @else
+                                        <p class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($stats['outstanding_balance']) }} in unpaid invoices</p>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
+                        @else
+                            <div class="flex gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 p-3">
+                                <flux:icon.clock class="size-5 flex-shrink-0 text-zinc-400 dark:text-zinc-500" />
+                                <div>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Outstanding Balance</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Available from the 16th once auto-submit runs</p>
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="flex gap-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
                             <flux:icon.information-circle class="size-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
@@ -276,13 +299,7 @@
                 </div>
 
                 @if($isLoadingCharts)
-                    <!-- Loading skeleton for chart -->
-                    <div class="relative h-64 flex items-center justify-center">
-                        <div class="text-center">
-                            <div class="inline-block h-24 w-24 rounded-full border-8 border-zinc-200 dark:border-zinc-700 border-t-blue-500 animate-spin"></div>
-                            <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">Loading chart data...</p>
-                        </div>
-                    </div>
+                    <flux:skeleton animate="shimmer" class="h-64 w-full rounded-lg" />
                 @else
                     <div id="chartDataContainer"
                         data-chart-labels='@json($contractorStatusChartData["labels"])'
@@ -312,13 +329,7 @@
                     <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Last 6 months payment trends</p>
                 </div>
                 @if($isLoadingCharts)
-                    <!-- Loading skeleton for chart -->
-                    <div class="relative h-64 flex items-center justify-center">
-                        <div class="text-center">
-                            <div class="inline-block h-24 w-24 rounded-full border-8 border-zinc-200 dark:border-zinc-700 border-t-purple-500 animate-spin"></div>
-                            <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">Loading chart data...</p>
-                        </div>
-                    </div>
+                    <flux:skeleton animate="shimmer" class="h-64 w-full rounded-lg" />
                 @else
                     <!-- Data container for Payment Overview chart -->
                     <div id="paymentChartDataContainer"

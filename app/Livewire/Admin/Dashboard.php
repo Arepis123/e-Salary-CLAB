@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\ContractWorker;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
@@ -59,6 +60,7 @@ class Dashboard extends Component
             'clients_with_submission_count' => 0,
             'active_workers' => 0,
             'this_month_payments' => 0,
+            'last_month_payments' => 0,
             'outstanding_balance' => 0,
             'workers_growth' => 0,
             'payments_growth' => 0,
@@ -118,9 +120,25 @@ class Dashboard extends Component
         $currentYear = now()->year;
         $lastMonth = now()->subMonth()->month;
         $lastMonthYear = now()->subMonth()->year;
+        $twoMonthsAgoMonth = now()->subMonths(2)->month;
+        $twoMonthsAgoYear = now()->subMonths(2)->year;
 
-        // Get all clients
-        $allClients = User::where('role', 'client')->get();
+        // Before the 16th, the current month has no submissions yet.
+        // Use last month as "current" and two months ago as "previous" for comparisons.
+        $isBeforeAutoSubmit = now()->day < 16;
+        [$displayMonth, $displayYear, $prevMonth, $prevYear] = $isBeforeAutoSubmit
+            ? [$lastMonth, $lastMonthYear, $twoMonthsAgoMonth, $twoMonthsAgoYear]
+            : [$currentMonth, $currentYear, $lastMonth, $lastMonthYear];
+
+        // Get clients that have at least one active worker
+        $activeClabNos = ContractWorker::active()
+            ->distinct('con_ctr_clab_no')
+            ->pluck('con_ctr_clab_no')
+            ->toArray();
+
+        $allClients = User::where('role', 'client')
+            ->whereIn('contractor_clab_no', $activeClabNos)
+            ->get();
         $totalClients = $allClients->count();
 
         // Get clients who have submitted for current month (exclude drafts)
@@ -140,8 +158,18 @@ class Dashboard extends Component
             ->distinct('contractor_clab_no')
             ->count();
 
-        // Active workers (unique workers from all submissions)
-        $activeWorkers = PayrollWorker::distinct('worker_id')->count('worker_id');
+        // Active workers — use display period (last month before 16th, current month after)
+        $activeWorkers = PayrollWorker::whereHas('submission', function ($q) use ($displayMonth, $displayYear) {
+            $q->where('month', $displayMonth)->where('year', $displayYear);
+        })->distinct('worker_id')->count('worker_id');
+
+        // Active workers in the previous period for net change comparison
+        $activeWorkersPrev = PayrollWorker::whereHas('submission', function ($q) use ($prevMonth, $prevYear) {
+            $q->where('month', $prevMonth)->where('year', $prevYear);
+        })->distinct('worker_id')->count('worker_id');
+
+        // Net change
+        $workersGrowth = $activeWorkers - $activeWorkersPrev;
 
         // This month payments
         $thisMonthPayments = PayrollPayment::where('status', 'completed')
@@ -155,8 +183,11 @@ class Dashboard extends Component
             ->sum('amount');
 
         // Outstanding balance (approved + pending + overdue submissions)
+        // Only count from the 16th onwards — early submissions are not allowed,
+        // so all legitimate submissions will always have submitted_at on day 16+.
         // Use total_due accessor to include penalty calculation
         $outstandingSubmissions = PayrollSubmission::whereIn('status', ['approved', 'pending_payment', 'overdue'])
+            ->whereRaw('DAY(submitted_at) >= 16')
             ->get();
 
         $outstandingBalance = $outstandingSubmissions->sum(function ($submission) {
@@ -174,8 +205,9 @@ class Dashboard extends Component
             'clients_with_submission_count' => $clientsWithSubmission->count(),
             'active_workers' => $activeWorkers,
             'this_month_payments' => $thisMonthPayments,
+            'last_month_payments' => $lastMonthPayments,
             'outstanding_balance' => $outstandingBalance,
-            'workers_growth' => 0, // TODO: Track worker growth over time
+            'workers_growth' => $workersGrowth,
             'payments_growth' => $paymentsGrowth,
         ];
     }
@@ -262,8 +294,15 @@ class Dashboard extends Component
         $month = $this->selectedMonth;
         $year = $this->selectedYear;
 
-        // Get all contractors
-        $allContractors = User::where('role', 'client')->get();
+        // Get contractors that have at least one active worker
+        $activeClabNos = ContractWorker::active()
+            ->distinct('con_ctr_clab_no')
+            ->pluck('con_ctr_clab_no')
+            ->toArray();
+
+        $allContractors = User::where('role', 'client')
+            ->whereIn('contractor_clab_no', $activeClabNos)
+            ->get();
         $totalContractors = $allContractors->count();
 
         // Contractors who submitted and paid
@@ -352,7 +391,13 @@ class Dashboard extends Component
                 ->unique()
                 ->toArray();
 
+            $activeClabNos = ContractWorker::active()
+                ->distinct('con_ctr_clab_no')
+                ->pluck('con_ctr_clab_no')
+                ->toArray();
+
             $notSubmitted = User::where('role', 'client')
+                ->whereIn('contractor_clab_no', $activeClabNos)
                 ->whereNotIn('contractor_clab_no', $allSubmittedClabNos)
                 ->orderBy('name')
                 ->get();

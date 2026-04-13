@@ -69,7 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         if (in_array(auth()->user()->role, ['admin', 'super_admin', 'finance'])) {
             return view('admin.dashboard');
         } elseif (auth()->user()->role === 'client') {
-            return app(\App\Http\Controllers\Client\DashboardController::class)->index($request);
+            return view('client.dashboard');
         }
         abort(403);
     })->name('dashboard');

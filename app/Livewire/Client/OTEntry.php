@@ -57,6 +57,8 @@ class OTEntry extends Component
 
     public string $autoSaveStatus = ''; // '', 'saved', 'error'
 
+    public bool $isLoading = true;
+
     protected $otEntryService;
 
     public function boot(OTEntryService $otEntryService)
@@ -66,6 +68,17 @@ class OTEntry extends Component
 
     public function mount()
     {
+        // Initialize safe defaults — initializeData() runs via wire:init
+        $this->period = [
+            'entry_month_name' => now()->subMonth()->format('F Y'),
+            'submission_month_name' => now()->format('F Y'),
+            'window_end' => now()->endOfMonth(),
+            'days_remaining' => 0,
+        ];
+    }
+
+    public function initializeData(): void
+    {
         $clabNo = auth()->user()->contractor_clab_no;
 
         if (! $clabNo) {
@@ -74,8 +87,9 @@ class OTEntry extends Component
                 heading: 'Error',
                 text: 'No contractor CLAB number assigned to your account.'
             );
+            $this->isLoading = false;
 
-            return redirect()->route('dashboard');
+            return;
         }
 
         // Get entry period information
@@ -90,6 +104,8 @@ class OTEntry extends Component
         // Check submission status
         $this->hasSubmitted = $this->otEntryService->hasSubmittedEntries($clabNo);
         $this->submissionStatus = $this->otEntryService->getSubmissionStatus($clabNo);
+
+        $this->isLoading = false;
     }
 
     public function loadEntries()

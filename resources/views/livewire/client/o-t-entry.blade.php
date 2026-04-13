@@ -1,4 +1,4 @@
-<div id="ot-entry-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto">
+<div id="ot-entry-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto" wire:init="initializeData">
         <!-- Page Header -->
         <div class="flex items-center justify-between">
             <div>
@@ -9,7 +9,7 @@
             </div>
             <div class="flex gap-2">
                 <x-tutorial-button page="ot-entry" />
-                @if($isWithinWindow && !$hasSubmitted)
+                @if(!$isLoading && $isWithinWindow && !$hasSubmitted)
                     <flux:button id="download-template-btn" wire:click="downloadTemplate" variant="outline" icon="arrow-down-tray" size="sm">
                         Download Template
                     </flux:button>
@@ -23,6 +23,20 @@
         <!-- Entry Window Status Card -->
         <flux:card id="entry-window-status" class="p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
+                @if($isLoading)
+                    <div class="flex items-center gap-4">
+                        <flux:skeleton animate="shimmer" class="size-12 rounded-full flex-shrink-0" />
+                        <div class="space-y-2">
+                            <flux:skeleton animate="shimmer" class="h-5 w-40 rounded" />
+                            <flux:skeleton animate="shimmer" class="h-4 w-56 rounded" />
+                            <flux:skeleton animate="shimmer" class="h-3 w-48 rounded" />
+                        </div>
+                    </div>
+                    <div class="text-right space-y-1">
+                        <flux:skeleton animate="shimmer" class="h-9 w-10 rounded ml-auto" />
+                        <flux:skeleton animate="shimmer" class="h-3 w-20 rounded" />
+                    </div>
+                @else
                 <div class="flex items-center gap-4">
                     @if($isWithinWindow)
                         <flux:icon.check-circle class="size-12 text-green-600 dark:text-green-400" />
@@ -59,11 +73,12 @@
                         </div>
                     </div>
                 @endif
+                @endif
             </div>
         </flux:card>
 
         <!-- Submission Status -->
-        @if($hasSubmitted)
+        @if(!$isLoading && $hasSubmitted)
             <flux:callout icon="check-circle" color="emerald">
                 <flux:callout.heading>Entries Submitted</flux:callout.heading>
                 <flux:callout.text>
@@ -79,11 +94,51 @@
         <flux:card id="ot-entry-table" class="p-6 dark:bg-zinc-900 rounded-lg">
             <div class="mb-4">
                 <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                    Overtime Hours for {{ $period['entry_month_name'] }}
+                    @if($isLoading)
+                        <flux:skeleton animate="shimmer" class="h-6 w-56 rounded inline-block" />
+                    @else
+                        Overtime Hours for {{ $period['entry_month_name'] }}
+                    @endif
                 </h3>
             </div>
 
-            @if(count($entries) === 0)
+            @if($isLoading)
+                <!-- Skeleton table -->
+                <div class="overflow-x-auto">
+                    <flux:table>
+                        <flux:table.columns>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
+                            <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker ID</span></flux:table.column>
+                            <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker Name</span></flux:table.column>
+                            <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport</span></flux:table.column>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weekday OT<br>(Hours)</span></flux:table.column>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span></flux:table.column>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span></flux:table.column>
+                            <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span></flux:table.column>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
+                        </flux:table.columns>
+                        <flux:table.rows>
+                            <flux:skeleton.group>
+                                @for($i = 0; $i < 6; $i++)
+                                <flux:table.rows>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></flux:table.cell>
+                                    <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                                    <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-28 rounded" /></flux:table.cell>
+                                    <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
+                                    <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-7 w-16 rounded" /></flux:table.cell>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-5 w-14 rounded-full" /></flux:table.cell>
+                                </flux:table.rows>
+                                @endfor
+                            </flux:skeleton.group>
+                        </flux:table.rows>
+                    </flux:table>
+                </div>
+            @elseif(count($entries) === 0)
                 <div class="text-center py-12">
                     <flux:icon.users class="size-16 mx-auto text-zinc-400 dark:text-zinc-600 mb-4" />
                     <p class="text-zinc-600 dark:text-zinc-400">No workers found</p>
