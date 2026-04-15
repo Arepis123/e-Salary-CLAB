@@ -14,6 +14,15 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**
+     * The model's default attribute values.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'tutorial_completed' => '{}',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>

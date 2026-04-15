@@ -262,7 +262,9 @@
                                                         @if($txn['type'] === 'allowance')
                                                             +RM {{ number_format($txn['amount'], 2) }}
                                                         @elseif($txn['type'] === 'backpay')
-                                                            +RM {{ number_format($txn['amount'], 2) }}                                                            
+                                                            +RM {{ number_format($txn['amount'], 2) }}
+                                                        @elseif($txn['type'] === 'medical_claim')
+                                                            +RM {{ number_format($txn['amount'], 2) }}
                                                         @elseif($txn['type'] === 'npl')
                                                             {{ $txn['amount'] }} {{ $txn['amount'] == 1 ? 'day' : 'days' }} (NPL)
                                                         @else
