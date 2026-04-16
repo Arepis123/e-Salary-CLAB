@@ -230,7 +230,8 @@ class MissingSubmissions extends Component
                     $otEntryMonth = 12;
                     $otEntryYear--;
                 }
-                $otEntries = MonthlyOTEntry::where('contractor_clab_no', $clabNo)
+                $otEntries = MonthlyOTEntry::with('transactions')
+                    ->where('contractor_clab_no', $clabNo)
                     ->where('entry_month', $otEntryMonth)
                     ->where('entry_year', $otEntryYear)
                     ->whereIn('status', ['submitted', 'locked'])
@@ -272,6 +273,17 @@ class MissingSubmissions extends Component
                         $payrollWorker->payroll_submission_id = $existingSubmission->id;
                         $payrollWorker->calculateSalary(0);
                         $payrollWorker->save();
+
+                        if ($otEntry && $otEntry->transactions) {
+                            foreach ($otEntry->transactions as $txn) {
+                                $payrollWorker->transactions()->create([
+                                    'type'    => $txn->type,
+                                    'amount'  => $txn->amount,
+                                    'remarks' => $txn->remarks,
+                                ]);
+                            }
+                        }
+
                         $addedAmount += $payrollWorker->total_payment;
                     }
 
@@ -354,6 +366,17 @@ class MissingSubmissions extends Component
                     $payrollWorker->payroll_submission_id = $submission->id;
                     $payrollWorker->calculateSalary(0);
                     $payrollWorker->save();
+
+                    if ($otEntry && $otEntry->transactions) {
+                        foreach ($otEntry->transactions as $txn) {
+                            $payrollWorker->transactions()->create([
+                                'type'    => $txn->type,
+                                'amount'  => $txn->amount,
+                                'remarks' => $txn->remarks,
+                            ]);
+                        }
+                    }
+
                     $totalAmount += $payrollWorker->total_payment;
                 }
 
@@ -1118,11 +1141,13 @@ class MissingSubmissions extends Component
 
     public function getFilteredContractorsProperty()
     {
+        $contractors = collect($this->missingContractors);
+
         if ($this->activeTab === 'not_paid') {
-            return $this->missingContractors->filter(fn ($c) => $c['submitted_not_paid'] > 0)->values();
+            return $contractors->filter(fn ($c) => $c['submitted_not_paid'] > 0)->values();
         }
 
-        return $this->missingContractors->filter(fn ($c) => $c['not_submitted'] > 0)->values();
+        return $contractors->filter(fn ($c) => $c['not_submitted'] > 0)->values();
     }
 
     public function getMissingPaginatedProperty()

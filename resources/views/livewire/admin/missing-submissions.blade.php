@@ -136,8 +136,8 @@
 
     <!-- Contractors List with Tabs -->
     @php
-        $notSubmittedCount = $missingContractors->filter(fn($c) => $c['not_submitted'] > 0)->count();
-        $notPaidCount = $missingContractors->filter(fn($c) => $c['submitted_not_paid'] > 0)->count();
+        $notSubmittedCount = collect($missingContractors)->filter(fn($c) => $c['not_submitted'] > 0)->count();
+        $notPaidCount = collect($missingContractors)->filter(fn($c) => $c['submitted_not_paid'] > 0)->count();
     @endphp
 
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
@@ -162,7 +162,7 @@
         </div>
 
         <flux:tab.group>
-            <flux:tabs wire:model="activeTab" class="mb-4">
+            <flux:tabs wire:model.live="activeTab" class="mb-4">
                 <flux:tab name="not_submitted" icon="x-circle">
                     Not Submit
                     @if($notSubmittedCount > 0)
