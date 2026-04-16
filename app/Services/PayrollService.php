@@ -311,7 +311,7 @@ class PayrollService
      * Apply all enabled deductions for this contractor and month
      * Applies both contractor-level (all workers) and worker-level (specific workers) deductions
      */
-    protected function applyConfiguredDeductions(PayrollSubmission $submission): void
+    public function applyConfiguredDeductions(PayrollSubmission $submission): void
     {
         $configService = app(\App\Services\ContractorConfigurationService::class);
         $workerDeductionService = app(\App\Services\WorkerDeductionService::class);

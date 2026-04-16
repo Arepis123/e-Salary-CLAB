@@ -8,7 +8,7 @@
  *   2. Auto-submit timesheets for contractors who haven't submitted  (payroll:auto-submit)
  *
  * Usage (set this as a cron job on the server):
- *   0 0 16 * * php /path/to/e-payroll/run-monthly-autosubmit.php >> /path/to/e-payroll/storage/logs/autosubmit-cron.log 2>&1
+ *   1 16 15 * * php /path/to/e-payroll/run-monthly-autosubmit.php >> /path/to/e-payroll/storage/logs/autosubmit-cron.log 2>&1
  *
  * Or with a dry run (safe preview, no changes made):
  *   php run-monthly-autosubmit.php --dry-run
@@ -67,10 +67,10 @@ $dryRun = in_array('--dry-run', $args, true);
 // Gate: only run on the 16th (unless --force is passed)
 // --------------------------------------------------------------------------
 
-$today = (int) date('j');   // Day of month without leading zero
-
-if ($today !== 16 && !$force) {
-    log_line("Skipped: today is the {$today}th, not the 16th. Use --force to override.");
+$today = (int) date('j');   // Day of month without leading zero (server UTC)
+// Server is UTC; 16th 12:01 AM MYT (UTC+8) = 15th 16:01 UTC
+if ($today !== 15 && !$force) {
+    log_line("Skipped: today is the {$today}th, not the 15th (UTC). Use --force to override.");
     exit(0);
 }
 

@@ -134,8 +134,12 @@
     </flux:card>
     @endif
 
-    <!-- Contractors Without Submission Table -->
-    @if($missingContractors->count() > 0)
+    <!-- Contractors List with Tabs -->
+    @php
+        $notSubmittedCount = $missingContractors->filter(fn($c) => $c['not_submitted'] > 0)->count();
+        $notPaidCount = $missingContractors->filter(fn($c) => $c['submitted_not_paid'] > 0)->count();
+    @endphp
+
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
             <div>
@@ -148,129 +152,194 @@
                 <flux:button variant="ghost" size="sm" icon="arrow-path" icon-variant="outline" wire:click="refresh">
                     Refresh
                 </flux:button>
-                @if($missingContractors->count() > 0)
-                    <flux:button variant="ghost" size="sm" icon="arrow-down-tray" icon-variant="outline" wire:click="exportCurrentPeriodDetailed">
-                        Export Details
-                    </flux:button>
-                    <flux:button variant="ghost" size="sm" icon="document-text" icon-variant="outline" wire:click="export">
-                        Export Summary
-                    </flux:button>
-                @endif
+                <flux:button variant="ghost" size="sm" icon="arrow-down-tray" icon-variant="outline" wire:click="exportCurrentPeriodDetailed">
+                    Export Details
+                </flux:button>
+                <flux:button variant="ghost" size="sm" icon="document-text" icon-variant="outline" wire:click="export">
+                    Export Summary
+                </flux:button>
             </div>
         </div>
 
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
-                <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</span></flux:table.column>
-                <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor Name</span></flux:table.column>
-                <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contact</span></flux:table.column>
-                <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Active Workers</span></flux:table.column>
-                <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Reminders Sent</span></flux:table.column>
-                <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
-            </flux:table.columns>
+        <flux:tab.group>
+            <flux:tabs wire:model="activeTab" class="mb-4">
+                <flux:tab name="not_submitted" icon="x-circle">
+                    Not Submit
+                    @if($notSubmittedCount > 0)
+                        <flux:badge color="red" size="sm" inset="top bottom" class="ml-1">{{ $notSubmittedCount }}</flux:badge>
+                    @endif
+                </flux:tab>
+                <flux:tab name="not_paid" icon="banknotes">
+                    Not Paid
+                    @if($notPaidCount > 0)
+                        <flux:badge color="amber" size="sm" inset="top bottom" class="ml-1">{{ $notPaidCount }}</flux:badge>
+                    @endif
+                </flux:tab>
+            </flux:tabs>
 
-            <flux:table.rows>
-                @foreach($this->missingPaginated as $index => $contractor)
-                    <flux:table.rows :key="$contractor['clab_no']">
-                        <flux:table.cell align="center">{{ $this->missingPagination['from'] + $index }}</flux:table.cell>
-
-                        <flux:table.cell variant="strong">
-                            {{ $contractor['clab_no'] }}
-                        </flux:table.cell>
-
-                        <flux:table.cell variant="strong">
-                            {{ $contractor['name'] }}
-                        </flux:table.cell>
-
-                        <flux:table.cell>
-                            <div class="text-sm">
-                                @if($contractor['email'])
-                                    @php
-                                        // Extract first email if multiple emails separated by comma or semicolon
-                                        $firstEmail = trim(preg_split('/[,;]/', $contractor['email'])[0]);
-                                    @endphp
-                                    <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                                        <flux:icon.envelope class="size-3 me-1" />
-                                        <span>{{ $firstEmail }}</span>
+            {{-- Tab 1: Not Submit --}}
+            <flux:tab.panel name="not_submitted">
+                @if($notSubmittedCount > 0)
+                <flux:table>
+                    <flux:table.columns>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor Name</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Contact</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Not Submitted</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Reminders Sent</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
+                    </flux:table.columns>
+                    <flux:table.rows>
+                        @foreach($this->missingPaginated as $index => $contractor)
+                            <flux:table.rows :key="$contractor['clab_no']">
+                                <flux:table.cell align="center">{{ $this->missingPagination['from'] + $index }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
+                                <flux:table.cell>
+                                    <div class="text-sm">
+                                        @if($contractor['email'])
+                                            @php $firstEmail = trim(preg_split('/[,;]/', $contractor['email'])[0]); @endphp
+                                            <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
+                                                <flux:icon.envelope class="size-3 me-1" />
+                                                <span>{{ $firstEmail }}</span>
+                                            </div>
+                                        @endif
+                                        @if($contractor['phone'])
+                                            <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 mt-1">
+                                                <flux:icon.phone class="size-3 me-1" />
+                                                <span>{{ $contractor['phone'] }}</span>
+                                            </div>
+                                        @endif
+                                        @if(!$contractor['email'] && !$contractor['phone'])
+                                            <span class="text-zinc-400 dark:text-zinc-500">No contact info</span>
+                                        @endif
                                     </div>
-                                @endif
-                                @if($contractor['phone'])
-                                    <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 mt-1">
-                                        <flux:icon.phone class="size-3 me-1" />
-                                        <span>{{ $contractor['phone'] }}</span>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <flux:badge color="red" size="sm" inset="top bottom">
+                                            {{ $contractor['not_submitted'] }} of {{ $contractor['total_workers'] }} workers
+                                        </flux:badge>
                                     </div>
-                                @endif
-                                @if(!$contractor['email'] && !$contractor['phone'])
-                                    <span class="text-zinc-400 dark:text-zinc-500">No contact info</span>
-                                @endif
-                            </div>
-                        </flux:table.cell>
-
-                        <flux:table.cell align="center">
-                            <div class="flex flex-col items-center gap-1">
-                                <flux:badge color="orange" size="sm" inset="top bottom">
-                                    {{ $contractor['active_workers'] }} of {{ $contractor['total_workers'] }} with issues
-                                </flux:badge>
-                                <div class="flex flex-col gap-0.5 text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                    @if($contractor['not_submitted'] > 0)
-                                        <span class="text-red-600 dark:text-red-400">
-                                            {{ $contractor['not_submitted'] }} not submitted
-                                        </span>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    @if($contractor['reminders_sent'] > 0)
+                                        <flux:badge color="blue" size="sm" inset="top bottom">
+                                            {{ $contractor['reminders_sent'] }} {{ Str::plural('time', $contractor['reminders_sent']) }}
+                                        </flux:badge>
+                                    @else
+                                        <flux:badge color="zinc" size="sm" inset="top bottom">No reminders</flux:badge>
                                     @endif
-                                    @if($contractor['submitted_not_paid'] > 0)
-                                        <span class="text-amber-600 dark:text-amber-400">
-                                            {{ $contractor['submitted_not_paid'] }} not paid
-                                        </span>
-                                    @endif
-                                    @if($contractor['total_workers'] - $contractor['active_workers'] > 0)
-                                        <span class="text-green-600 dark:text-green-400">
-                                            {{ $contractor['total_workers'] - $contractor['active_workers'] }} completed
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
-                        </flux:table.cell>
-
-                        <flux:table.cell align="center">
-                            <div class="flex flex-col items-center gap-1">
-                                @if($contractor['reminders_sent'] > 0)
-                                    <flux:badge color="blue" size="sm" inset="top bottom">
-                                        {{ $contractor['reminders_sent'] }} {{ Str::plural('time', $contractor['reminders_sent']) }}
-                                    </flux:badge>
-                                    <span class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                        This period
-                                    </span>
-                                @else
-                                    <flux:badge color="zinc" size="sm" inset="top bottom">
-                                        No reminders
-                                    </flux:badge>
-                                @endif
-                            </div>
-                        </flux:table.cell>
-
-                        <flux:table.cell align="center">
-                            <flux:dropdown align="end">
-                                <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" icon-variant="micro" inset="top bottom"></flux:button>
-
-                                <flux:menu>
-                                    <flux:menu.item icon="bell" wire:click="openRemindModal('{{ $contractor['clab_no'] }}')">
-                                        Send Reminder
-                                    </flux:menu.item>
-                                    <flux:menu.item icon="paper-airplane" wire:click="openBulkSubmitModal('{{ $contractor['clab_no'] }}')">
-                                        Submit on Behalf
-                                    </flux:menu.item>
-                                    <flux:menu.separator />
-                                    <flux:menu.item icon="eye" href="{{ route('missing-submissions.detail', $contractor['clab_no']) }}" wire:navigate>
-                                        View Details
-                                    </flux:menu.item>
-                                </flux:menu>
-                            </flux:dropdown>
-                        </flux:table.cell>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <flux:dropdown align="end">
+                                        <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" icon-variant="micro" inset="top bottom"></flux:button>
+                                        <flux:menu>
+                                            <flux:menu.item icon="bell" wire:click="openRemindModal('{{ $contractor['clab_no'] }}')">Send Reminder</flux:menu.item>
+                                            <flux:menu.item icon="paper-airplane" wire:click="openBulkSubmitModal('{{ $contractor['clab_no'] }}')">Submit on Behalf</flux:menu.item>
+                                            <flux:menu.separator />
+                                            <flux:menu.item icon="eye" href="{{ route('missing-submissions.detail', $contractor['clab_no']) }}" wire:navigate>View Details</flux:menu.item>
+                                        </flux:menu>
+                                    </flux:dropdown>
+                                </flux:table.cell>
+                            </flux:table.rows>
+                        @endforeach
                     </flux:table.rows>
-                @endforeach
-            </flux:table.rows>
-        </flux:table>
+                </flux:table>
+                @else
+                <div class="py-12 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
+                            <flux:icon.check-circle class="size-10 text-green-600 dark:text-green-400" />
+                        </div>
+                        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">All contractors have submitted for this period.</p>
+                    </div>
+                </div>
+                @endif
+            </flux:tab.panel>
+
+            {{-- Tab 2: Not Paid --}}
+            <flux:tab.panel name="not_paid">
+                @if($notPaidCount > 0)
+                <flux:table>
+                    <flux:table.columns>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor Name</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Contact</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Not Paid</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Reminders Sent</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
+                    </flux:table.columns>
+                    <flux:table.rows>
+                        @foreach($this->missingPaginated as $index => $contractor)
+                            <flux:table.rows :key="$contractor['clab_no']">
+                                <flux:table.cell align="center">{{ $this->missingPagination['from'] + $index }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
+                                <flux:table.cell>
+                                    <div class="text-sm">
+                                        @if($contractor['email'])
+                                            @php $firstEmail = trim(preg_split('/[,;]/', $contractor['email'])[0]); @endphp
+                                            <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
+                                                <flux:icon.envelope class="size-3 me-1" />
+                                                <span>{{ $firstEmail }}</span>
+                                            </div>
+                                        @endif
+                                        @if($contractor['phone'])
+                                            <div class="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 mt-1">
+                                                <flux:icon.phone class="size-3 me-1" />
+                                                <span>{{ $contractor['phone'] }}</span>
+                                            </div>
+                                        @endif
+                                        @if(!$contractor['email'] && !$contractor['phone'])
+                                            <span class="text-zinc-400 dark:text-zinc-500">No contact info</span>
+                                        @endif
+                                    </div>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <flux:badge color="amber" size="sm" inset="top bottom">
+                                            {{ $contractor['submitted_not_paid'] }} of {{ $contractor['total_workers'] }} workers
+                                        </flux:badge>
+                                    </div>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    @if($contractor['reminders_sent'] > 0)
+                                        <flux:badge color="blue" size="sm" inset="top bottom">
+                                            {{ $contractor['reminders_sent'] }} {{ Str::plural('time', $contractor['reminders_sent']) }}
+                                        </flux:badge>
+                                    @else
+                                        <flux:badge color="zinc" size="sm" inset="top bottom">No reminders</flux:badge>
+                                    @endif
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <flux:dropdown align="end">
+                                        <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" icon-variant="micro" inset="top bottom"></flux:button>
+                                        <flux:menu>
+                                            <flux:menu.item icon="bell" wire:click="openRemindModal('{{ $contractor['clab_no'] }}')">Send Reminder</flux:menu.item>
+                                            <flux:menu.separator />
+                                            <flux:menu.item icon="eye" href="{{ route('missing-submissions.detail', $contractor['clab_no']) }}" wire:navigate>View Details</flux:menu.item>
+                                        </flux:menu>
+                                    </flux:dropdown>
+                                </flux:table.cell>
+                            </flux:table.rows>
+                        @endforeach
+                    </flux:table.rows>
+                </flux:table>
+                @else
+                <div class="py-12 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
+                            <flux:icon.check-circle class="size-10 text-green-600 dark:text-green-400" />
+                        </div>
+                        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">All submitted contractors have completed payment for this period.</p>
+                    </div>
+                </div>
+                @endif
+            </flux:tab.panel>
+        </flux:tab.group>
 
         <!-- Pagination -->
         @if($this->missingPagination['total'] > $currentPerPage)
@@ -281,30 +350,20 @@
             <div class="flex gap-2">
                 <flux:button
                     wire:click="$set('currentPage', {{ $this->missingPagination['current_page'] - 1 }})"
-                    variant="ghost"
-                    size="sm"
-                    icon="chevron-left"
-                    icon-variant="micro"
+                    variant="ghost" size="sm" icon="chevron-left" icon-variant="micro"
                     :disabled="$this->missingPagination['current_page'] === 1"
-                >
-                    Previous
-                </flux:button>
+                >Previous</flux:button>
                 <flux:button
                     wire:click="$set('currentPage', {{ $this->missingPagination['current_page'] + 1 }})"
-                    variant="ghost"
-                    size="sm"
-                    icon="chevron-right"
-                    icon-trailing
-                    icon-variant="micro"
+                    variant="ghost" size="sm" icon="chevron-right" icon-trailing icon-variant="micro"
                     :disabled="$this->missingPagination['current_page'] >= $this->missingPagination['last_page']"
-                >
-                    Next
-                </flux:button>
+                >Next</flux:button>
             </div>
         </div>
         @endif
     </flux:card>
-    @else
+
+    @if($missingContractors->count() === 0)
     <flux:card class="p-12 text-center dark:bg-zinc-900 rounded-lg">
         <div class="flex flex-col items-center gap-4">
             <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
@@ -466,33 +525,4 @@
         </flux:modal>
     @endif
 
-    <!-- Bulk Submit Modal -->
-    @if($showBulkSubmitModal && $bulkSubmitContractor)
-        <flux:modal wire:model="showBulkSubmitModal" class="w-full max-w-lg">
-            <div class="space-y-4 p-4 sm:p-6">
-                <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
-                        Submit on Behalf of Contractor
-                    </h2>
-                    <p class="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                        Create and submit a payroll submission on behalf of a contractor.
-                    </p>
-                </div>
-
-                <div class="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                    <p class="text-sm text-zinc-700 dark:text-zinc-300">
-                        {!! $bulkSubmitMessage !!}
-                    </p>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                    <flux:button wire:click="closeBulkSubmitModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>
-                    <flux:button wire:click="performBulkSubmission" variant="primary" icon="paper-airplane" class="w-full sm:w-auto">
-                        Confirm & Submit
-                    </flux:button>
-                </div>
-            </div>
-        </flux:modal>
-    @endif
 </div>

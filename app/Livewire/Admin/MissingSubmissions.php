@@ -10,6 +10,7 @@ use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
+use App\Services\PayrollService;
 use Flux\Flux;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -50,6 +51,9 @@ class MissingSubmissions extends Component
     public $historicalSummary = [];
 
     public $showHistoricalSummary = true;
+
+    // Tabs
+    public $activeTab = 'not_submitted';
 
     // Pagination
     public $historicalPage = 1;
@@ -211,6 +215,7 @@ class MissingSubmissions extends Component
                     ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
                     ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
                     ->whereRaw($this->getActiveWorkerIds())
+                    ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
                     ->get();
 
                 if ($activeContractWorkers->isEmpty()) {
@@ -288,6 +293,9 @@ class MissingSubmissions extends Component
 
                     $existingSubmission->update($updateData);
 
+                    // Apply configured deduction templates to newly added workers
+                    app(PayrollService::class)->applyConfiguredDeductions($existingSubmission);
+
                     return;
                 }
 
@@ -358,6 +366,9 @@ class MissingSubmissions extends Component
                     'service_charge' => $serviceCharge,
                     'sst' => $sst,
                 ]);
+
+                // Apply configured deduction templates to all workers
+                app(PayrollService::class)->applyConfiguredDeductions($submission);
             });
 
             Flux::toast(variant: 'success', heading: 'Submission Updated', text: 'Payroll for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y')." updated successfully on behalf of {$this->bulkSubmitContractor['name']}.");
@@ -627,6 +638,7 @@ class MissingSubmissions extends Component
             ->where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
+            ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
             ->with('worker')
             ->get();
 
@@ -783,6 +795,16 @@ class MissingSubmissions extends Component
         return $this->activeWorkerSubquery;
     }
 
+    protected function getInactiveWorkerIds(): array
+    {
+        static $ids = null;
+        if ($ids === null) {
+            $ids = \DB::table('inactive_workers')->pluck('worker_id')->all();
+        }
+
+        return $ids;
+    }
+
     protected function loadMissingContractors()
     {
         $currentMonth = $this->selectedMonth;
@@ -792,10 +814,13 @@ class MissingSubmissions extends Component
         $periodStart = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
         $periodEnd = $periodStart->copy()->endOfMonth();
 
+        $inactiveWorkerIds = $this->getInactiveWorkerIds();
+
         // Get all contractors with workers who had active contracts during this period
         $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
+            ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
@@ -804,6 +829,7 @@ class MissingSubmissions extends Component
         $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
+            ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
             ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
             ->groupBy('con_ctr_clab_no')
             ->pluck('count', 'con_ctr_clab_no');
@@ -830,6 +856,7 @@ class MissingSubmissions extends Component
         $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
             ->where('con_end', '>=', $periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
+            ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
             ->select('con_ctr_clab_no')
             ->groupBy('con_ctr_clab_no')
             ->get();
@@ -844,6 +871,7 @@ class MissingSubmissions extends Component
                 ->where('con_start', '<=', $periodEnd->toDateString())
                 ->where('con_end', '>=', $periodStart->toDateString())
                 ->whereRaw($this->getActiveWorkerIds())
+                ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
                 ->pluck('con_wkr_id');
 
             if ($activeWorkerIds->isEmpty()) {
@@ -990,6 +1018,7 @@ class MissingSubmissions extends Component
                     ->where('con_start', '<=', $periodEnd->toDateString())
                     ->where('con_end', '>=', $periodStart->toDateString())
                     ->whereRaw($this->getActiveWorkerIds())
+                    ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
                     ->pluck('con_wkr_id');
 
                 if ($periodWorkerIds->isNotEmpty()) {
@@ -1082,18 +1111,32 @@ class MissingSubmissions extends Component
         ];
     }
 
+    public function updatedActiveTab(): void
+    {
+        $this->currentPage = 1;
+    }
+
+    public function getFilteredContractorsProperty()
+    {
+        if ($this->activeTab === 'not_paid') {
+            return $this->missingContractors->filter(fn ($c) => $c['submitted_not_paid'] > 0)->values();
+        }
+
+        return $this->missingContractors->filter(fn ($c) => $c['not_submitted'] > 0)->values();
+    }
+
     public function getMissingPaginatedProperty()
     {
         $start = ($this->currentPage - 1) * $this->currentPerPage;
 
-        return $this->missingContractors->slice($start, $this->currentPerPage)->values();
+        return $this->filteredContractors->slice($start, $this->currentPerPage)->values();
     }
 
     public function getMissingPaginationProperty()
     {
-        $total = $this->missingContractors->count();
-        $lastPage = ceil($total / $this->currentPerPage);
-        $from = (($this->currentPage - 1) * $this->currentPerPage) + 1;
+        $total = $this->filteredContractors->count();
+        $lastPage = max(1, ceil($total / $this->currentPerPage));
+        $from = $total > 0 ? (($this->currentPage - 1) * $this->currentPerPage) + 1 : 0;
         $to = min($this->currentPage * $this->currentPerPage, $total);
 
         return [
