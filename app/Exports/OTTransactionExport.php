@@ -53,6 +53,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'Deduction',
             'NPL',
             'Accommodation',
+            'Medical Claim',
             'Status',
             'Submitted At',
         ];
@@ -67,6 +68,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
         $deduction = 0;
         $npl = 0;
         $accommodation = 0;
+        $medicalClaim = 0;
 
         if ($entry->transactions) {
             foreach ($entry->transactions as $transaction) {
@@ -82,6 +84,8 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
                     $npl += $transaction->amount;
                 } elseif ($transaction->type === 'accommodation') {
                     $accommodation += $transaction->amount;
+                } elseif ($transaction->type === 'medical_claim') {
+                    $medicalClaim += $transaction->amount;
                 }
             }
         }
@@ -107,6 +111,7 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             $deduction > 0 ? $deduction : '',
             $npl > 0 ? $npl : '',
             $accommodation > 0 ? $accommodation : '',
+            $medicalClaim > 0 ? $medicalClaim : '',
             ucfirst($entry->status),
             $entry->submitted_at ? $entry->submitted_at->format('d/m/Y H:i') : '',
         ];
@@ -140,8 +145,9 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'P' => 15, // Deduction
             'Q' => 15, // NPL
             'R' => 15, // Accommodation
-            'S' => 12, // Status
-            'T' => 18, // Submitted At
+            'S' => 15, // Medical Claim
+            'T' => 12, // Status
+            'U' => 18, // Submitted At
         ];
     }
 }
