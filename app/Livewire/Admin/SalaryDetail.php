@@ -218,7 +218,7 @@ class SalaryDetail extends Component
 
             // Title row
             $sheet->setCellValue('A1', 'PAYROLL SUBMISSION - '.strtoupper($this->submission->month_year));
-            $sheet->mergeCells('A1:O1');
+            $sheet->mergeCells('A1:R1');
             $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
             $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -254,7 +254,10 @@ class SalaryDetail extends Component
                 'L9' => 'Other Deduction (RM)',
                 'M9' => 'NPL (days)',
                 'N9' => 'Allowance (RM)',
-                'O9' => 'Transaction Details',
+                'O9' => 'Backpay (RM)',
+                'P9' => 'Accommodation (RM)',
+                'Q9' => 'Medical Claim (RM)',
+                'R9' => 'Transaction Details',
             ];
 
             foreach ($headers as $cell => $value) {
@@ -262,7 +265,7 @@ class SalaryDetail extends Component
             }
 
             // Style headers
-            $sheet->getStyle('A9:O9')->applyFromArray([
+            $sheet->getStyle('A9:R9')->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -278,6 +281,40 @@ class SalaryDetail extends Component
             $row = 10;
             $no = 1;
             foreach ($this->workers as $worker) {
+                // Aggregate transaction amounts by type
+                $txnTotals = [
+                    'advance_payment' => 0,
+                    'deduction' => 0,
+                    'npl' => 0,
+                    'allowance' => 0,
+                    'backpay' => 0,
+                    'accommodation' => 0,
+                    'medical_claim' => 0,
+                ];
+                $transactionDetails = [];
+                foreach ($worker->transactions as $txn) {
+                    if (array_key_exists($txn->type, $txnTotals)) {
+                        $txnTotals[$txn->type] += $txn->amount;
+                    }
+                    // Build human-readable detail line
+                    if ($txn->type === 'allowance') {
+                        $transactionDetails[] = "+RM {$txn->amount} (Allowance".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'backpay') {
+                        $transactionDetails[] = "+RM {$txn->amount} (Backpay".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'medical_claim') {
+                        $transactionDetails[] = "+RM {$txn->amount} (Medical Claim".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'accommodation') {
+                        $transactionDetails[] = "-RM {$txn->amount} (Accommodation".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'npl') {
+                        $transactionDetails[] = "{$txn->amount} days (NPL".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'advance_payment') {
+                        $transactionDetails[] = "-RM {$txn->amount} (Advance".($txn->remarks ? ': '.$txn->remarks : '').')';
+                    } elseif ($txn->type === 'deduction') {
+                        $label = $txn->description ?? 'Deduction';
+                        $transactionDetails[] = "-RM {$txn->amount} ({$label}".($txn->remarks ? ' - '.$txn->remarks : '').')';
+                    }
+                }
+
                 $sheet->setCellValue('A'.$row, $no++);
                 $sheet->setCellValue('B'.$row, $worker->worker_id);
                 $sheet->setCellValue('C'.$row, $worker->worker_name);
@@ -288,32 +325,19 @@ class SalaryDetail extends Component
                 $sheet->setCellValue('H'.$row, $worker->ot_normal_hours ?? 0);
                 $sheet->setCellValue('I'.$row, $worker->ot_rest_hours ?? 0);
                 $sheet->setCellValue('J'.$row, $worker->ot_public_hours ?? 0);
-                $sheet->setCellValue('K'.$row, $worker->advance_payment ?? 0);
-                $sheet->setCellValue('L'.$row, $worker->other_deduction ?? 0);
-                $sheet->setCellValue('M'.$row, $worker->npl_days ?? 0);
-                $sheet->setCellValue('N'.$row, $worker->allowance ?? 0);
-
-                // Add transaction details
-                $transactionDetails = [];
-                foreach ($worker->transactions as $txn) {
-                    if ($txn->type === 'allowance') {
-                        $transactionDetails[] = "+RM {$txn->amount} (Allowance".($txn->remarks ? ': '.$txn->remarks : '').')';
-                    } elseif ($txn->type === 'npl') {
-                        $transactionDetails[] = "{$txn->amount} days (NPL".($txn->remarks ? ': '.$txn->remarks : '').')';
-                    } elseif ($txn->type === 'advance_payment') {
-                        $transactionDetails[] = "-RM {$txn->amount} (Advance".($txn->remarks ? ': '.$txn->remarks : '').')';
-                    } elseif ($txn->type === 'deduction') {
-                        // For configured deductions, show the description if available
-                        $label = $txn->description ?? 'Deduction';
-                        $transactionDetails[] = "-RM {$txn->amount} ({$label}".($txn->remarks ? ' - '.$txn->remarks : '').')';
-                    }
-                }
-                $sheet->setCellValue('O'.$row, implode("\n", $transactionDetails));
-                $sheet->getStyle('O'.$row)->getAlignment()->setWrapText(true);
-                $sheet->getStyle('O'.$row)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->setCellValue('K'.$row, $txnTotals['advance_payment']);
+                $sheet->setCellValue('L'.$row, $txnTotals['deduction']);
+                $sheet->setCellValue('M'.$row, $txnTotals['npl']);
+                $sheet->setCellValue('N'.$row, $txnTotals['allowance']);
+                $sheet->setCellValue('O'.$row, $txnTotals['backpay']);
+                $sheet->setCellValue('P'.$row, $txnTotals['accommodation']);
+                $sheet->setCellValue('Q'.$row, $txnTotals['medical_claim']);
+                $sheet->setCellValue('R'.$row, implode("\n", $transactionDetails));
+                $sheet->getStyle('R'.$row)->getAlignment()->setWrapText(true);
+                $sheet->getStyle('R'.$row)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
 
                 // Format currency columns
-                foreach (['G', 'K', 'L', 'N'] as $col) {
+                foreach (['G', 'K', 'L', 'N', 'O', 'P', 'Q'] as $col) {
                     $sheet->getStyle($col.$row)->getNumberFormat()
                         ->setFormatCode('#,##0.00');
                 }
@@ -343,10 +367,13 @@ class SalaryDetail extends Component
             $sheet->setCellValue('L'.$totalRow, '=SUM(L10:L'.($totalRow - 1).')');
             $sheet->setCellValue('M'.$totalRow, '=SUM(M10:M'.($totalRow - 1).')');
             $sheet->setCellValue('N'.$totalRow, '=SUM(N10:N'.($totalRow - 1).')');
-            $sheet->setCellValue('O'.$totalRow, ''); // No total for transaction details
+            $sheet->setCellValue('O'.$totalRow, '=SUM(O10:O'.($totalRow - 1).')');
+            $sheet->setCellValue('P'.$totalRow, '=SUM(P10:P'.($totalRow - 1).')');
+            $sheet->setCellValue('Q'.$totalRow, '=SUM(Q10:Q'.($totalRow - 1).')');
+            $sheet->setCellValue('R'.$totalRow, '');
 
             // Style total row
-            $sheet->getStyle('A'.$totalRow.':O'.$totalRow)->applyFromArray([
+            $sheet->getStyle('A'.$totalRow.':R'.$totalRow)->applyFromArray([
                 'font' => ['bold' => true],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -358,7 +385,7 @@ class SalaryDetail extends Component
             ]);
 
             // Format currency in total row
-            foreach (['G', 'K', 'L', 'N'] as $col) {
+            foreach (['G', 'K', 'L', 'N', 'O', 'P', 'Q'] as $col) {
                 $sheet->getStyle($col.$totalRow)->getNumberFormat()
                     ->setFormatCode('#,##0.00');
             }
@@ -374,12 +401,12 @@ class SalaryDetail extends Component
                 ->setFormatCode('0.0');
 
             // Auto-size columns
-            foreach (range('A', 'O') as $col) {
+            foreach (range('A', 'R') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
             // Set a minimum width for Transaction Details column to show wrapped text properly
-            $sheet->getColumnDimension('O')->setWidth(50);
+            $sheet->getColumnDimension('R')->setWidth(50);
 
             // Freeze panes at header row
             $sheet->freezePane('A10');

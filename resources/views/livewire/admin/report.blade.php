@@ -375,6 +375,7 @@
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">NPL</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Accommodation</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Medical Claim</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
                                 </tr>
                             </thead>
@@ -448,6 +449,13 @@
                                                 -
                                             @endif
                                         </td>
+                                        <td class="py-3 text-sm text-teal-600 dark:text-teal-400">
+                                            @if($entry['medical_claim'] > 0)
+                                                RM {{ number_format($entry['medical_claim'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
                                         <td class="py-3">
                                             <flux:badge color="{{ $entry['status'] === 'locked' ? 'green' : 'blue' }}" size="sm">
                                                 {{ ucfirst($entry['status']) }}
@@ -473,6 +481,7 @@
                             <span class="text-red-600 dark:text-red-400">Deductions: RM {{ number_format(collect($otTransactionData)->sum('deduction'), 2) }}</span>
                             <span class="text-red-600 dark:text-red-400">NPL: RM {{ number_format(collect($otTransactionData)->sum('npl'), 2) }}</span>
                             <span class="text-yellow-600 dark:text-yellow-400">Accommodation: RM {{ number_format(collect($otTransactionData)->sum('accommodation'), 2) }}</span>
+                            <span class="text-teal-600 dark:text-teal-400">Medical Claim: RM {{ number_format(collect($otTransactionData)->sum('medical_claim'), 2) }}</span>
                         </div>
                     </div>
                 @else
