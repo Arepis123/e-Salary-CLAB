@@ -1185,6 +1185,9 @@ class Configuration extends Component
                 heading: 'Sync Complete',
                 text: "Synced {$totalPending} payments: {$updated} updated, {$stillPending} still pending, {$cancelled} cancelled (expired), {$failed} failed"
             );
+
+            // Auto-fix any missing receipts, paid dates, or transaction IDs on paid submissions
+            $this->fixMissingReceipts();
         } catch (\Exception $e) {
             Flux::toast(
                 variant: 'danger',

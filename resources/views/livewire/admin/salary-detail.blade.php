@@ -480,7 +480,7 @@
             <!-- File Upload -->
             <flux:field class="mt-3">
                 <flux:label required>Breakdown File (Excel)</flux:label>
-                <flux:description>Upload Excel file with columns: Gross Salary, EPF, SOCSO, EIS, HRDF, Backpay. Amount will be calculated automatically.</flux:description>
+                <flux:description>Upload Excel file with columns: Gross Salary, EPF, SOCSO, EIS, HRDF. Amount will be calculated automatically.</flux:description>
                 <input type="file" wire:model="breakdownFile" accept=".xlsx,.xls"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="breakdownFile" />
@@ -522,12 +522,6 @@
                             <span class="text-green-700 dark:text-green-300">HRDF:</span>
                             <span class="font-medium text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['hrdf'], 2) }}</span>
                         </div>
-                        @if(isset($calculatedBreakdown['backpay']) && $calculatedBreakdown['backpay'] > 0)
-                        <div class="flex justify-between">
-                            <span class="text-green-700 dark:text-green-300">Backpay:</span>
-                            <span class="font-medium text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['backpay'], 2) }}</span>
-                        </div>
-                        @endif
                         @if(isset($calculatedBreakdown['custom_advance_salary']) && $calculatedBreakdown['custom_advance_salary'] > 0)
                         <div class="flex justify-between">
                             <span class="text-red-600 dark:text-red-400">Custom Advance Salary:</span>
@@ -625,7 +619,7 @@
             <!-- New Breakdown File -->
             <flux:field class="mt-3">
                 <flux:label>Replace Breakdown File (Excel)</flux:label>
-                <flux:description>Upload Excel with columns: Gross Salary, EPF, SOCSO, EIS, HRDF, Backpay. Amount calculated automatically. Leave blank to keep existing.</flux:description>
+                <flux:description>Amount calculated automatically. Leave blank to keep existing.</flux:description>
                 <input type="file" wire:model="newBreakdownFile" accept=".xlsx,.xls"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="newBreakdownFile" />
@@ -667,12 +661,6 @@
                             <span class="text-green-700 dark:text-green-300">HRDF:</span>
                             <span class="font-medium text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['hrdf'], 2) }}</span>
                         </div>
-                        @if(isset($calculatedBreakdown['backpay']) && $calculatedBreakdown['backpay'] > 0)
-                        <div class="flex justify-between">
-                            <span class="text-green-700 dark:text-green-300">Backpay:</span>
-                            <span class="font-medium text-green-900 dark:text-green-100">+ RM {{ number_format($calculatedBreakdown['backpay'], 2) }}</span>
-                        </div>
-                        @endif
                         @if(isset($calculatedBreakdown['custom_advance_salary']) && $calculatedBreakdown['custom_advance_salary'] > 0)
                         <div class="flex justify-between">
                             <span class="text-red-600 dark:text-red-400">Custom Advance Salary:</span>
