@@ -28,7 +28,8 @@ define('ARTISAN', BASE_PATH . '/artisan');
 
 function log_line(string $message): void
 {
-    $line = '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL;
+    $myt  = new DateTimeZone('Asia/Kuala_Lumpur');
+    $line = '[' . (new DateTime('now', $myt))->format('Y-m-d H:i:s T') . '] ' . $message . PHP_EOL;
     file_put_contents(LOG_FILE, $line, FILE_APPEND | LOCK_EX);
     echo $line;
 }
@@ -60,23 +61,27 @@ $force  = in_array('--force', $args, true);
 $dryRun = in_array('--dry-run', $args, true);
 
 // --------------------------------------------------------------------------
-// Gate: only run from the 18th through the 1st of the next month
+// Gate: only run from the 18th through the 1st of the next month,
+//       between 08:00–19:00 Malaysia Time (MYT, UTC+8)
 // --------------------------------------------------------------------------
 
-$today = (int) date('j');   // Day of month without leading zero (server local time)
+$myt  = new DateTimeZone('Asia/Kuala_Lumpur');
+$now  = new DateTime('now', $myt);
+$today = (int) $now->format('j');  // Day of month in MYT
+$hour  = (int) $now->format('G');  // 24-hour in MYT
+
+log_line("MYT time: " . $now->format('Y-m-d H:i:s T'));
 
 // Active window: day >= 18 OR day == 1
 $inWindow = ($today >= 18 || $today === 1);
 
 if (! $inWindow && ! $force) {
-    log_line("Skipped: today is the {$today}th, outside the active window (18th–1st). Use --force to override.");
+    log_line("Skipped: MYT date is the {$today}th, outside the active window (18th–1st). Use --force to override.");
     exit(0);
 }
 
-$hour = (int) date('G');    // 24-hour format without leading zero
-
 if (($hour < 8 || $hour >= 19) && ! $force) {
-    log_line("Skipped: current hour is {$hour}:00, outside the active hours (08:00–19:00). Use --force to override.");
+    log_line("Skipped: MYT hour is {$hour}:00, outside the active hours (08:00–19:00). Use --force to override.");
     exit(0);
 }
 

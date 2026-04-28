@@ -1,17 +1,15 @@
 <div class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto">
     <!-- Page Header -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                    Payroll Details #PAY{{ str_pad($submission->id, 6, '0', STR_PAD_LEFT) }}
-                </h1>
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Submission for {{ $submission->month_year }}
-                </p>
-            </div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-xl font-bold text-zinc-900 dark:text-zinc-100 sm:text-2xl">
+                Payroll Details #PAY{{ str_pad($submission->id, 6, '0', STR_PAD_LEFT) }}
+            </h1>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+                Submission for {{ $submission->month_year }}
+            </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <flux:button variant="filled" size="sm" wire:click="exportWorkerList" icon="arrow-down-tray" icon-variant="outline">
                 Export
             </flux:button>
@@ -24,10 +22,10 @@
                 <flux:button variant="filled" size="sm" wire:click="downloadReceipt" icon="document" icon-variant="outline">
                     Receipt
                 </flux:button>
-            @endif            
+            @endif
             <flux:button variant="filled" size="sm" href="{{ route('payroll') }}" icon="arrow-left" icon-variant="outline">
-                Back to Submissions
-            </flux:button>            
+                Back
+            </flux:button>
         </div>
     </div>
 
@@ -88,8 +86,9 @@
             <div>
                 <p class="text-sm text-green-700 dark:text-green-300">Breakdown File:</p>
                 @if($submission->hasBreakdownFile())
-                    <flux:button size="sm" class="mt-2" variant="filled" wire:click="downloadBreakdown" icon="arrow-down-tray">
-                        {{ $submission->breakdown_file_name }}
+                    <flux:button size="sm" class="mt-2" variant="filled" wire:click="downloadBreakdown" icon="arrow-down-tray" title="{{ $submission->breakdown_file_name }}">
+                        <span class="sm:hidden">{{ Str::limit($submission->breakdown_file_name, 25) }}</span>
+                        <span class="hidden sm:inline">{{ $submission->breakdown_file_name }}</span>
                     </flux:button>
                 @else
                     <p class="text-sm text-zinc-500">No file uploaded</p>

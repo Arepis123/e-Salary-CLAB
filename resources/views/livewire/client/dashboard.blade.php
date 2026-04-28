@@ -258,7 +258,7 @@
                             <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">Active</p>
                         @endif
                     </div>
-                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3 hidden lg:hidden xl:block">
                         <flux:icon.users class="size-6 text-green-600 dark:text-green-400" />
                     </div>
                 </div>
@@ -282,7 +282,7 @@
                             <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($paymentStats['this_month_amount'], 2) }}</p>
                         @endif
                     </div>
-                    <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-3">
+                    <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-3 hidden lg:hidden xl:block">
                         <flux:icon.wallet class="size-6 text-purple-600 dark:text-purple-400" />
                     </div>
                 </div>
@@ -308,7 +308,7 @@
                             <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($paymentStats['outstanding_balance'], 2) }}</p>
                         @endif
                     </div>
-                    <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
+                    <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3 hidden lg:hidden xl:block">
                         <flux:icon.exclamation-circle class="size-6 text-orange-600 dark:text-orange-400" />
                     </div>
                 </div>
@@ -334,7 +334,7 @@
                             <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($paymentStats['year_to_date_paid'], 2) }}</p>
                         @endif
                     </div>
-                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3 hidden lg:hidden xl:block">
                         <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400" />
                     </div>
                 </div>
