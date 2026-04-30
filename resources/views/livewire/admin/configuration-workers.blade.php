@@ -227,6 +227,33 @@
     @endif
 </div>
 
+<!-- Remove from Payroll Modal -->
+<flux:modal name="remove-from-payroll" class="md:w-96 space-y-6" wire:model="showRemoveFromPayrollModal">
+    <div>
+        <flux:heading size="lg">Remove from Current Payroll?</flux:heading>
+        <flux:subheading>{{ $deactivatingWorkerName }}</flux:subheading>
+    </div>
+
+    @if($payrollSubmissionToRemove)
+    <div class="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 border border-blue-200 dark:border-blue-800">
+        <div class="flex gap-3">
+            <flux:icon.information-circle class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div class="text-sm text-blue-900 dark:text-blue-100">
+                <p>This worker is currently included in the <strong>{{ $payrollSubmissionToRemove['month_year'] }}</strong> payroll (status: <strong>{{ $payrollSubmissionToRemove['status'] }}</strong>).</p>
+                <p class="mt-2">Do you want to remove <strong>{{ $deactivatingWorkerName }}</strong> from this payroll?</p>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <div class="flex gap-2 justify-end">
+        <flux:button variant="ghost" wire:click="skipRemoveFromPayroll">No, Keep in Payroll</flux:button>
+        <flux:button variant="danger" wire:click="confirmRemoveFromPayroll">
+            Yes, Remove from Payroll
+        </flux:button>
+    </div>
+</flux:modal>
+
 <!-- Deactivate Worker Modal -->
 <flux:modal name="deactivate-worker" class="md:w-96 space-y-6" wire:model="showDeactivateModal">
     <div>

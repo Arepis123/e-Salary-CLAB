@@ -173,6 +173,10 @@ class Configuration extends Component
 
     public $deactivateReason = '';
 
+    public $showRemoveFromPayrollModal = false;
+
+    public $payrollSubmissionToRemove = null;  // ['id', 'month_year', 'status']
+
     public function boot(
         WorkerService $workerService,
         ContractorWindowService $windowService,
@@ -1401,11 +1405,7 @@ class Configuration extends Component
     public function closeDeactivateModal()
     {
         $this->showDeactivateModal = false;
-        $this->deactivatingWorkerId = '';
-        $this->deactivatingWorkerName = '';
-        $this->deactivatingWorkerPassport = '';
-        $this->deactivatingContractorClab = '';
-        $this->deactivateReason = '';
+        $this->resetDeactivateState();
     }
 
     public function confirmDeactivate()
@@ -1426,7 +1426,30 @@ class Configuration extends Component
                 text: "{$this->deactivatingWorkerName} has been set as inactive."
             );
 
-            $this->closeDeactivateModal();
+            $this->showDeactivateModal = false;
+
+            // Check if this worker exists in a current-month payroll that is not yet paid
+            $payrollWorker = \App\Models\PayrollWorker::where('worker_id', $this->deactivatingWorkerId)
+                ->whereHas('payrollSubmission', function ($q) {
+                    $q->where('month', now()->month)
+                      ->where('year', now()->year)
+                      ->where('status', '!=', 'paid');
+                })
+                ->with('payrollSubmission')
+                ->first();
+
+            if ($payrollWorker) {
+                $submission = $payrollWorker->payrollSubmission;
+                $monthYear = \Carbon\Carbon::createFromDate($submission->year, $submission->month, 1)->format('F Y');
+                $this->payrollSubmissionToRemove = [
+                    'id'         => $submission->id,
+                    'month_year' => $monthYear,
+                    'status'     => $submission->status,
+                ];
+                $this->showRemoveFromPayrollModal = true;
+            } else {
+                $this->resetDeactivateState();
+            }
         } catch (\Exception $e) {
             Flux::toast(
                 variant: 'danger',
@@ -1434,6 +1457,55 @@ class Configuration extends Component
                 text: 'Failed to deactivate worker: '.$e->getMessage()
             );
         }
+    }
+
+    public function confirmRemoveFromPayroll()
+    {
+        try {
+            if (! $this->payrollSubmissionToRemove) {
+                return;
+            }
+
+            $deleted = \App\Models\PayrollWorker::where('worker_id', $this->deactivatingWorkerId)
+                ->where('payroll_submission_id', $this->payrollSubmissionToRemove['id'])
+                ->delete();
+
+            if ($deleted) {
+                \App\Models\PayrollSubmission::where('id', $this->payrollSubmissionToRemove['id'])
+                    ->decrement('total_workers');
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Worker Removed from Payroll',
+                text: "{$this->deactivatingWorkerName} has been removed from the {$this->payrollSubmissionToRemove['month_year']} payroll."
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to remove worker from payroll: '.$e->getMessage()
+            );
+        } finally {
+            $this->showRemoveFromPayrollModal = false;
+            $this->resetDeactivateState();
+        }
+    }
+
+    public function skipRemoveFromPayroll()
+    {
+        $this->showRemoveFromPayrollModal = false;
+        $this->resetDeactivateState();
+    }
+
+    protected function resetDeactivateState()
+    {
+        $this->deactivatingWorkerId = '';
+        $this->deactivatingWorkerName = '';
+        $this->deactivatingWorkerPassport = '';
+        $this->deactivatingContractorClab = '';
+        $this->deactivateReason = '';
+        $this->payrollSubmissionToRemove = null;
     }
 
     public function reactivateWorker(string $workerId)
