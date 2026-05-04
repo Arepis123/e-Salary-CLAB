@@ -4,7 +4,7 @@
  * Payment Sync Script
  *
  * Syncs all pending Billplz payments and fixes missing receipt data on paid submissions.
- * Only runs between the 18th of the month and the 1st of the next month (payment window).
+ * Only runs between the 18th of the month and the 5th of the next month (payment window).
  * Safe to run frequently — it only touches records that still need updating.
  *
  * Usage (set this as a cron job on the server):
@@ -61,7 +61,7 @@ $force  = in_array('--force', $args, true);
 $dryRun = in_array('--dry-run', $args, true);
 
 // --------------------------------------------------------------------------
-// Gate: only run from the 18th through the 1st of the next month,
+// Gate: only run from the 18th through the 5th of the next month,
 //       between 08:00–19:00 Malaysia Time (MYT, UTC+8)
 // --------------------------------------------------------------------------
 
@@ -72,11 +72,11 @@ $hour  = (int) $now->format('G');  // 24-hour in MYT
 
 log_line("MYT time: " . $now->format('Y-m-d H:i:s T'));
 
-// Active window: day >= 18 OR day == 1
-$inWindow = ($today >= 18 || $today === 1);
+// Active window: day >= 18 OR day <= 5
+$inWindow = ($today >= 18 || $today <= 5);
 
 if (! $inWindow && ! $force) {
-    log_line("Skipped: MYT date is the {$today}th, outside the active window (18th–1st). Use --force to override.");
+    log_line("Skipped: MYT date is the {$today}th, outside the active window (18th–5th). Use --force to override.");
     exit(0);
 }
 
