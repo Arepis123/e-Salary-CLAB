@@ -171,7 +171,7 @@
 
                     <div class="flex justify-between py-2">
                         <span class="text-sm text-red-600 dark:text-red-400">Late Payment Penalty (8%):</span>
-                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->penalty_amount, 2) }}</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->has_penalty && $invoice->penalty_amount > 0 ? $invoice->penalty_amount : $invoice->calculatePenalty(), 2) }}</span>
                     </div>
                 @endif
 

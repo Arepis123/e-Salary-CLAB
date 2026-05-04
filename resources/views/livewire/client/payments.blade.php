@@ -210,7 +210,7 @@
                         <flux:table.cell variant="strong">{{ $payment->submission->month_year }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            RM {{ number_format($payment->amount, 2) }}
+                            RM {{ number_format($payment->status === 'completed' ? $payment->amount : $payment->submission->total_due, 2) }}
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">

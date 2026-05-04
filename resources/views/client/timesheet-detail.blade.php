@@ -283,7 +283,7 @@
                                 <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2">
                                     <div class="flex justify-between text-sm text-red-600 dark:text-red-400">
                                         <span>Late Payment Penalty (8%)</span>
-                                        <span class="font-medium">RM {{ number_format($submission->penalty_amount, 2) }}</span>
+                                        <span class="font-medium">RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
                                     </div>
                                 </div>
                             @endif
