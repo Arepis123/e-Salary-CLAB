@@ -43,72 +43,56 @@ class ContractorDetail extends Component
 
     public function getWorkersProperty()
     {
-        // Get unique workers by grouping by passport number
-        $payrollWorkers = PayrollWorker::whereHas('payrollSubmission', function ($query) {
-            $query->where('contractor_clab_no', $this->contractorClabNo);
-        })
-            ->with(['worker.country', 'worker.workTrade', 'payrollSubmission'])
-            ->selectRaw('worker_id, worker_passport, worker_name, MAX(id) as latest_id, MAX(payroll_submission_id) as latest_submission_id')
-            ->groupBy('worker_id', 'worker_passport', 'worker_name')
-            ->orderBy('worker_name', 'asc')
-            ->get();
+        // Get all contracts for this contractor, then pick the latest per worker
+        $contracts = ContractWorker::where('con_ctr_clab_no', $this->contractorClabNo)
+            ->with(['worker.country', 'worker.workTrade'])
+            ->get()
+            ->groupBy('con_wkr_id')
+            ->map(fn ($group) => $group->sortByDesc('con_start')->first());
 
-        // Enrich with worker details from worker_db
-        $enrichedWorkers = $payrollWorkers->map(function ($payrollWorker) {
-            $worker = $payrollWorker->worker;
+        $enrichedWorkers = $contracts->map(function ($contract) {
+            $worker = $contract->worker;
 
-            // Get the latest contract for this worker with this contractor
-            $contract = ContractWorker::where('con_wkr_id', $payrollWorker->worker_id)
-                ->where('con_ctr_clab_no', $this->contractorClabNo)
-                ->orderBy('con_start', 'desc')
+            $country = $worker?->country?->cty_desc ?? $worker?->wkr_nationality ?? '-';
+            $position = $worker?->workTrade?->trade_desc ?? $worker?->wkr_wtrade ?? '-';
+            $passport = $worker?->wkr_passno ?? $contract->con_wkr_passno;
+
+            $latestPayrollWorker = PayrollWorker::where('worker_passport', $passport)
+                ->whereHas('payrollSubmission', function ($query) {
+                    $query->where('contractor_clab_no', $this->contractorClabNo);
+                })
+                ->orderByDesc('id')
                 ->first();
 
-            // Get country name
-            $country = $worker?->country?->cty_desc ?? $worker?->wkr_nationality ?? '-';
-
-            // Get position/trade name
-            $position = $worker?->workTrade?->trade_desc ?? $worker?->wkr_wtrade ?? '-';
-
-            // Get contract period
-            $contractStart = $contract?->con_start ?? null;
-            $contractEnd = $contract?->con_end ?? null;
-
-            // Count total submissions for this worker
-            $totalSubmissions = PayrollWorker::where('worker_passport', $payrollWorker->worker_passport)
+            $totalSubmissions = PayrollWorker::where('worker_passport', $passport)
                 ->whereHas('payrollSubmission', function ($query) {
                     $query->where('contractor_clab_no', $this->contractorClabNo);
                 })
                 ->count();
 
             return (object) [
-                'worker_passport' => $payrollWorker->worker_passport,
-                'worker_name' => $payrollWorker->worker_name,
+                'worker_passport' => $passport,
+                'worker_name' => $worker?->wkr_name ?? '-',
                 'country' => $country,
                 'position' => $position,
-                'contract_start' => $contractStart,
-                'contract_end' => $contractEnd,
-                'latest_submission_id' => $payrollWorker->latest_submission_id,
+                'contract_start' => $contract->con_start,
+                'contract_end' => $contract->con_end,
+                'latest_submission_id' => $latestPayrollWorker?->payroll_submission_id,
                 'total_submissions' => $totalSubmissions,
             ];
-        });
+        })->sortBy('worker_name')->values();
 
-        // Manually paginate the results
         $perPage = $this->workersPerPage;
         $currentPage = $this->workersPage;
         $offset = ($currentPage - 1) * $perPage;
 
-        $paginatedWorkers = $enrichedWorkers->slice($offset, $perPage);
-
-        // Create a LengthAwarePaginator instance
-        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $paginatedWorkers->values(),
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $enrichedWorkers->slice($offset, $perPage)->values(),
             $enrichedWorkers->count(),
             $perPage,
             $currentPage,
             ['path' => request()->url(), 'pageName' => 'workersPage']
         );
-
-        return $paginator;
     }
 
     public function getPayrollHistoryProperty()
