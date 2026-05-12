@@ -234,6 +234,10 @@ class Timesheet extends Component
             $activeWorkers = $activeWorkers->merge($workersWithPendingOT)->unique('wkr_id')->values();
         }
 
+        // Exclude workers manually deactivated by admin
+        $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+        $activeWorkers = $activeWorkers->filter(fn ($worker) => ! in_array($worker->wkr_id, $manuallyInactiveIds))->values();
+
         // Get ALL submissions for this month to find all submitted workers
 
         $allSubmissionsThisMonth = PayrollSubmission::where('contractor_clab_no', $clabNo)

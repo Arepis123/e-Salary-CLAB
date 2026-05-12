@@ -3,6 +3,7 @@
 namespace App\Livewire\Client;
 
 use App\Exports\WorkersExport;
+use App\Models\InactiveWorker;
 use App\Services\ContractWorkerService;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -103,6 +104,9 @@ class Workers extends Component
         // Get all contracted workers with current filters applied
         $allWorkers = $this->contractWorkerService->getContractedWorkers($clabNo);
 
+        $manuallyInactiveIds = InactiveWorker::getInactiveWorkerIds();
+        $isActive = fn ($worker) => $worker->contract_info && $worker->contract_info->isActive() && ! in_array($worker->wkr_id, $manuallyInactiveIds);
+
         // Apply the same filters as in render()
         if ($this->search) {
             $allWorkers = $allWorkers->filter(function ($worker) {
@@ -113,11 +117,11 @@ class Workers extends Component
         }
 
         if ($this->status && $this->status !== 'all') {
-            $allWorkers = $allWorkers->filter(function ($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) use ($isActive) {
                 if ($this->status === 'active') {
-                    return $worker->contract_info && $worker->contract_info->isActive();
+                    return $isActive($worker);
                 } elseif ($this->status === 'inactive') {
-                    return ! $worker->contract_info || ! $worker->contract_info->isActive();
+                    return ! $isActive($worker);
                 }
 
                 return true;
@@ -186,6 +190,9 @@ class Workers extends Component
         // Get all contracted workers
         $allWorkers = $this->contractWorkerService->getContractedWorkers($clabNo);
 
+        $manuallyInactiveIds = InactiveWorker::getInactiveWorkerIds();
+        $isActive = fn ($worker) => $worker->contract_info && $worker->contract_info->isActive() && ! in_array($worker->wkr_id, $manuallyInactiveIds);
+
         // Get unique countries and positions for filters
         $countries = $allWorkers->pluck('country')->filter()->unique('cty_code')->sortBy('cty_desc')->values();
         $positions = $allWorkers->pluck('workTrade')->filter()->unique('trade_code')->sortBy('trade_desc')->values();
@@ -201,11 +208,11 @@ class Workers extends Component
 
         // Apply status filter
         if ($this->status && $this->status !== 'all') {
-            $allWorkers = $allWorkers->filter(function ($worker) {
+            $allWorkers = $allWorkers->filter(function ($worker) use ($isActive) {
                 if ($this->status === 'active') {
-                    return $worker->contract_info && $worker->contract_info->isActive();
+                    return $isActive($worker);
                 } elseif ($this->status === 'inactive') {
-                    return ! $worker->contract_info || ! $worker->contract_info->isActive();
+                    return ! $isActive($worker);
                 }
 
                 return true;
@@ -244,7 +251,7 @@ class Workers extends Component
         }
 
         // Apply sorting
-        $allWorkers = $allWorkers->sort(function ($a, $b) {
+        $allWorkers = $allWorkers->sort(function ($a, $b) use ($isActive) {
             $primaryA = match ($this->sortBy) {
                 'wkr_id' => $a->wkr_id,
                 'name' => strtolower($a->name),
@@ -254,7 +261,7 @@ class Workers extends Component
                 'country' => strtolower($a->country->cty_desc ?? ''),
                 'position' => strtolower($a->workTrade->trade_desc ?? ''),
                 'basic_salary' => $a->basic_salary ?? 0,
-                'status' => ($a->contract_info && $a->contract_info->isActive()) ? 0 : 1,
+                'status' => $isActive($a) ? 0 : 1,
                 default => $a->wkr_id,
             };
 
@@ -267,7 +274,7 @@ class Workers extends Component
                 'country' => strtolower($b->country->cty_desc ?? ''),
                 'position' => strtolower($b->workTrade->trade_desc ?? ''),
                 'basic_salary' => $b->basic_salary ?? 0,
-                'status' => ($b->contract_info && $b->contract_info->isActive()) ? 0 : 1,
+                'status' => $isActive($b) ? 0 : 1,
                 default => $b->wkr_id,
             };
 
@@ -284,9 +291,7 @@ class Workers extends Component
         })->values();
 
         // Calculate statistics
-        $activeWorkers = $allWorkers->filter(function ($worker) {
-            return $worker->contract_info && $worker->contract_info->isActive();
-        });
+        $activeWorkers = $allWorkers->filter(fn ($worker) => $isActive($worker));
 
         $totalSalary = $allWorkers->sum(function ($worker) {
             return $worker->basic_salary ?? 0;
@@ -323,6 +328,7 @@ class Workers extends Component
             'pagination' => $pagination,
             'countries' => $countries,
             'positions' => $positions,
+            'manuallyInactiveIds' => $manuallyInactiveIds,
         ])->layout('components.layouts.app', ['title' => __('My Workers')]);
     }
 }

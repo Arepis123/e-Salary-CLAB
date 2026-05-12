@@ -100,8 +100,12 @@ class Salary extends Component
 
     public function export()
     {
-        // Get all submissions based on current filters
-        $submissions = $this->getSubmissions();
+        set_time_limit(200);
+
+        // Fetch all matching submissions with payments eager-loaded to avoid N+1
+        $submissions = $this->getSubmissionsQuery()
+            ->with(['payments'])
+            ->get();
 
         // Check if there are submissions to export
         if ($submissions->isEmpty()) {

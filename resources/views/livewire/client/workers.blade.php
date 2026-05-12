@@ -252,7 +252,7 @@
                             </flux:table.cell>
 
                             <flux:table.cell>
-                                @if($worker->contract_info && $worker->contract_info->isActive())
+                                @if($worker->contract_info && $worker->contract_info->isActive() && !in_array($worker->wkr_id, $manuallyInactiveIds))
                                     <flux:badge color="green" size="sm" inset="top bottom">Active</flux:badge>
                                 @else
                                     <flux:badge color="zinc" size="sm" inset="top bottom">Inactive</flux:badge>

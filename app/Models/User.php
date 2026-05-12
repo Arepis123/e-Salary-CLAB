@@ -69,7 +69,7 @@ class User extends Authenticatable
      */
     public function hasTutorialCompleted(string $page): bool
     {
-        $completed = $this->tutorial_completed ?? [];
+        $completed = is_array($this->tutorial_completed) ? $this->tutorial_completed : [];
 
         return isset($completed[$page]) && $completed[$page] === true;
     }
@@ -79,7 +79,7 @@ class User extends Authenticatable
      */
     public function markTutorialCompleted(string $page): void
     {
-        $completed = $this->tutorial_completed ?? [];
+        $completed = is_array($this->tutorial_completed) ? $this->tutorial_completed : [];
         $completed[$page] = true;
         $this->tutorial_completed = $completed;
         $this->save();

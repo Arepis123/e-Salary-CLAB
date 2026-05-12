@@ -156,12 +156,14 @@
                         <flux:table.column>Grand Total</flux:table.column>
                         <flux:table.column>Status</flux:table.column>
                         <flux:table.column>Payment</flux:table.column>
+                        <flux:table.column>Pay Slip</flux:table.column>
                         <flux:table.column>Submitted</flux:table.column>
                         <flux:table.column>Actions</flux:table.column>
                     </flux:table.columns>
                     <flux:table.rows>
                         @for($i = 0; $i < 8; $i++)
                             <flux:table.row>
+                                <flux:table.cell><flux:skeleton.line /></flux:table.cell>
                                 <flux:table.cell><flux:skeleton.line /></flux:table.cell>
                                 <flux:table.cell><flux:skeleton.line /></flux:table.cell>
                                 <flux:table.cell><flux:skeleton.line /></flux:table.cell>
@@ -188,6 +190,7 @@
                 <flux:table.column sortable :sorted="$sortBy === 'grand_total'" :direction="$sortDirection" wire:click="sortByColumn('grand_total')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Grand Total</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'status'" :direction="$sortDirection" wire:click="sortByColumn('status')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
                 <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Payment</span></flux:table.column>
+                <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Pay Slip</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'submitted_at'" :direction="$sortDirection" wire:click="sortByColumn('submitted_at')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Submitted</span></flux:table.column>
                 <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
             </flux:table.columns>
@@ -248,6 +251,14 @@
                                 <flux:badge color="green" size="sm" class="w-12 justify-center">Paid</flux:badge>
                             @else
                                 <flux:badge color="red" size="sm" class="w-12 justify-center">No</flux:badge>
+                            @endif
+                        </flux:table.cell>
+
+                        <flux:table.cell>
+                            @if($submission->hasPayslipFile())
+                                <flux:badge color="green" size="sm" inset="top bottom">Yes</flux:badge>
+                            @else
+                                <flux:badge color="zinc" size="sm" inset="top bottom">No</flux:badge>
                             @endif
                         </flux:table.cell>
 
