@@ -19,7 +19,9 @@
 
     // Contract information
     $contract = $worker->contract_info;
-    $contractActive = $contract && $contract->isActive();
+    $inactiveRecord = \App\Models\InactiveWorker::where('worker_id', $worker->wkr_id)->first();
+    $isManuallyInactive = $inactiveRecord !== null;
+    $contractActive = $contract && $contract->isActive() && !$isManuallyInactive;
     $daysRemaining = $contract ? $contract->daysRemaining() : 0;
 
     // Get payroll history for this worker
@@ -172,30 +174,59 @@
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Contract Period</p>
                                 <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $contract->con_period }} months</p>
                             </div>
+                            @if(!$isManuallyInactive && $daysRemaining > 0)
                             <div>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Days Remaining</p>
                                 <p class="text-sm font-medium {{ $daysRemaining < 30 ? 'text-orange-600 dark:text-orange-400' : 'text-zinc-900 dark:text-zinc-100' }}">
                                     {{ $daysRemaining }} days
-                                    @if($daysRemaining < 30 && $daysRemaining > 0)
+                                    @if($daysRemaining < 30)
                                         <span class="text-xs">(Expiring Soon)</span>
-                                    @elseif($daysRemaining <= 0)
-                                        <span class="text-xs text-red-600 dark:text-red-400">(Expired)</span>
                                     @endif
                                 </p>
                             </div>
+                            @endif
                             <div>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Contract Status</p>
                                 <div class="mt-1">
                                     @if($contractActive)
                                         <flux:badge color="green">Active</flux:badge>
+                                    @elseif($isManuallyInactive)
+                                        <flux:badge color="red">Terminated</flux:badge>
                                     @else
                                         <flux:badge color="red">Expired</flux:badge>
                                     @endif
                                 </div>
                             </div>
+
+                            @if($isManuallyInactive)
+                                <div>
+                                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Termination Date</p>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        {{ $inactiveRecord->deactivated_at->format('F d, Y') }}
+                                    </p>
+                                </div>
+                                @if($inactiveRecord->reason)
+                                    <div class="md:col-span-2">
+                                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Termination Reason</p>
+                                        <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $inactiveRecord->reason }}</p>
+                                    </div>
+                                @endif
+                            @endif
                         </div>
 
-                        @if($daysRemaining > 0 && $daysRemaining < 30)
+                        @if($isManuallyInactive)
+                            <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                <div class="flex gap-3">
+                                    <flux:icon.x-circle class="size-5 flex-shrink-0 text-red-600 dark:text-red-400" />
+                                    <div>
+                                        <p class="text-sm font-medium text-red-900 dark:text-red-100">Worker Terminated</p>
+                                        <p class="text-xs text-red-700 dark:text-red-300 mt-1">
+                                            This worker was terminated on {{ $inactiveRecord->deactivated_at->format('F d, Y') }} and is no longer active in the payroll system.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @elseif($daysRemaining > 0 && $daysRemaining < 30)
                             <div class="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                                 <div class="flex gap-3">
                                     <flux:icon.exclamation-triangle class="size-5 flex-shrink-0 text-orange-600 dark:text-orange-400" />

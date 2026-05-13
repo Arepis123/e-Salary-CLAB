@@ -113,26 +113,66 @@ class OTEntryService
     }
 
     /**
-     * Get or create OT entries for a contractor for the current entry period
+     * Get or create OT entries for a contractor for the current entry period.
+     * Only returns entries for workers with active contracts (con_end >= today).
      */
     public function getOrCreateEntriesForContractor(string $clabNo): Collection
     {
         $period = $this->getEntryPeriod();
 
-        // Check if entries already exist
+        // Get IDs of currently active workers for this contractor
+        $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+
+        $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
+            ->where('con_end', '>=', now()->toDateString())
+            ->whereNotIn('con_wkr_id', $manuallyInactiveIds)
+            ->pluck('con_wkr_id')
+            ->unique()
+            ->toArray();
+
+        if (empty($activeWorkerIds)) {
+            return collect();
+        }
+
+        // Get existing entries only for currently active workers
         $existingEntries = MonthlyOTEntry::forContractorPeriod(
             $clabNo,
             $period['entry_month'],
             $period['entry_year']
-        )->get();
+        )->whereIn('worker_id', $activeWorkerIds)->get();
 
-        // If entries exist, return them
-        if ($existingEntries->isNotEmpty()) {
+        // Find active workers who don't yet have an entry for this period
+        $existingWorkerIds = $existingEntries->pluck('worker_id')->toArray();
+        $missingWorkerIds = array_diff($activeWorkerIds, $existingWorkerIds);
+
+        if (empty($missingWorkerIds)) {
             return $existingEntries;
         }
 
-        // If no entries exist, create them from workers
-        return $this->createEntriesFromWorkers($clabNo, $period);
+        // Create entries for active workers not yet in this period
+        $workers = \App\Models\Worker::whereIn('wkr_id', $missingWorkerIds)->get();
+        $newEntries = collect();
+
+        foreach ($workers as $worker) {
+            $entry = MonthlyOTEntry::create([
+                'contractor_clab_no' => $clabNo,
+                'worker_id' => $worker->wkr_id,
+                'worker_name' => $worker->wkr_name,
+                'worker_passport' => $worker->wkr_passno ?? 'N/A',
+                'entry_month' => $period['entry_month'],
+                'entry_year' => $period['entry_year'],
+                'submission_month' => $period['submission_month'],
+                'submission_year' => $period['submission_year'],
+                'ot_normal_hours' => 0,
+                'ot_rest_hours' => 0,
+                'ot_public_hours' => 0,
+                'status' => 'draft',
+            ]);
+
+            $newEntries->push($entry);
+        }
+
+        return $existingEntries->merge($newEntries);
     }
 
     /**
