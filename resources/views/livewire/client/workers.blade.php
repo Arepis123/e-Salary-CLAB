@@ -200,7 +200,7 @@
                             $permitExpiringSoon = $worker->wkr_permitexp && $worker->wkr_permitexp->isFuture() && now()->diffInDays($worker->wkr_permitexp, false) <= 30;
                         @endphp
                         <flux:table.rows :key="$worker->wkr_id">
-                            <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
+                            <flux:table.cell>{{ ($pagination['current_page'] - 1) * $pagination['per_page'] + $loop->iteration }}</flux:table.cell>
 
                             <flux:table.cell variant="strong" class="flex items-center gap-2">
                                 <flux:avatar size="xs" color="auto" name="{{ $worker->name }}" />
@@ -286,7 +286,7 @@
                     </p>
                     <div class="flex gap-2">
                         @if($pagination['current_page'] > 1)
-                            <flux:button variant="ghost" size="sm" href="{{ route('client.workers', array_merge(request()->query(), ['page' => $pagination['current_page'] - 1])) }}">Previous</flux:button>
+                            <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] - 1 }})">Previous</flux:button>
                         @else
                             <flux:button variant="ghost" size="sm" disabled>Previous</flux:button>
                         @endif
@@ -295,12 +295,12 @@
                             @if($i == $pagination['current_page'])
                                 <flux:button variant="primary" size="sm">{{ $i }}</flux:button>
                             @else
-                                <flux:button variant="ghost" size="sm" href="{{ route('client.workers', array_merge(request()->query(), ['page' => $i])) }}">{{ $i }}</flux:button>
+                                <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $i }})">{{ $i }}</flux:button>
                             @endif
                         @endfor
 
                         @if($pagination['current_page'] < $pagination['last_page'])
-                            <flux:button variant="ghost" size="sm" href="{{ route('client.workers', array_merge(request()->query(), ['page' => $pagination['current_page'] + 1])) }}">Next</flux:button>
+                            <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] + 1 }})">Next</flux:button>
                         @else
                             <flux:button variant="ghost" size="sm" disabled>Next</flux:button>
                         @endif

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Client;
 
+use App\Models\InactiveWorker;
 use App\Models\News;
 use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
@@ -69,7 +70,9 @@ class Dashboard extends Component
 
         // Workers
         $workers = $workerService->getContractedWorkers($clabNo);
-        $activeContracts = $workerService->getActiveContractsByContractor($clabNo);
+        $manuallyInactiveIds = InactiveWorker::getInactiveWorkerIds();
+        $activeContracts = $workerService->getActiveContractsByContractor($clabNo)
+            ->filter(fn ($c) => ! in_array($c->con_wkr_id, $manuallyInactiveIds));
         $expiringContracts = $workerService->getExpiringContracts(30)
             ->filter(fn ($c) => $c->con_ctr_clab_no === $clabNo);
 

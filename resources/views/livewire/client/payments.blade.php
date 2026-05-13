@@ -201,7 +201,7 @@
             <flux:table.rows>
                 @forelse($payments as $payment)
                     <flux:table.rows :key="$payment->id">
-                        <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
+                        <flux:table.cell>{{ ($pagination['current_page'] - 1) * $pagination['per_page'] + $loop->iteration }}</flux:table.cell>
 
                         <flux:table.cell variant="strong" class="font-mono">
                             {{ $payment->transaction_id ?? $payment->billplz_bill_id ?? 'N/A' }}

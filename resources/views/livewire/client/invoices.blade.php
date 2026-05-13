@@ -169,7 +169,7 @@
                         id="invoice-{{ $invoice->id }}"
                         class="{{ $highlightId == $invoice->id ? 'animate-pulse bg-green-100 dark:bg-green-900/30' : '' }}"
                     >
-                        <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
+                        <flux:table.cell>{{ ($pagination['current_page'] - 1) * $pagination['per_page'] + $loop->iteration }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
                             INV-{{ str_pad($invoice->id, 4, '0', STR_PAD_LEFT) }}
