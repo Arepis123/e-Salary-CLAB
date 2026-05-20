@@ -9,7 +9,7 @@
             </div>
             <div class="flex gap-2">
                 <x-tutorial-button page="ot-entry" />
-                @if(!$isLoading && $isWithinWindow && !$hasSubmitted)
+                @if(!$isLoading && $isWithinWindow)
                     <flux:button id="download-template-btn" wire:click="downloadTemplate" variant="outline" icon="arrow-down-tray" size="sm">
                         Download Template
                     </flux:button>
@@ -78,7 +78,7 @@
         </flux:card>
 
         <!-- Submission Status -->
-        @if(!$isLoading && $hasSubmitted)
+        @if(!$isLoading && $hasSubmitted && !$isManuallyOpened)
             <flux:callout icon="check-circle" color="emerald">
                 <flux:callout.heading>Entries Submitted</flux:callout.heading>
                 <flux:callout.text>

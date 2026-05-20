@@ -112,7 +112,8 @@ class ContractorWindowService
         foreach ($lockedEntries as $entry) {
             $previousStatus = $entry->status;
 
-            // Change status back to submitted (so it can be edited)
+            // Restore to submitted — the contractor's finalised state is preserved.
+            // Auto-save will move entries to draft only when the contractor actually edits.
             $entry->update([
                 'status' => 'submitted',
                 'locked_at' => null,

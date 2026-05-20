@@ -23,6 +23,8 @@ class OTEntry extends Component
 
     public $isWithinWindow = false;
 
+    public $isManuallyOpened = false;
+
     public $hasSubmitted = false;
 
     public $submissionStatus = [];
@@ -96,7 +98,9 @@ class OTEntry extends Component
         $this->period = $this->otEntryService->getEntryPeriod();
 
         // Use contractor-specific window check instead of default
-        $this->isWithinWindow = $this->otEntryService->isContractorWindowOpen($clabNo);
+        $windowStatus = $this->otEntryService->getContractorWindowStatus($clabNo);
+        $this->isWithinWindow = $windowStatus['is_open'];
+        $this->isManuallyOpened = $windowStatus['is_manually_controlled'];
 
         // Get or create entries for this contractor
         $this->loadEntries();
@@ -300,10 +304,6 @@ class OTEntry extends Component
     public function autoSaveDraft(int $index): void
     {
         $clabNo = auth()->user()->contractor_clab_no;
-
-        if (! $this->isWithinWindow || $this->hasSubmitted) {
-            return;
-        }
 
         if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
             return;
