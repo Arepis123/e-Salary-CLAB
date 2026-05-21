@@ -844,7 +844,7 @@ class SalaryDetail extends Component
     public function uploadPayslip()
     {
         $this->validate([
-            'payslipFile' => 'required|file|mimes:zip|max:10240', // 10MB max
+            'payslipFile' => 'required|file|mimes:zip,rar,pdf|max:10240', // 10MB max
         ]);
 
         try {

@@ -129,11 +129,11 @@
 
                             <!-- Type -->
                             <div>
-                                <flux:select wire:model="type" label="Type" placeholder="Select type">
-                                    <option value="welcome">Welcome</option>
-                                    <option value="alert">Alert</option>
-                                    <option value="announcement">Announcement</option>
-                                    <option value="image">Image</option>
+                                <flux:select variant="listbox" wire:model="type" label="Type" placeholder="Select type">
+                                    <flux:select.option value="welcome">Welcome</flux:select.option>
+                                    <flux:select.option value="alert">Alert</flux:select.option>
+                                    <flux:select.option value="announcement">Announcement</flux:select.option>
+                                    <flux:select.option value="image">Image</flux:select.option>
                                 </flux:select>
                                 @error('type') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
                             </div>

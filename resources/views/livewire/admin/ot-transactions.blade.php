@@ -157,7 +157,7 @@
                         $hasTransactions = $submission->has_transactions;
                     @endphp
                     <flux:table.row :key="$submission->contractor_clab_no . '-' . $submission->entry_month . '-' . $submission->entry_year">
-                        <flux:table.cell align="center">{{ $pagination['from'] + $index }}</flux:table.cell>
+                        <flux:table.cell align="center">{{ $submissions->firstItem() + $loop->index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong" class="max-w-xs truncate">
                             {{ $submission->contractor_name }}
@@ -257,37 +257,7 @@
             </flux:table.rows>
         </flux:table>
 
-        <!-- Pagination -->
-        @if($pagination['total'] > $perPage)
-        <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-zinc-600 dark:text-zinc-400">
-                Showing {{ $pagination['from'] }} to {{ $pagination['to'] }} of {{ $pagination['total'] }} submissions
-            </div>
-            <div class="flex gap-2">
-                <flux:button
-                    wire:click="$set('page', {{ $pagination['current_page'] - 1 }})"
-                    variant="ghost"
-                    size="sm"
-                    icon="chevron-left"
-                    icon-variant="micro"
-                    :disabled="$pagination['current_page'] === 1"
-                >
-                    Previous
-                </flux:button>
-                <flux:button
-                    wire:click="$set('page', {{ $pagination['current_page'] + 1 }})"
-                    variant="ghost"
-                    size="sm"
-                    icon="chevron-right"
-                    icon-trailing
-                    icon-variant="micro"
-                    :disabled="$pagination['current_page'] >= $pagination['last_page']"
-                >
-                    Next
-                </flux:button>
-            </div>
-        </div>
-        @endif
+        <flux:pagination :paginator="$submissions" class="mt-5"/>
     </flux:card>
 
     <!-- Detail Modal -->

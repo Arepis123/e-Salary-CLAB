@@ -5,11 +5,14 @@ namespace App\Livewire\Admin;
 use App\Models\PayrollSubmission;
 use App\Models\User;
 use Flux\Flux;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Contractors extends Component
 {
+    use WithPagination;
     public $stats = [];
 
     #[Url(except: '')]
@@ -17,9 +20,6 @@ class Contractors extends Component
 
     #[Url(except: '')]
     public $statusFilter = '';
-
-    #[Url(except: 1)]
-    public $page = 1;
 
     public $perPage = 10;
 
@@ -68,11 +68,6 @@ class Contractors extends Component
             heading: 'Export feature',
             text: 'Contractor export will be implemented soon.'
         );
-    }
-
-    public function resetPage()
-    {
-        $this->page = 1;
     }
 
     public function updatingSearch()
@@ -175,22 +170,17 @@ class Contractors extends Component
             return $contractor;
         });
 
-        // Manual pagination
-        $total = $allContractors->count();
-        $contractors = $allContractors->slice(($this->page - 1) * $this->perPage, $this->perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $this->perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $this->perPage),
-            'from' => (($this->page - 1) * $this->perPage) + 1,
-            'to' => min($this->page * $this->perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $contractors = new LengthAwarePaginator(
+            $allContractors->slice(($currentPage - 1) * $this->perPage, $this->perPage)->values(),
+            $allContractors->count(),
+            $this->perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.admin.contractors', [
             'contractors' => $contractors,
-            'pagination' => $pagination,
         ]);
     }
 }

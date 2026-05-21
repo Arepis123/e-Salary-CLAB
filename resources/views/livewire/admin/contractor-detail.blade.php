@@ -216,12 +216,7 @@
                 </flux:table>
             </div>
 
-            <!-- Workers Pagination -->
-            @if($workers->hasPages())
-                <div class="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    {{ $workers->links() }}
-                </div>
-            @endif
+            <flux:pagination :paginator="$workers" class="mt-5"/>
         </flux:card>
     @elseif($activeTab === 'payroll')
         <!-- Payroll History -->
@@ -301,12 +296,7 @@
                 </flux:table>
             </div>
 
-            <!-- Payroll Pagination -->
-            @if($payrollHistory->hasPages())
-                <div class="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    {{ $payrollHistory->links() }}
-                </div>
-            @endif
+            <flux:pagination :paginator="$payrollHistory" class="mt-5"/>
         </flux:card>
     @endif
 </div>

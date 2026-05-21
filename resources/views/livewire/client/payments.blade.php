@@ -201,7 +201,7 @@
             <flux:table.rows>
                 @forelse($payments as $payment)
                     <flux:table.rows :key="$payment->id">
-                        <flux:table.cell>{{ ($pagination['current_page'] - 1) * $pagination['per_page'] + $loop->iteration }}</flux:table.cell>
+                        <flux:table.cell>{{ $payments->firstItem() + $loop->index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong" class="font-mono">
                             {{ $payment->transaction_id ?? $payment->billplz_bill_id ?? 'N/A' }}
@@ -256,35 +256,7 @@
             </flux:table.rows>
         </flux:table>
 
-        <!-- Pagination -->
-        @if($pagination['total'] > 0)
-            <div class="mt-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ $pagination['from'] }} to {{ $pagination['to'] }} of {{ $pagination['total'] }} results
-                </p>
-                <div class="flex gap-2">
-                    @if($pagination['current_page'] > 1)
-                        <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] - 1 }})">Previous</flux:button>
-                    @else
-                        <flux:button variant="ghost" size="sm" disabled>Previous</flux:button>
-                    @endif
-
-                    @for($i = 1; $i <= $pagination['last_page']; $i++)
-                        @if($i == $pagination['current_page'])
-                            <flux:button variant="primary" size="sm">{{ $i }}</flux:button>
-                        @else
-                            <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $i }})">{{ $i }}</flux:button>
-                        @endif
-                    @endfor
-
-                    @if($pagination['current_page'] < $pagination['last_page'])
-                        <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] + 1 }})">Next</flux:button>
-                    @else
-                        <flux:button variant="ghost" size="sm" disabled>Next</flux:button>
-                    @endif
-                </div>
-            </div>
-        @endif
+        <flux:pagination :paginator="$payments" class="mt-5"/>
     </flux:card>
     @endif
 </div>

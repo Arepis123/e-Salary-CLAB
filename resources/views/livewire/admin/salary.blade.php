@@ -198,7 +198,7 @@
             <flux:table.rows>
                 @forelse($submissions as $index => $submission)
                     <flux:table.rows :key="$submission->id">
-                        <flux:table.cell>{{ $pagination['from'] + $index }}</flux:table.cell>
+                        <flux:table.cell>{{ $submissions->firstItem() + $index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
                             #PAY{{ str_pad($submission->id, 6, '0', STR_PAD_LEFT) }}
@@ -294,36 +294,7 @@
         </flux:table>
 
         <!-- Pagination -->
-        @if($pagination['total'] > $perPage)
-        <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-zinc-600 dark:text-zinc-400">
-                Showing {{ $pagination['from'] }} to {{ $pagination['to'] }} of {{ $pagination['total'] }} submissions
-            </div>
-            <div class="flex gap-2">
-                <flux:button
-                    wire:click="$set('page', {{ $pagination['current_page'] - 1 }})"
-                    variant="ghost"
-                    size="sm"
-                    icon="chevron-left"
-                    icon-variant="micro"
-                    :disabled="$pagination['current_page'] === 1"
-                >
-                    Previous
-                </flux:button>
-                <flux:button
-                    wire:click="$set('page', {{ $pagination['current_page'] + 1 }})"
-                    variant="ghost"
-                    size="sm"
-                    icon="chevron-right"
-                    icon-trailing
-                    icon-variant="micro"
-                    :disabled="$pagination['current_page'] >= $pagination['last_page']"
-                >
-                    Next
-                </flux:button>
-            </div>
-        </div>
-        @endif
+        <flux:pagination :paginator="$submissions" class="mt-5"/>
         @endif
     </flux:card>
 

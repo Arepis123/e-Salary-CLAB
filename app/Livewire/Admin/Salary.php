@@ -7,10 +7,13 @@ use App\Models\PayrollSubmission;
 use Flux\Flux;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 use Maatwebsite\Excel\Facades\Excel;
 
 class Salary extends Component
 {
+    use WithPagination;
+
     public $stats = [];
 
     #[Url(except: '')]
@@ -30,9 +33,6 @@ class Salary extends Component
 
     #[Url(except: '')]
     public $monthFilter = '';
-
-    #[Url(except: 1)]
-    public $page = 1;
 
     public $contractors = [];
 
@@ -145,11 +145,6 @@ class Salary extends Component
     {
         $this->showPaymentLog = false;
         $this->selectedSubmission = null;
-    }
-
-    public function resetPage()
-    {
-        $this->page = 1;
     }
 
     public function updatingSearch()
@@ -301,21 +296,8 @@ class Salary extends Component
 
     public function render()
     {
-        // Use database-level pagination (much faster than loading all then slicing)
-        $paginator = $this->getSubmissionsQuery()->paginate($this->perPage, ['*'], 'page', $this->page);
-
-        $pagination = [
-            'current_page' => $paginator->currentPage(),
-            'per_page' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'last_page' => $paginator->lastPage(),
-            'from' => $paginator->firstItem() ?? 0,
-            'to' => $paginator->lastItem() ?? 0,
-        ];
-
         return view('livewire.admin.salary', [
-            'submissions' => $paginator->items(),
-            'pagination' => $pagination,
+            'submissions' => $this->getSubmissionsQuery()->paginate($this->perPage),
         ]);
     }
 }

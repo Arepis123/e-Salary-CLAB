@@ -4,11 +4,14 @@ namespace App\Livewire\Admin;
 
 use App\Models\ActivityLog;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class ActivityLogs extends Component
 {
+    use WithPagination;
     #[Url]
     public $moduleFilter = '';
 
@@ -26,9 +29,6 @@ class ActivityLogs extends Component
 
     #[Url]
     public $endDate = '';
-
-    #[Url]
-    public $page = 1;
 
     public $perPage = 40;
 
@@ -71,11 +71,6 @@ class ActivityLogs extends Component
         $this->startDate = now()->subDays(7)->format('Y-m-d');
         $this->endDate = now()->format('Y-m-d');
         $this->resetPage();
-    }
-
-    public function resetPage()
-    {
-        $this->page = 1;
     }
 
     public function updatingModuleFilter()
@@ -186,22 +181,17 @@ class ActivityLogs extends Component
     {
         $allLogs = $this->getLogs();
 
-        // Manual pagination
-        $total = $allLogs->count();
-        $logs = $allLogs->slice(($this->page - 1) * $this->perPage, $this->perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $this->perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $this->perPage),
-            'from' => (($this->page - 1) * $this->perPage) + 1,
-            'to' => min($this->page * $this->perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $logs = new LengthAwarePaginator(
+            $allLogs->slice(($currentPage - 1) * $this->perPage, $this->perPage)->values(),
+            $allLogs->count(),
+            $this->perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.admin.activity-logs', [
             'logs' => $logs,
-            'pagination' => $pagination,
         ]);
     }
 }

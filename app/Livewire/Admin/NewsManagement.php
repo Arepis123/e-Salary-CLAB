@@ -68,6 +68,7 @@ class NewsManagement extends Component
         $this->showModal = true;
         $this->is_active = true;
         $this->type = 'announcement';
+        $this->order = (News::where('is_active', true)->max('order') ?? 0) + 1;
     }
 
     public function openEditModal($id)
@@ -117,6 +118,7 @@ class NewsManagement extends Component
         }
 
         if ($this->modalMode === 'create') {
+            $this->shiftOrderConflict($this->order);
             News::create($data);
             Flux::toast(variant: 'success', text: 'News created successfully.');
         } else {
@@ -127,6 +129,7 @@ class NewsManagement extends Component
                 $data['image_path'] = $this->existing_image_path;
             }
 
+            $this->shiftOrderConflict($this->order, $this->newsId);
             $news->update($data);
             Flux::toast(variant: 'success', text: 'News updated successfully.');
         }
@@ -147,6 +150,22 @@ class NewsManagement extends Component
         $news = News::findOrFail($id);
         $news->update(['is_active' => ! $news->is_active]);
         $this->loadNews();
+    }
+
+    protected function shiftOrderConflict(int $order, ?int $excludeId = null): void
+    {
+        // Only active items participate in ordering — inactive items are invisible in the carousel
+        $exists = News::where('order', $order)
+            ->where('is_active', true)
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->exists();
+
+        if ($exists) {
+            News::where('order', '>=', $order)
+                ->where('is_active', true)
+                ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+                ->increment('order');
+        }
     }
 
     public function render()

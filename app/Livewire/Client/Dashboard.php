@@ -153,6 +153,10 @@ class Dashboard extends Component
 
         $this->newsItems = News::active()->get();
 
+        if ($this->newsItems->count() > 0) {
+            $this->dispatch('news-loaded');
+        }
+
         $this->overduePayments = PayrollSubmission::byContractor($clabNo)
             ->overdue()
             ->orderBy('year', 'desc')

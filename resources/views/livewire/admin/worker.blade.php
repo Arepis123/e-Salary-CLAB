@@ -157,7 +157,7 @@
                             }
                         @endphp
                         <flux:table.rows :key="$worker['contract_id']">
-                            <flux:table.cell>{{ $pagination['from'] + $index }}</flux:table.cell>
+                            <flux:table.cell>{{ $workers->firstItem() + $loop->index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong" class="flex items-center gap-3">
                                 <flux:avatar size="xs" color="auto" name="{{ $worker['name'] }}" />
@@ -214,60 +214,6 @@
                 </flux:table.rows>
             </flux:table>
 
-            <!-- Pagination -->
-            @if($pagination['total'] > 0)
-                <div class="mt-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                        Showing {{ $pagination['from'] }} to {{ $pagination['to'] }} of {{ $pagination['total'] }} results
-                    </p>
-                    <div class="flex items-center gap-2">
-                        @if($pagination['current_page'] > 1)
-                            <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] - 1 }})">Previous</flux:button>
-                        @else
-                            <flux:button variant="ghost" size="sm" disabled>Previous</flux:button>
-                        @endif
-
-                        @php
-                            $currentPage = $pagination['current_page'];
-                            $lastPage = $pagination['last_page'];
-                            $delta = 2; // Number of pages to show on each side of current page
-                            $left = $currentPage - $delta;
-                            $right = $currentPage + $delta + 1;
-                            $pages = [];
-                            $l = 0;
-
-                            for ($i = 1; $i <= $lastPage; $i++) {
-                                if ($i == 1 || $i == $lastPage || ($i >= $left && $i < $right)) {
-                                    if ($l) {
-                                        if ($i - $l === 2) {
-                                            $pages[] = $l + 1;
-                                        } else if ($i - $l !== 1) {
-                                            $pages[] = '...';
-                                        }
-                                    }
-                                    $pages[] = $i;
-                                    $l = $i;
-                                }
-                            }
-                        @endphp
-
-                        @foreach($pages as $page)
-                            @if($page === '...')
-                                <span class="px-2 text-zinc-400">...</span>
-                            @elseif($page == $currentPage)
-                                <flux:button variant="primary" size="xs">{{ $page }}</flux:button>
-                            @else
-                                <flux:button variant="ghost" size="xs" wire:click="$set('page', {{ $page }})">{{ $page }}</flux:button>
-                            @endif
-                        @endforeach
-
-                        @if($pagination['current_page'] < $pagination['last_page'])
-                            <flux:button variant="ghost" size="sm" wire:click="$set('page', {{ $pagination['current_page'] + 1 }})">Next</flux:button>
-                        @else
-                            <flux:button variant="ghost" size="sm" disabled>Next</flux:button>
-                        @endif
-                    </div>
-                </div>
-            @endif
+            <flux:pagination :paginator="$workers" class="mt-5"/>
         </flux:card>
 </div>

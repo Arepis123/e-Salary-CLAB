@@ -361,7 +361,7 @@
 
         <!-- Transaction Management Modal -->
         @if($showTransactionModal && $currentWorkerIndex !== null)
-            <flux:modal wire:model="showTransactionModal" class="min-w-[600px]">
+            <flux:modal wire:model="showTransactionModal" class="min-w-[600px]" :dismissible="false">
                 <div class="space-y-6">
                     <div>
                         <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
@@ -394,7 +394,7 @@
                                     @if($newTransactionCategory === 'deduction')
                                         <flux:select.option value="accommodation">Accommodation</flux:select.option>
                                         <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
-                                        <flux:select.option value="deduction">Other Deduction</flux:select.option>
+                                        {{-- <flux:select.option value="deduction">Other Deduction</flux:select.option> --}}
                                         <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
                                     @else
                                         <flux:select.option value="allowance">Allowance</flux:select.option>
@@ -485,8 +485,7 @@
 
                     <!-- Modal Actions -->
                     <div class="flex justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                        <flux:button wire:click="closeTransactionModal" variant="ghost">Cancel</flux:button>
-                        <flux:button wire:click="saveTransactions" variant="primary">Save Transactions</flux:button>
+                        <flux:button wire:click="closeTransactionModal" variant="primary">Close</flux:button>
                     </div>
                 </div>
             </flux:modal>

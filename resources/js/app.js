@@ -194,7 +194,7 @@ const tutorialConfigs = {
                 element: '#dashboard-stats',
                 popover: {
                     title: 'Dashboard Statistics',
-                    description: 'Here you can see your current month\'s payroll summary, outstanding balance, and year-to-date payments at a glance.',
+                    description: 'Four quick-glance cards: (1) My Workers — active headcount with contract expiry alerts, (2) This Month — total payroll amount due with payment deadline, (3) Outstanding Balance — any unpaid or overdue invoices, (4) Paid This Year — cumulative payments made since January.',
                     side: 'bottom'
                 }
             },

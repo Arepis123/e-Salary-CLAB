@@ -6,9 +6,11 @@ use App\Models\PayrollSubmission;
 use App\Models\User;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Invoices extends Component
 {
+    use WithPagination;
     #[Url]
     public $search = '';
 
@@ -20,9 +22,6 @@ class Invoices extends Component
 
     #[Url]
     public $year;
-
-    #[Url]
-    public $page = 1;
 
     #[Url]
     public $sortBy = 'issue_date';
@@ -133,10 +132,6 @@ class Invoices extends Component
         $this->resetPage();
     }
 
-    public function resetPage()
-    {
-        $this->page = 1;
-    }
 
     public function sortByColumn($column)
     {
@@ -202,21 +197,10 @@ class Invoices extends Component
 
     public function render()
     {
-        // Use database-level pagination
-        $paginator = $this->getInvoicesQuery()->paginate($this->perPage, ['*'], 'page', $this->page);
-
-        $pagination = [
-            'current_page' => $paginator->currentPage(),
-            'per_page' => $paginator->perPage(),
-            'total' => $paginator->total(),
-            'last_page' => $paginator->lastPage(),
-            'from' => $paginator->firstItem() ?? 0,
-            'to' => $paginator->lastItem() ?? 0,
-        ];
+        $invoices = $this->getInvoicesQuery()->paginate($this->perPage);
 
         return view('livewire.admin.invoices', [
-            'invoices' => $paginator->items(),
-            'pagination' => $pagination,
+            'invoices' => $invoices,
         ]);
     }
 }

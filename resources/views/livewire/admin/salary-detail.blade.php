@@ -719,30 +719,27 @@
         <form wire:submit.prevent="uploadPayslip">
             <flux:heading size="lg">Upload Payslip File</flux:heading>
             <flux:subheading class="mb-4">
-                Upload a ZIP file containing all workers' payslip PDFs for {{ $submission->month_year }}
+                Upload a ZIP file containing all workers' payslip PDFs for {{ $submission->month_year }}.
             </flux:subheading>
 
-            <flux:field>
-                <flux:label>Payslip ZIP File</flux:label>
-                <flux:description>Maximum file size: 10MB. Must be a ZIP file containing individual worker payslip PDFs.</flux:description>
-                <input
-                    type="file"
-                    wire:model="payslipFile"
-                    accept=".zip"
-                    class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600"
+            <flux:file-upload wire:model="payslipFile" accept=".zip,.rar,.pdf" label="Payslip File" :disabled="(bool) $payslipFile">
+                <flux:file-upload.dropzone
+                    heading="Drop file here or click to browse"
+                    text="ZIP, RAR, or PDF up to 10MB"
+                    with-progress
+                    inline
                 />
-                <flux:error name="payslipFile" />
+            </flux:file-upload>
 
-                <div wire:loading wire:target="payslipFile" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    <flux:icon.arrow-path class="size-3 inline animate-spin" /> Uploading file...
-                </div>
-
-                @if($payslipFile)
-                <div class="text-xs text-green-600 dark:text-green-400 mt-1">
-                    <flux:icon.check-circle class="size-3 inline" /> File selected: {{ $payslipFile->getClientOriginalName() }} ({{ number_format($payslipFile->getSize() / 1024, 2) }} KB)
-                </div>
-                @endif
-            </flux:field>
+            @if($payslipFile)
+            <div class="mt-3">
+                <flux:file-item heading="{{ $payslipFile->getClientOriginalName() }}" :description="number_format($payslipFile->getSize() / 1024, 2) . ' KB'">
+                    <x-slot name="actions">
+                        <flux:file-item.remove wire:click="$set('payslipFile', null)" />
+                    </x-slot>
+                </flux:file-item>
+            </div>
+            @endif
 
             <div class="flex gap-2 mt-6">
                 <flux:button type="submit" variant="filled" icon="arrow-up-tray" :disabled="!$payslipFile" wire:loading.attr="disabled" wire:target="payslipFile, uploadPayslip">

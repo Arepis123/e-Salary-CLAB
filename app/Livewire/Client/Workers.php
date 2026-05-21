@@ -5,12 +5,16 @@ namespace App\Livewire\Client;
 use App\Exports\WorkersExport;
 use App\Models\InactiveWorker;
 use App\Services\ContractWorkerService;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 use Maatwebsite\Excel\Facades\Excel;
 
 class Workers extends Component
 {
+    use WithPagination;
+
     protected ContractWorkerService $contractWorkerService;
 
     #[Url]
@@ -27,9 +31,6 @@ class Workers extends Component
 
     #[Url]
     public $expiryStatus = 'all';
-
-    #[Url]
-    public $page = 1;
 
     #[Url]
     public $sortBy = 'status';
@@ -75,11 +76,6 @@ class Workers extends Component
         $this->position = 'all';
         $this->expiryStatus = 'all';
         $this->resetPage();
-    }
-
-    public function resetPage()
-    {
-        $this->page = 1;
     }
 
     public function sortByColumn($column)
@@ -167,20 +163,12 @@ class Workers extends Component
 
         if (! $clabNo) {
             return view('livewire.client.workers', [
-                'workers' => collect([]),
+                'workers' => new LengthAwarePaginator([], 0, 10, 1, ['path' => request()->url()]),
                 'stats' => [
                     'total_workers' => 0,
                     'active_workers' => 0,
                     'inactive_workers' => 0,
                     'average_salary' => 0,
-                ],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => 10,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'from' => 0,
-                    'to' => 0,
                 ],
                 'countries' => collect([]),
                 'positions' => collect([]),
@@ -310,22 +298,18 @@ class Workers extends Component
 
         // Pagination
         $perPage = 10;
-        $total = $allWorkers->count();
-        $workers = $allWorkers->slice(($this->page - 1) * $perPage, $perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $perPage),
-            'from' => (($this->page - 1) * $perPage) + 1,
-            'to' => min($this->page * $perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $workers = new LengthAwarePaginator(
+            $allWorkers->slice(($currentPage - 1) * $perPage, $perPage)->values(),
+            $allWorkers->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.client.workers', [
             'workers' => $workers,
             'stats' => $stats,
-            'pagination' => $pagination,
             'countries' => $countries,
             'positions' => $positions,
             'manuallyInactiveIds' => $manuallyInactiveIds,

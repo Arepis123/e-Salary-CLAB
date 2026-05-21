@@ -3,11 +3,15 @@
 namespace App\Livewire\Client;
 
 use App\Models\PayrollSubmission;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Invoices extends Component
 {
+    use WithPagination;
+
     #[Url]
     public $search = '';
 
@@ -16,9 +20,6 @@ class Invoices extends Component
 
     #[Url]
     public $year;
-
-    #[Url]
-    public $page = 1;
 
     #[Url]
     public $sortBy = 'issue_date';
@@ -70,11 +71,6 @@ class Invoices extends Component
         $this->resetPage();
     }
 
-    public function resetPage()
-    {
-        $this->page = 1;
-    }
-
     public function sortByColumn($column)
     {
         if ($this->sortBy === $column) {
@@ -119,9 +115,8 @@ class Invoices extends Component
     {
         if ($this->isLoading) {
             return view('livewire.client.invoices', [
-                'invoices' => collect([]),
+                'invoices' => new LengthAwarePaginator([], 0, 10, 1, ['path' => request()->url()]),
                 'stats' => ['pending_invoices' => 0, 'paid_invoices' => 0, 'total_invoiced' => 0],
-                'pagination' => ['current_page' => 1, 'per_page' => 10, 'total' => 0, 'last_page' => 1, 'from' => 0, 'to' => 0],
                 'availableYears' => collect([]),
                 'invoiceMonthLabel' => '',
             ])->layout('components.layouts.app', ['title' => __('Invoices')]);
@@ -132,19 +127,11 @@ class Invoices extends Component
         if (! $clabNo) {
             return view('livewire.client.invoices', [
                 'error' => 'No contractor CLAB number assigned to your account.',
-                'invoices' => collect([]),
+                'invoices' => new LengthAwarePaginator([], 0, 10, 1, ['path' => request()->url()]),
                 'stats' => [
                     'pending_invoices' => 0,
                     'paid_invoices' => 0,
                     'total_invoiced' => 0,
-                ],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => 10,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'from' => 0,
-                    'to' => 0,
                 ],
                 'availableYears' => collect([]),
             ]);
@@ -260,22 +247,18 @@ class Invoices extends Component
 
         // Pagination
         $perPage = 10;
-        $total = $allInvoices->count();
-        $invoices = $allInvoices->slice(($this->page - 1) * $perPage, $perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $perPage),
-            'from' => (($this->page - 1) * $perPage) + 1,
-            'to' => min($this->page * $perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $invoices = new LengthAwarePaginator(
+            $allInvoices->slice(($currentPage - 1) * $perPage, $perPage)->values(),
+            $allInvoices->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.client.invoices', [
             'invoices' => $invoices,
             'stats' => $stats,
-            'pagination' => $pagination,
             'availableYears' => $availableYears,
             'invoiceMonthLabel' => ($isBeforeAutoSubmit ? 'Last Month Invoice' : 'This Month Invoice').' ('.$displayDate->format('F').')',
         ])->layout('components.layouts.app', ['title' => __('Invoices')]);

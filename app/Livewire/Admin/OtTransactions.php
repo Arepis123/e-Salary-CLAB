@@ -5,11 +5,14 @@ namespace App\Livewire\Admin;
 use App\Models\MonthlyOTEntry;
 use App\Models\MonthlyOTEntryTransaction;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class OtTransactions extends Component
 {
+    use WithPagination;
     public $stats = [];
 
     #[Url(except: '')]
@@ -26,9 +29,6 @@ class OtTransactions extends Component
 
     #[Url(except: '')]
     public $selectedPeriod = '';
-
-    #[Url(except: 1)]
-    public $page = 1;
 
     public $availableMonths = [];
 
@@ -110,10 +110,6 @@ class OtTransactions extends Component
         }
     }
 
-    public function resetPage()
-    {
-        $this->page = 1;
-    }
 
     public function updatingSearch()
     {
@@ -363,22 +359,17 @@ class OtTransactions extends Component
     {
         $allSubmissions = $this->getContractorSubmissions();
 
-        // Manual pagination
-        $total = $allSubmissions->count();
-        $submissions = $allSubmissions->slice(($this->page - 1) * $this->perPage, $this->perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $this->perPage,
-            'total' => $total,
-            'last_page' => max(1, ceil($total / $this->perPage)),
-            'from' => $total > 0 ? (($this->page - 1) * $this->perPage) + 1 : 0,
-            'to' => min($this->page * $this->perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $submissions = new LengthAwarePaginator(
+            $allSubmissions->slice(($currentPage - 1) * $this->perPage, $this->perPage)->values(),
+            $allSubmissions->count(),
+            $this->perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.admin.ot-transactions', [
             'submissions' => $submissions,
-            'pagination' => $pagination,
         ]);
     }
 }

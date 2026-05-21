@@ -245,7 +245,7 @@
         @endif
 
         <!-- Statistics Cards -->
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div id="dashboard-stats" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <!-- My Workers -->
             <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
                 <div class="flex items-center justify-between">
@@ -699,7 +699,6 @@
         function stopAutoSlide() { if (autoSlideInterval) clearInterval(autoSlideInterval); }
 
         document.addEventListener('DOMContentLoaded', function () {
-            setTimeout(() => { if (document.querySelectorAll('.carousel-slide').length > 0) { showNewsModal(); goToSlide(0); startAutoSlide(); } }, 500);
             document.addEventListener('keydown', function (e) {
                 const modal = document.getElementById('newsModal');
                 if (modal && !modal.classList.contains('invisible')) {
@@ -709,6 +708,11 @@
                 }
             });
             document.getElementById('newsModal')?.addEventListener('click', function (e) { if (e.target === this) closeNewsModal(); });
+        });
+
+        // Open the carousel only after Livewire has rendered the news slides into the DOM
+        window.addEventListener('news-loaded', () => {
+            setTimeout(() => { showNewsModal(); goToSlide(0); startAutoSlide(); }, 100);
         });
 
         // Trigger deferred load after stats are done

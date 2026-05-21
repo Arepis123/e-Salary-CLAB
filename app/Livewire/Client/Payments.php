@@ -4,11 +4,15 @@ namespace App\Livewire\Client;
 
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Payments extends Component
 {
+    use WithPagination;
+
     #[Url]
     public $search = '';
 
@@ -17,9 +21,6 @@ class Payments extends Component
 
     #[Url]
     public $statusFilter = 'all';
-
-    #[Url]
-    public $page = 1;
 
     #[Url]
     public $sortBy = 'payment_date';
@@ -56,11 +57,6 @@ class Payments extends Component
         $this->resetPage();
     }
 
-    public function resetPage()
-    {
-        $this->page = 1;
-    }
-
     public function sortByColumn($column)
     {
         if ($this->sortBy === $column) {
@@ -79,7 +75,7 @@ class Payments extends Component
         if (! $clabNo) {
             return view('livewire.client.payments', [
                 'error' => 'No contractor CLAB number assigned to your account.',
-                'payments' => collect([]),
+                'payments' => new LengthAwarePaginator([], 0, 10, 1, ['path' => request()->url()]),
                 'stats' => [
                     'this_month_amount' => 0,
                     'this_month_status' => null,
@@ -87,14 +83,6 @@ class Payments extends Component
                     'this_year_amount' => 0,
                     'this_year_count' => 0,
                     'avg_monthly' => 0,
-                ],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => 10,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'from' => 0,
-                    'to' => 0,
                 ],
                 'availableYears' => collect([]),
             ]);
@@ -262,22 +250,18 @@ class Payments extends Component
 
         // Pagination
         $perPage = 10;
-        $total = $allPayments->count();
-        $payments = $allPayments->slice(($this->page - 1) * $perPage, $perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $perPage),
-            'from' => (($this->page - 1) * $perPage) + 1,
-            'to' => min($this->page * $perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $payments = new LengthAwarePaginator(
+            $allPayments->slice(($currentPage - 1) * $perPage, $perPage)->values(),
+            $allPayments->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.client.payments', [
             'payments' => $payments,
             'stats' => $stats,
-            'pagination' => $pagination,
             'availableYears' => $availableYears,
         ])->layout('components.layouts.app', ['title' => __('Payment History')]);
     }

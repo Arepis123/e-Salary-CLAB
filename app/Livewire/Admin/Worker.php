@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Exports\WorkersExport;
 use App\Models\ContractWorker;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -26,17 +27,12 @@ class Worker extends Component
     public $positionFilter = '';
 
     #[Url]
-    public $page = 1;
-
-    #[Url]
     public $sortBy = 'name';
 
     #[Url]
     public $sortDirection = 'asc';
 
     public $stats = [];
-
-    public $workers = [];
 
     public $showFilters = true;
 
@@ -76,11 +72,6 @@ class Worker extends Component
             $this->sortDirection = 'asc';
         }
         $this->resetPage();
-    }
-
-    public function resetPage()
-    {
-        $this->page = 1;
     }
 
     public function export()
@@ -338,22 +329,17 @@ class Worker extends Component
     {
         $allWorkers = $this->getWorkersData();
 
-        // Pagination
-        $total = $allWorkers->count();
-        $this->workers = $allWorkers->slice(($this->page - 1) * $this->perPage, $this->perPage)->values();
-
-        $pagination = [
-            'current_page' => $this->page,
-            'per_page' => $this->perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $this->perPage),
-            'from' => (($this->page - 1) * $this->perPage) + 1,
-            'to' => min($this->page * $this->perPage, $total),
-        ];
+        $currentPage = $this->getPage();
+        $workers = new LengthAwarePaginator(
+            $allWorkers->slice(($currentPage - 1) * $this->perPage, $this->perPage)->values(),
+            $allWorkers->count(),
+            $this->perPage,
+            $currentPage,
+            ['path' => request()->url()]
+        );
 
         return view('livewire.admin.worker', [
-            'workers' => $this->workers,
-            'pagination' => $pagination,
+            'workers' => $workers,
         ]);
     }
 }
