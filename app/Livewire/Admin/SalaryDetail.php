@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Mail\PayrollApproved;
 use App\Mail\PayslipReady;
 use App\Models\PayrollSubmission;
+use App\Traits\LogsActivity;
 use Flux\Flux;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
@@ -17,6 +18,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class SalaryDetail extends Component
 {
+    use LogsActivity;
     use WithFileUploads;
 
     public PayrollSubmission $submission;
@@ -64,6 +66,23 @@ class SalaryDetail extends Component
     public $payslipFile;
 
     public $isUpdatingAmount = false;
+
+    // Manual (off-platform) payment recording properties
+    public $showManualPaymentModal = false;
+
+    public $manualPaymentDate = '';
+
+    public $manualPaymentReference = '';
+
+    public $manualPaymentBank = '';
+
+    public $manualPaymentAmount = '';
+
+    public $manualPaymentNotes = '';
+
+    public $manualPaymentProof;
+
+    public $isRecordingPayment = false;
 
     public function mount($id)
     {
@@ -193,10 +212,196 @@ class SalaryDetail extends Component
         }, $filename);
     }
 
-    public function markAsPaid()
+    public function openManualPaymentModal()
     {
-        // TODO: Implement mark as paid functionality (for manual payments)
-        Flux::toast(variant: 'success', text: 'Manual payment marking functionality coming soon!');
+        // Guard: only unpaid submissions that have passed admin review can be marked paid
+        if ($this->submission->status === 'paid' || ($this->submission->payment && $this->submission->payment->status === 'completed')) {
+            Flux::toast(variant: 'warning', text: 'This payroll has already been paid.');
+
+            return;
+        }
+
+        if (! $this->submission->canCreatePayment()) {
+            Flux::toast(variant: 'warning', text: 'This submission must be approved by admin before a payment can be recorded.');
+
+            return;
+        }
+
+        // Make sure penalty (if overdue) is reflected before pre-filling the amount
+        $this->submission->updatePenalty();
+        $this->submission->refresh();
+
+        $this->manualPaymentDate = now()->format('Y-m-d');
+        $this->manualPaymentReference = '';
+        $this->manualPaymentBank = '';
+        $this->manualPaymentAmount = number_format($this->submission->total_due, 2, '.', '');
+        $this->manualPaymentNotes = '';
+        $this->manualPaymentProof = null;
+        $this->resetValidation();
+        $this->showManualPaymentModal = true;
+    }
+
+    public function closeManualPaymentModal()
+    {
+        $this->showManualPaymentModal = false;
+        $this->manualPaymentProof = null;
+        $this->resetValidation();
+    }
+
+    /**
+     * Record a payment that was made off-platform (e.g. a direct bank transfer
+     * into the company account, not collected through Billplz FPX).
+     *
+     * This creates a completed PayrollPayment labelled honestly as a bank
+     * transfer so reconciliation can tell it apart from FPX settlements, then
+     * flips the submission to paid so the official receipt can be generated.
+     */
+    public function recordManualPayment()
+    {
+        // Re-check state in case it changed while the modal was open
+        if ($this->submission->status === 'paid' || ($this->submission->payment && $this->submission->payment->status === 'completed')) {
+            Flux::toast(variant: 'warning', text: 'This payroll has already been paid.');
+            $this->closeManualPaymentModal();
+
+            return;
+        }
+
+        $this->validate([
+            'manualPaymentDate' => 'required|date|before_or_equal:today',
+            'manualPaymentReference' => 'required|string|max:191',
+            'manualPaymentBank' => 'required|string|max:191',
+            'manualPaymentAmount' => 'required|numeric|min:0.01',
+            'manualPaymentNotes' => 'nullable|string|max:1000',
+            'manualPaymentProof' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB max
+        ], [
+            'manualPaymentReference.required' => 'Enter the bank transaction / reference number.',
+            'manualPaymentBank.required' => 'Enter the bank the transfer came from.',
+            'manualPaymentDate.before_or_equal' => 'Payment date cannot be in the future.',
+        ]);
+
+        try {
+            $this->isRecordingPayment = true;
+
+            // Store proof of payment (bank-in slip) if provided
+            $proofPath = null;
+            $proofName = null;
+            if ($this->manualPaymentProof) {
+                $extension = $this->manualPaymentProof->getClientOriginalExtension();
+                $proofName = sprintf(
+                    'payment_proof_%s_%s.%s',
+                    $this->submission->id,
+                    now()->format('YmdHis'),
+                    $extension
+                );
+                $proofPath = $this->manualPaymentProof->storeAs('payment-proofs', $proofName, 'local');
+            }
+
+            $completedAt = \Carbon\Carbon::parse($this->manualPaymentDate)->setTime(
+                now()->hour,
+                now()->minute,
+                now()->second
+            );
+
+            // Create the completed payment record, honestly labelled as a bank transfer
+            $payment = \App\Models\PayrollPayment::create([
+                'payroll_submission_id' => $this->submission->id,
+                'payment_method' => 'bank_transfer',
+                'payment_type' => 'manual',
+                'bank_name' => $this->manualPaymentBank,
+                'transaction_id' => $this->manualPaymentReference,
+                'amount' => $this->manualPaymentAmount,
+                'status' => 'completed',
+                'completed_at' => $completedAt,
+                'payment_proof_path' => $proofPath,
+                'payment_proof_name' => $proofName,
+                'recorded_by' => auth()->id(),
+                'payment_response' => json_encode([
+                    'source' => 'manual_admin_entry',
+                    'recorded_by' => auth()->user()->name,
+                    'recorded_by_id' => auth()->id(),
+                    'recorded_at' => now()->toDateTimeString(),
+                    'payment_date' => $this->manualPaymentDate,
+                    'bank_name' => $this->manualPaymentBank,
+                    'reference' => $this->manualPaymentReference,
+                    'notes' => $this->manualPaymentNotes,
+                ]),
+            ]);
+
+            // Flip the submission to paid using the actual date money was received
+            $this->submission->update([
+                'status' => 'paid',
+                'paid_at' => $completedAt,
+            ]);
+
+            // Generate the official receipt number now that it's paid
+            if (! $this->submission->hasTaxInvoice()) {
+                $this->submission->generateTaxInvoiceNumber();
+            }
+
+            // Audit trail
+            $this->logPaymentActivity(
+                action: 'recorded_manually',
+                description: 'Recorded manual bank transfer of RM '.number_format((float) $this->manualPaymentAmount, 2)." for payroll {$this->submission->month_year} (Ref: {$this->manualPaymentReference}, Bank: {$this->manualPaymentBank})",
+                payment: $payment,
+                properties: [
+                    'submission_id' => $this->submission->id,
+                    'amount' => $this->manualPaymentAmount,
+                    'period' => $this->submission->month_year,
+                    'payment_method' => 'bank_transfer',
+                    'reference' => $this->manualPaymentReference,
+                    'bank_name' => $this->manualPaymentBank,
+                    'payment_date' => $this->manualPaymentDate,
+                    'has_proof' => (bool) $proofPath,
+                ]
+            );
+
+            $this->closeManualPaymentModal();
+            $this->mount($this->submission->id); // Refresh data
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Payment Recorded',
+                text: 'Bank transfer of RM '.number_format((float) $this->manualPaymentAmount, 2).' recorded. The official receipt is now available.'
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Failed to Record Payment',
+                text: 'Could not record the payment: '.$e->getMessage()
+            );
+
+            \Log::error('Manual payment recording failed', [
+                'submission_id' => $this->submission->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        } finally {
+            $this->isRecordingPayment = false;
+        }
+    }
+
+    public function downloadPaymentProof()
+    {
+        $payment = $this->submission->payments()
+            ->whereNotNull('payment_proof_path')
+            ->latest()
+            ->first();
+
+        if (! $payment || ! $payment->payment_proof_path) {
+            Flux::toast(variant: 'warning', text: 'No payment proof available.');
+
+            return;
+        }
+
+        $filePath = \Storage::disk('local')->path($payment->payment_proof_path);
+
+        if (! file_exists($filePath)) {
+            Flux::toast(variant: 'danger', heading: 'File Not Found', text: 'The payment proof file is missing from storage.');
+
+            return;
+        }
+
+        return response()->download($filePath, $payment->payment_proof_name ?? basename($filePath));
     }
 
     public function sendReminder()
@@ -616,7 +821,8 @@ class SalaryDetail extends Component
             }
 
             // Calculate total payroll amount (additions - deductions)
-            $totalAdditions = array_sum($totals);
+            // Backpay is read for the breakdown record but deliberately excluded from the total.
+            $totalAdditions = array_sum($totals) - ($totals['Backpay'] ?? 0);
             $totalDeductions = array_sum($deductions);
             $totalAmount = $totalAdditions - $totalDeductions;
 
@@ -1234,7 +1440,8 @@ class SalaryDetail extends Component
             }
 
             // Calculate total payroll amount (additions - deductions)
-            $totalAdditions = array_sum($totals);
+            // Backpay is read for the breakdown record but deliberately excluded from the total.
+            $totalAdditions = array_sum($totals) - ($totals['Backpay'] ?? 0);
             $totalDeductions = array_sum($deductions);
             $totalAmount = $totalAdditions - $totalDeductions;
 

@@ -38,10 +38,36 @@
                         <flux:sidebar.item icon="wallet" :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>{{ __('Payroll') }}</flux:sidebar.item>
                     @else
                         {{-- Admin/Super admin see expanded payroll menu --}}
+                        @php
+                            $month = now()->month;
+                            $year = now()->year;
+                            $periodStart = now()->startOfMonth()->toDateString();
+                            $periodEnd = now()->endOfMonth()->toDateString();
+
+                            $inactiveWorkerIds = \DB::table('inactive_workers')->pluck('worker_id')->all();
+
+                            $submittedWorkerIds = \App\Models\PayrollWorker::whereHas('payrollSubmission', function ($q) use ($month, $year) {
+                                $q->where('month', $month)->where('year', $year);
+                            })->pluck('worker_id')->unique()->all();
+
+                            $missingCount = \App\Models\ContractWorker::where('con_start', '<=', $periodEnd)
+                                ->where('con_end', '>=', $periodStart)
+                                ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
+                                ->whereNotIn('con_wkr_id', $submittedWorkerIds)
+                                ->distinct()
+                                ->count('con_ctr_clab_no');
+                        @endphp
                         <flux:sidebar.group expandable icon="wallet" heading="Payroll" class="grid">
                             <flux:sidebar.item :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>All submissions</flux:sidebar.item>
                             <flux:sidebar.item :href="route('ot-transactions')" :current="request()->routeIs('ot-transactions')" wire:navigate>OT & Transactions</flux:sidebar.item>
-                            <flux:sidebar.item :href="route('missing-submissions')" :current="request()->routeIs('missing-submissions')" wire:navigate>No submissions</flux:sidebar.item>
+                            <flux:sidebar.item :href="route('missing-submissions')" :current="request()->routeIs('missing-submissions')" wire:navigate>
+                                <span class="flex items-center w-full">
+                                    No submissions
+                                    @if($missingCount > 0)
+                                        <flux:badge color="red" rounded size="sm" class="ml-auto">{{ $missingCount }}</flux:badge>
+                                    @endif
+                                </span>
+                            </flux:sidebar.item>
                         </flux:sidebar.group>
                     @endif
                 @endif

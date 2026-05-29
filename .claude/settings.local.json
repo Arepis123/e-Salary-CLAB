@@ -54,7 +54,11 @@
       "WebSearch",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:billplz.github.io)"
+      "WebFetch(domain:billplz.github.io)",
+      "PowerShell(php artisan migrate --force 2>&1 | Select-Object -Last 20)",
+      "PowerShell(php -l app/Livewire/Admin/SalaryDetail.php; php -l app/Models/PayrollPayment.php)",
+      "PowerShell(php artisan view:clear; php artisan optimize:clear 2>&1 | Select-Object -Last 3)",
+      "PowerShell(php -l app/Livewire/Admin/SalaryDetail.php)"
     ],
     "deny": [],
     "ask": []

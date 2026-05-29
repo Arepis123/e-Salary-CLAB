@@ -161,6 +161,9 @@
     $transactionId    = $invoice->payment->transaction_id ?? 'N/A';
     $paidAt           = $invoice->payment?->completed_at?->format('d M Y') ?? now()->format('d M Y');
     $receiptNo        = $invoice->tax_invoice_number ?? 'PENDING';
+    $paymentMethod    = ($invoice->payment && $invoice->payment->payment_method === 'bank_transfer')
+        ? 'Bank Transfer' . ($invoice->payment->bank_name ? ' (' . $invoice->payment->bank_name . ')' : '')
+        : 'FPX / Online Banking';
     $periodLabel      = \Carbon\Carbon::create($invoice->year, $invoice->month, 1)->format('F Y');
     $contractorName   = $contractor ? ($contractor->company_name ?? $contractor->name) : $invoice->contractor_clab_no;
     $contractorClab   = $invoice->contractor_clab_no;
@@ -247,6 +250,7 @@
                 <div>Official Receipt No &nbsp;: <strong>{{ $receiptNo }}</strong></div>
                 <div>Invoice No &nbsp;: <strong>#PAY{{ str_pad($invoice->id, 6, '0', STR_PAD_LEFT) }}</strong></div>
                 <div>Date : {{ $paidAt }}</div>
+                <div>Payment : {{ $paymentMethod }}</div>
             </td>
         </tr>
     </table>

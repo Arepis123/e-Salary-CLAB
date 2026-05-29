@@ -18,6 +18,9 @@ class PayrollPayment extends Model
         'amount',
         'payment_response',
         'completed_at',
+        'payment_proof_path',
+        'payment_proof_name',
+        'recorded_by',
     ];
 
     protected $casts = [
@@ -39,6 +42,31 @@ class PayrollPayment extends Model
     public function submission()
     {
         return $this->belongsTo(PayrollSubmission::class, 'payroll_submission_id');
+    }
+
+    /**
+     * The admin/finance user who manually recorded this payment (if any)
+     */
+    public function recordedBy()
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    /**
+     * Whether this payment was recorded manually (off-platform), e.g. a direct
+     * bank transfer, rather than collected automatically through Billplz FPX.
+     */
+    public function isManual(): bool
+    {
+        return $this->payment_method !== 'billplz';
+    }
+
+    /**
+     * Whether a proof-of-payment file is attached
+     */
+    public function hasProof(): bool
+    {
+        return ! empty($this->payment_proof_path);
     }
 
     /**

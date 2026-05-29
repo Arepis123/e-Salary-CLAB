@@ -18,6 +18,11 @@
                     Edit
                 </flux:button>
             @endif
+            @if($submission->hasAdminReview() && (!$submission->payment || $submission->payment->status !== 'completed'))
+                <flux:button variant="filled" size="sm" wire:click="openManualPaymentModal" icon="banknotes" icon-variant="outline">
+                    Record Payment
+                </flux:button>
+            @endif
             @if($submission->payment && $submission->payment->status === 'completed')
                 <flux:button variant="filled" size="sm" wire:click="downloadReceipt" icon="document" icon-variant="outline">
                     Receipt
@@ -253,11 +258,20 @@
             <div>
                 <span class="text-sm text-zinc-600 dark:text-zinc-400">Payment Method:</span>
                 <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {{ strtoupper($actualPayment->payment_method ?? 'N/A') }}
+                    @if($actualPayment->payment_method === 'bank_transfer')
+                        Bank Transfer
+                        @if($actualPayment->bank_name)
+                            <span class="text-zinc-500">({{ $actualPayment->bank_name }})</span>
+                        @endif
+                    @else
+                        {{ strtoupper($actualPayment->payment_method ?? 'N/A') }}
+                    @endif
                 </p>
             </div>
             <div>
-                <span class="text-sm text-zinc-600 dark:text-zinc-400">Transaction ID:</span>
+                <span class="text-sm text-zinc-600 dark:text-zinc-400">
+                    {{ $actualPayment->payment_method === 'bank_transfer' ? 'Bank Reference:' : 'Transaction ID:' }}
+                </span>
                 <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                     {{ $actualPayment->transaction_id ?? 'N/A' }}
                 </p>
@@ -279,6 +293,40 @@
                 </p>
             </div>
         </div>
+
+        @if($actualPayment->payment_method === 'bank_transfer')
+            <div class="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4 grid gap-4 md:grid-cols-3">
+                <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Recorded By:</span>
+                    <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {{ $actualPayment->recordedBy?->name ?? 'N/A' }}
+                    </p>
+                </div>
+                <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Recorded At:</span>
+                    <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {{ $actualPayment->created_at?->format('d M Y, H:i') ?? 'N/A' }}
+                    </p>
+                </div>
+                <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Proof of Payment:</span>
+                    <div class="mt-1">
+                        @if($actualPayment->hasProof())
+                            <flux:button size="xs" variant="filled" wire:click="downloadPaymentProof" icon="arrow-down-tray">
+                                Download
+                            </flux:button>
+                        @else
+                            <span class="text-sm text-zinc-500">Not attached</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <flux:callout icon="information-circle" color="blue" inline class="mt-4">
+                <flux:callout.text>
+                    <span class="text-sm">This payment was recorded manually (paid directly into the company bank account, outside Billplz FPX).</span>
+                </flux:callout.text>
+            </flux:callout>
+        @endif
     </flux:card>
     @endif
 
@@ -751,6 +799,99 @@
                     </span>
                 </flux:button>
                 <flux:button type="button" wire:click="closeUploadPayslipModal" variant="ghost">
+                    Cancel
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <!-- Record Manual Payment Modal -->
+    <flux:modal wire:model="showManualPaymentModal" size="lg">
+        <form wire:submit.prevent="recordManualPayment">
+            <flux:heading size="lg">Record Manual Payment</flux:heading>
+            <flux:subheading class="mb-4">
+                Record a payment made directly into the company bank account (outside Billplz FPX) for {{ $submission->month_year }}.
+            </flux:subheading>
+
+            <flux:callout icon="exclamation-triangle" color="amber" class="mb-4">
+                <flux:callout.text>
+                    <p class="text-sm">This will mark the payroll as <strong>paid</strong> and generate the official receipt. Only use this once you have confirmed the funds were received in your bank account.</p>
+                </flux:callout.text>
+            </flux:callout>
+
+            <!-- Amount Due reference -->
+            <div class="mb-4 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-between items-center">
+                <span class="text-sm text-zinc-600 dark:text-zinc-400">Total Amount Due:</span>
+                <span class="text-lg font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</span>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+                <!-- Amount Received -->
+                <flux:field>
+                    <flux:label required>Amount Received (RM)</flux:label>
+                    <flux:input type="number" step="0.01" min="0.01" wire:model="manualPaymentAmount" placeholder="0.00" />
+                    <flux:error name="manualPaymentAmount" />
+                </flux:field>
+
+                <!-- Payment Date -->
+                <flux:field>
+                    <flux:label required>Date Received</flux:label>
+                    <flux:input type="date" wire:model="manualPaymentDate" max="{{ now()->format('Y-m-d') }}" />
+                    <flux:error name="manualPaymentDate" />
+                </flux:field>
+
+                <!-- Bank -->
+                <flux:field>
+                    <flux:label required>Paid From (Bank)</flux:label>
+                    <flux:input wire:model="manualPaymentBank" placeholder="e.g. Maybank" />
+                    <flux:error name="manualPaymentBank" />
+                </flux:field>
+
+                <!-- Reference -->
+                <flux:field>
+                    <flux:label required>Bank Reference No.</flux:label>
+                    <flux:input wire:model="manualPaymentReference" placeholder="Transaction / reference number" />
+                    <flux:error name="manualPaymentReference" />
+                </flux:field>
+            </div>
+
+            <!-- Proof of Payment -->
+            <flux:field class="mt-3">
+                <flux:label>Proof of Payment</flux:label>
+                <flux:description>Upload the bank-in slip / transfer confirmation (PDF or image)</flux:description>
+                <input type="file" wire:model="manualPaymentProof" accept=".pdf,.jpg,.jpeg,.png"
+                    class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
+                <flux:error name="manualPaymentProof" />
+                <div wire:loading wire:target="manualPaymentProof" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    <flux:icon.arrow-path class="size-3 inline animate-spin" /> Uploading file...
+                </div>
+                @if($manualPaymentProof)
+                    <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                        <flux:icon.check-circle class="size-3 inline" /> Ready: {{ $manualPaymentProof->getClientOriginalName() }}
+                    </p>
+                @endif
+            </flux:field>
+
+            <!-- Notes -->
+            <flux:field class="mt-3">
+                <flux:label>Notes (Optional)</flux:label>
+                <flux:textarea wire:model="manualPaymentNotes" rows="2" placeholder="Any additional notes for the audit trail..." />
+                <flux:error name="manualPaymentNotes" />
+            </flux:field>
+
+            <div class="flex gap-2 mt-6">
+                <flux:button type="submit" variant="primary" icon="check-circle" :disabled="$isRecordingPayment" wire:loading.attr="disabled" wire:target="manualPaymentProof, recordManualPayment">
+                    <span wire:loading.remove wire:target="manualPaymentProof, recordManualPayment">
+                        Record Payment & Mark Paid
+                    </span>
+                    <span wire:loading wire:target="manualPaymentProof">
+                        Uploading file...
+                    </span>
+                    <span wire:loading wire:target="recordManualPayment">
+                        Recording...
+                    </span>
+                </flux:button>
+                <flux:button type="button" wire:click="closeManualPaymentModal" variant="ghost">
                     Cancel
                 </flux:button>
             </div>
