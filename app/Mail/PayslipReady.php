@@ -40,6 +40,7 @@ class PayslipReady extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.payslip-ready',
+            text: 'emails.payslip-ready-text',
         );
     }
 

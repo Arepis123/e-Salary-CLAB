@@ -42,6 +42,7 @@ class PayrollApproved extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.payroll-approved',
+            text: 'emails.payroll-approved-text',
         );
     }
 

@@ -39,23 +39,29 @@
                     @else
                         {{-- Admin/Super admin see expanded payroll menu --}}
                         @php
-                            $month = now()->month;
-                            $year = now()->year;
-                            $periodStart = now()->startOfMonth()->toDateString();
-                            $periodEnd = now()->endOfMonth()->toDateString();
+                            // The "No submissions" count is only meaningful after auto-submit
+                            // runs on the 16th — before then contractors are still within their
+                            // submission window, so suppress it (and skip the queries entirely).
+                            $missingCount = 0;
+                            if (now()->day >= \App\Livewire\Admin\MissingSubmissions::AUTO_SUBMIT_DAY) {
+                                $month = now()->month;
+                                $year = now()->year;
+                                $periodStart = now()->startOfMonth()->toDateString();
+                                $periodEnd = now()->endOfMonth()->toDateString();
 
-                            $inactiveWorkerIds = \DB::table('inactive_workers')->pluck('worker_id')->all();
+                                $inactiveWorkerIds = \DB::table('inactive_workers')->pluck('worker_id')->all();
 
-                            $submittedWorkerIds = \App\Models\PayrollWorker::whereHas('payrollSubmission', function ($q) use ($month, $year) {
-                                $q->where('month', $month)->where('year', $year);
-                            })->pluck('worker_id')->unique()->all();
+                                $submittedWorkerIds = \App\Models\PayrollWorker::whereHas('payrollSubmission', function ($q) use ($month, $year) {
+                                    $q->where('month', $month)->where('year', $year);
+                                })->pluck('worker_id')->unique()->all();
 
-                            $missingCount = \App\Models\ContractWorker::where('con_start', '<=', $periodEnd)
-                                ->where('con_end', '>=', $periodStart)
-                                ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
-                                ->whereNotIn('con_wkr_id', $submittedWorkerIds)
-                                ->distinct()
-                                ->count('con_ctr_clab_no');
+                                $missingCount = \App\Models\ContractWorker::where('con_start', '<=', $periodEnd)
+                                    ->where('con_end', '>=', $periodStart)
+                                    ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
+                                    ->whereNotIn('con_wkr_id', $submittedWorkerIds)
+                                    ->distinct()
+                                    ->count('con_ctr_clab_no');
+                            }
                         @endphp
                         <flux:sidebar.group expandable icon="wallet" heading="Payroll" class="grid">
                             <flux:sidebar.item :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>All submissions</flux:sidebar.item>
@@ -68,7 +74,8 @@
                                     @endif
                                 </span>
                             </flux:sidebar.item>
-                        </flux:sidebar.group>
+                        </flux:sidebar.group>                        
+                        {{-- <flux:sidebar.item icon="envelope" :href="route('email-logs')" :current="request()->routeIs('email-logs')" wire:navigate>{{ __('Email Logs') }}</flux:sidebar.item> --}}
                     @endif
                 @endif
 

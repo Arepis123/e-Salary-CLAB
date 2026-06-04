@@ -37,7 +37,6 @@ class Dashboard extends Component
     public $recentPayments;
     public $overduePayments;
     public $draftSubmissions;
-    public $missingSubmissions;
     public $newsItems;
     public $expiringContracts;
 
@@ -47,7 +46,6 @@ class Dashboard extends Component
         $this->recentPayments = collect();
         $this->overduePayments = collect();
         $this->draftSubmissions = collect();
-        $this->missingSubmissions = collect();
         $this->newsItems = collect();
         $this->expiringContracts = collect();
     }
@@ -164,7 +162,6 @@ class Dashboard extends Component
             ->get();
 
         $this->draftSubmissions = $this->getDraftSubmissions($clabNo);
-        $this->missingSubmissions = $this->getMissingSubmissionsHistory($clabNo, 6);
 
         $this->isLoadingContent = false;
     }
@@ -222,74 +219,6 @@ class Dashboard extends Component
                 'created_at' => $draft->created_at,
             ];
         })->filter(fn ($d) => ($d['draft_workers'] + $d['missing_workers']) > 0)->values();
-    }
-
-    protected function getMissingSubmissionsHistory(string $clabNo, int $monthsBack = 6)
-    {
-        $result = collect();
-        $currentDate = now();
-
-        for ($i = 1; $i <= $monthsBack; $i++) {
-            $checkDate = $currentDate->copy()->subMonths($i);
-            $month = $checkDate->month;
-            $year = $checkDate->year;
-
-            $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', $checkDate->copy()->startOfMonth()->toDateString())
-                ->where('con_start', '<=', $checkDate->copy()->endOfMonth()->toDateString())
-                ->pluck('con_wkr_id')
-                ->unique();
-
-            if ($activeWorkerIds->isEmpty()) continue;
-
-            $draftExists = PayrollSubmission::byContractor($clabNo)
-                ->forMonth($month, $year)
-                ->where('status', 'draft')
-                ->exists();
-
-            if ($draftExists) continue;
-
-            $finalizedSubmissions = PayrollSubmission::byContractor($clabNo)
-                ->forMonth($month, $year)
-                ->where('status', '!=', 'draft')
-                ->get();
-
-            $submittedWorkerIds = collect();
-            foreach ($finalizedSubmissions as $submission) {
-                $submittedWorkerIds = $submittedWorkerIds->merge(
-                    \App\Models\PayrollWorker::where('payroll_submission_id', $submission->id)->pluck('worker_id')
-                );
-            }
-            $submittedWorkerIds = $submittedWorkerIds->unique();
-
-            $missingWorkerIds = $activeWorkerIds->diff($submittedWorkerIds);
-
-            if ($missingWorkerIds->isEmpty()) continue;
-
-            $missingWorkerDetails = \App\Models\ContractWorker::whereIn('con_wkr_id', $missingWorkerIds)
-                ->where('con_ctr_clab_no', $clabNo)
-                ->with('worker')
-                ->get()
-                ->map(fn ($cw) => [
-                    'worker_id' => $cw->con_wkr_id,
-                    'name' => $cw->worker?->wkr_name ?? 'Unknown Worker',
-                    'passport' => $cw->worker?->wkr_passno ?? ($cw->con_wkr_passno ?? 'N/A'),
-                ]);
-
-            $result->push([
-                'month' => $month,
-                'year' => $year,
-                'month_label' => $checkDate->format('F Y'),
-                'total_workers' => $activeWorkerIds->count(),
-                'submitted_workers' => $submittedWorkerIds->count(),
-                'missing_workers' => $missingWorkerIds->count(),
-                'missing_worker_details' => $missingWorkerDetails,
-                'has_submission' => $finalizedSubmissions->count() > 0,
-                'submission_status' => $finalizedSubmissions->first()?->status ?? null,
-            ]);
-        }
-
-        return $result;
     }
 
     public function render()

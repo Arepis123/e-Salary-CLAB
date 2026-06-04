@@ -325,6 +325,7 @@ class OtTransactions extends Component
             $item->total_allowance = $transactions->where('type', 'allowance')->sum('amount');
             $item->total_backpay = $transactions->where('type', 'backpay')->sum('amount');
             $item->total_medical_claim = $transactions->where('type', 'medical_claim')->sum('amount');
+            $item->transactions_count = $transactions->count();
             $item->has_transactions = $transactions->count() > 0;
 
             return $item;

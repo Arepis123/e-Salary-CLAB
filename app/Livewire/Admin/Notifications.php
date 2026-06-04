@@ -256,8 +256,10 @@ class Notifications extends Component
         $stats = [
             'total_templates' => NotificationTemplate::count(),
             'active_templates' => NotificationTemplate::where('is_active', true)->count(),
-            'sent_today' => NotificationLog::whereDate('created_at', today())->where('status', 'sent')->count(),
-            'failed_today' => NotificationLog::whereDate('created_at', today())->where('status', 'failed')->count(),
+            'sent_today' => NotificationLog::whereDate('created_at', today())
+                ->whereIn('status', ['sent', 'delivered', 'opened', 'clicked'])->count(),
+            'failed_today' => NotificationLog::whereDate('created_at', today())
+                ->whereIn('status', ['failed', 'bounced', 'spam', 'blocked'])->count(),
         ];
 
         return view('livewire.admin.notifications', compact('templates', 'manualTemplates', 'logs', 'clients', 'stats'))

@@ -6,6 +6,7 @@ use App\Mail\TimesheetSubmitted;
 use App\Models\MonthlyOTEntry;
 use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
+use App\Services\OutstandingPayrollService;
 use App\Services\PayrollService;
 use App\Traits\LogsActivity;
 use Illuminate\Support\Facades\Mail;
@@ -928,118 +929,26 @@ class Timesheet extends Component
 
     protected function validatePeriodAccess($clabNo, $month, $year)
     {
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
-        $currentDate = now()->startOfMonth();
-
         // Always allow current month
-        if ($month == $currentMonth && $year == $currentYear) {
+        if ($month == now()->month && $year == now()->year) {
             return true;
         }
 
-        // Collect all outstanding periods
-        $outstandingPeriods = collect();
-
-        // 1. Check for draft submissions
-        $drafts = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->where('status', 'draft')
-            ->where(function ($query) use ($currentMonth, $currentYear) {
-                $query->where('year', '<', $currentYear)
-                    ->orWhere(function ($q) use ($currentMonth, $currentYear) {
-                        $q->where('year', '=', $currentYear)
-                            ->where('month', '<', $currentMonth);
-                    });
-            })
-            ->get();
-
-        foreach ($drafts as $draft) {
-            $outstandingPeriods->push([
-                'month' => $draft->month,
-                'year' => $draft->year,
-                'sort_key' => $draft->year * 100 + $draft->month,
-            ]);
-        }
-
-        // 2. Check for overdue payments (using overdue scope for correct deadline timing)
-        $overdue = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->overdue()
-            ->where(function ($query) use ($currentMonth, $currentYear) {
-                $query->where('year', '<', $currentYear)
-                    ->orWhere(function ($q) use ($currentMonth, $currentYear) {
-                        $q->where('year', '=', $currentYear)
-                            ->where('month', '<', $currentMonth);
-                    });
-            })
-            ->get();
-
-        foreach ($overdue as $payment) {
-            $outstandingPeriods->push([
-                'month' => $payment->month,
-                'year' => $payment->year,
-                'sort_key' => $payment->year * 100 + $payment->month,
-            ]);
-        }
-
-        // 3. Check for missing submissions
-        for ($i = 1; $i <= 6; $i++) {
-            $checkDate = $currentDate->copy()->subMonths($i);
-            $checkMonth = $checkDate->month;
-            $checkYear = $checkDate->year;
-
-            $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', $checkDate->startOfMonth()->toDateString())
-                ->where('con_start', '<=', $checkDate->endOfMonth()->toDateString())
-                ->pluck('con_wkr_id')
-                ->unique();
-
-            if ($activeWorkerIds->isEmpty()) {
-                continue;
-            }
-
-            // Get ALL submissions for that period (to find submitted worker IDs)
-            $allSubmissionsForPeriod = PayrollSubmission::where('contractor_clab_no', $clabNo)
-                ->where('month', $checkMonth)
-                ->where('year', $checkYear)
-                ->with('workers')
-                ->get();
-
-            // Get IDs of workers already submitted
-            $submittedWorkerIds = $allSubmissionsForPeriod->flatMap(function ($submission) {
-                return $submission->workers->pluck('worker_id');
-            })->unique()->toArray();
-
-            // Find workers that were active but not submitted
-            $unsubmittedWorkerIds = $activeWorkerIds->diff($submittedWorkerIds);
-
-            // If there are unsubmitted workers, add this period to outstanding
-            if ($unsubmittedWorkerIds->count() > 0) {
-                $outstandingPeriods->push([
-                    'month' => $checkMonth,
-                    'year' => $checkYear,
-                    'sort_key' => $checkYear * 100 + $checkMonth,
-                ]);
-            }
-        }
+        $outstandingPeriods = app(OutstandingPayrollService::class)->getOutstandingPeriods($clabNo);
 
         // If no outstanding periods, allow any past month
         if ($outstandingPeriods->isEmpty()) {
             return true;
         }
 
-        // Sort and get the oldest outstanding period
-        $outstandingPeriods = $outstandingPeriods->sortBy('sort_key')->values();
+        // Only allow access to the oldest outstanding period
         $oldest = $outstandingPeriods->first();
 
-        // Only allow access to the oldest outstanding period
         return $month == $oldest['month'] && $year == $oldest['year'];
     }
 
     protected function checkOutstandingIssues($clabNo)
     {
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
-        $currentDate = now()->startOfMonth();
-
         // Reset state
         $this->isBlocked = false;
         $this->blockReasons = [];
@@ -1047,142 +956,27 @@ class Timesheet extends Component
         $this->overduePayments = [];
         $this->missingSubmissions = [];
 
-        // Collect ALL outstanding periods (drafts, overdue, missing) in chronological order
-        $outstandingPeriods = collect();
+        $service = app(OutstandingPayrollService::class);
+        $outstandingPeriods = $service->getOutstandingPeriods($clabNo);
 
-        // 1. Check for draft submissions (excluding current month)
-        $drafts = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->where('status', 'draft')
-            ->where(function ($query) use ($currentMonth, $currentYear) {
-                $query->where('year', '<', $currentYear)
-                    ->orWhere(function ($q) use ($currentMonth, $currentYear) {
-                        $q->where('year', '=', $currentYear)
-                            ->where('month', '<', $currentMonth);
-                    });
-            })
-            ->get();
+        // Count of DISTINCT outstanding months (a month can appear under more than one type)
+        $this->totalOutstandingCount = $service->countOutstandingMonths($outstandingPeriods);
 
-        foreach ($drafts as $draft) {
-            $outstandingPeriods->push([
-                'type' => 'draft',
-                'month' => $draft->month,
-                'year' => $draft->year,
-                'month_year' => $draft->month_year,
-                'data' => $draft,
-                'sort_key' => $draft->year * 100 + $draft->month,
-            ]);
+        if ($outstandingPeriods->isEmpty()) {
+            return;
         }
 
-        // 2. Check for overdue payments (using overdue scope for correct deadline timing, excluding current month)
-        $overdue = PayrollSubmission::where('contractor_clab_no', $clabNo)
-            ->overdue()
-            ->where(function ($query) use ($currentMonth, $currentYear) {
-                $query->where('year', '<', $currentYear)
-                    ->orWhere(function ($q) use ($currentMonth, $currentYear) {
-                        $q->where('year', '=', $currentYear)
-                            ->where('month', '<', $currentMonth);
-                    });
-            })
-            ->get();
+        $oldest = $outstandingPeriods->first();
 
-        foreach ($overdue as $payment) {
-            $outstandingPeriods->push([
-                'type' => 'overdue',
-                'month' => $payment->month,
-                'year' => $payment->year,
-                'month_year' => $payment->month_year,
-                'data' => $payment,
-                'sort_key' => $payment->year * 100 + $payment->month,
-            ]);
-        }
+        // Store all outstanding for display
+        $this->outstandingDrafts = $outstandingPeriods->where('type', 'draft')->pluck('data');
+        $this->overduePayments = $outstandingPeriods->where('type', 'overdue')->pluck('data');
+        $this->missingSubmissions = $outstandingPeriods->where('type', 'missing')->all();
 
-        // 3. Check for missing submissions (excluding current month)
-        for ($i = 1; $i <= 6; $i++) {
-            $checkDate = $currentDate->copy()->subMonths($i);
-            $month = $checkDate->month;
-            $year = $checkDate->year;
-
-            // Get active workers for that month
-            $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', $checkDate->startOfMonth()->toDateString())
-                ->where('con_start', '<=', $checkDate->endOfMonth()->toDateString())
-                ->pluck('con_wkr_id')
-                ->unique();
-
-            if ($activeWorkerIds->isEmpty()) {
-                continue;
-            }
-
-            // Get ALL submissions for that period (to find submitted worker IDs)
-            $allSubmissionsForPeriod = PayrollSubmission::where('contractor_clab_no', $clabNo)
-                ->where('month', $month)
-                ->where('year', $year)
-                ->with('workers')
-                ->get();
-
-            // Get IDs of workers already submitted
-            $submittedWorkerIds = $allSubmissionsForPeriod->flatMap(function ($submission) {
-                return $submission->workers->pluck('worker_id');
-            })->unique()->toArray();
-
-            // Find workers that were active but not submitted
-            $unsubmittedWorkerIds = $activeWorkerIds->diff($submittedWorkerIds);
-
-            // If there are unsubmitted workers, add this period to outstanding
-            if ($unsubmittedWorkerIds->count() > 0) {
-                $outstandingPeriods->push([
-                    'type' => 'missing',
-                    'month' => $month,
-                    'year' => $year,
-                    'month_year' => $checkDate->format('F Y'),
-                    'total_workers' => $unsubmittedWorkerIds->count(),
-                    'sort_key' => $year * 100 + $month,
-                ]);
-            }
-        }
-
-        // Sort by oldest first (ascending)
-        $outstandingPeriods = $outstandingPeriods->sortBy('sort_key')->values();
-
-        // Store total count
-        $this->totalOutstandingCount = $outstandingPeriods->count();
-
-        // If there are outstanding periods, redirect to the OLDEST one
-        if ($outstandingPeriods->count() > 0) {
-            $oldest = $outstandingPeriods->first();
-
-            // Store all outstanding for display
-            $this->outstandingDrafts = $outstandingPeriods->where('type', 'draft')->pluck('data');
-            $this->overduePayments = $outstandingPeriods->where('type', 'overdue')->pluck('data');
-            $this->missingSubmissions = $outstandingPeriods->where('type', 'missing')->all();
-
-            // If NOT viewing the oldest period, redirect to it
-            if ($this->targetMonth != $oldest['month'] || $this->targetYear != $oldest['year']) {
-                $this->isBlocked = true;
-
-                // Determine redirect URL based on status
-                $redirectUrl = route('timesheet', ['month' => $oldest['month'], 'year' => $oldest['year']]);
-                $actionText = 'Go to '.$oldest['month_year'].' Payroll';
-
-                if ($oldest['type'] === 'overdue') {
-                    // For overdue payments, redirect to invoices page with correct year filter
-                    $redirectUrl = route('invoices.client', ['year' => $oldest['year']]);
-                    $actionText = 'Pay '.$oldest['month_year'].' Invoice';
-                } elseif ($oldest['type'] === 'draft' && isset($oldest['data'])) {
-                    // For drafts, redirect to edit page
-                    $redirectUrl = route('timesheet.edit', $oldest['data']->id);
-                    $actionText = 'Complete '.$oldest['month_year'].' Draft';
-                }
-
-                $this->blockReasons[] = [
-                    'type' => $oldest['type'],
-                    'message' => 'Please complete payroll submissions in chronological order. The next period to complete is '.$oldest['month_year'].'.',
-                    'redirect_month' => $oldest['month'],
-                    'redirect_year' => $oldest['year'],
-                    'redirect_url' => $redirectUrl,
-                    'action_text' => $actionText,
-                ];
-            }
+        // If NOT viewing the oldest period, block and redirect to it
+        if ($this->targetMonth != $oldest['month'] || $this->targetYear != $oldest['year']) {
+            $this->isBlocked = true;
+            $this->blockReasons[] = $service->buildBlockReason($oldest);
         }
     }
 

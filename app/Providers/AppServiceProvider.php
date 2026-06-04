@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Auth\ThirdPartyUserProvider;
+use App\Mail\Transport\BrevoApiTransport;
 use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
+use Brevo\Brevo;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +31,16 @@ class AppServiceProvider extends ServiceProvider
         Auth::provider('third_party', function ($app, array $config) {
             return new ThirdPartyUserProvider;
         });
+
+        // Register the Brevo API mail transport (sends via HTTPS API, not SMTP)
+        Mail::extend('brevo', function (array $config) {
+            return new BrevoApiTransport(
+                new Brevo(apiKey: $config['key'] ?? config('services.brevo.api_key'))
+            );
+        });
+
+        // NOTE: the MessageSent -> LogSentEmail listener is wired automatically
+        // via Laravel's event auto-discovery (App\Listeners\LogSentEmail).
 
         // Share notification counts with client sidebar
         View::composer('components.layouts.app.client-sidebar', function ($view) {

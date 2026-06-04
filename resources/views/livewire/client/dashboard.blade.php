@@ -1,7 +1,7 @@
 <div>
     <!-- Carousel News Notification Modal -->
     <div id="newsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px] opacity-0 invisible transition-all duration-300">
-        <div class="relative w-full max-w-2xl mx-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300">
+        <div class="relative w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300">
             <button onclick="closeNewsModal()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 transition-colors">
                 <flux:icon.x-mark class="size-5 text-zinc-600 dark:text-zinc-400" />
             </button>
@@ -21,7 +21,7 @@
                 </button>
             </div>
 
-            <div id="carouselContainer" class="relative pt-14">
+            <div id="carouselContainer" class="relative pt-14 flex-1 min-h-0 overflow-y-auto">
                 @foreach($newsItems as $index => $news)
                     <div class="carousel-slide {{ $index === 0 ? 'active' : '' }}">
                         <div class="flex flex-col">
@@ -91,34 +91,22 @@
             {{-- Hidden until content loads --}}
         @else
             @if($overduePayments->count() > 0)
-            <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20">
-                <div class="flex items-start gap-3">
-                    <flux:icon.exclamation-triangle class="size-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                    <div class="flex-1">
-                        <h3 class="text-base font-semibold text-red-900 dark:text-red-100">Urgent: Overdue Payments Detected</h3>
-                        <p class="text-sm text-red-700 dark:text-red-300 mt-1">
-                            You have {{ $overduePayments->count() }} submitted {{ Str::plural('payroll', $overduePayments->count()) }} with unpaid invoices past the deadline. Late payments incur an 8% penalty.
-                        </p>
-                        <div class="mt-3 space-y-2">
-                            @foreach($overduePayments as $overdue)
-                            <div class="flex items-center justify-between p-2 bg-white dark:bg-zinc-800 rounded">
-                                <div>
-                                    <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $overdue->month_year }}</span>
-                                    <span class="text-xs text-zinc-600 dark:text-zinc-400 ml-2">
-                                        Deadline: {{ $overdue->payment_deadline->format('M d, Y') }}
-                                        ({{ $overdue->payment_deadline->diffForHumans() }})
-                                    </span>
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <span class="font-bold text-red-600 dark:text-red-400">RM {{ number_format($overdue->total_due, 2) }}</span>
-                                    <flux:button variant="primary" size="sm" href="{{ route('invoices') }}" wire:navigate>Pay Now</flux:button>
-                                </div>
-                            </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            </flux:card>
+            <div class="space-y-3">
+                @foreach($overduePayments as $overdue)
+                <flux:callout variant="danger" icon="exclamation-triangle">
+                    <flux:callout.heading>Overdue Payment — {{ $overdue->month_year }}</flux:callout.heading>
+                    <flux:callout.text>
+                        <span class="font-semibold">RM {{ number_format($overdue->total_due, 2) }}</span> is past due.
+                        Deadline was {{ $overdue->payment_deadline->format('M d, Y') }}
+                        ({{ $overdue->payment_deadline->diffForHumans() }}). Late payments incur an 8% penalty.
+                    </flux:callout.text>
+
+                    <x-slot name="actions">
+                        <flux:button href="{{ route('invoices') }}" wire:navigate>Pay Now</flux:button>
+                    </x-slot>
+                </flux:callout>
+                @endforeach
+            </div>
             @endif
 
             @if($draftSubmissions->count() > 0)
@@ -192,56 +180,6 @@
             </flux:card>
             @endif
 
-            @if($missingSubmissions->count() > 0)
-            <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-                <div class="flex items-start gap-3">
-                    <flux:icon.exclamation-circle class="size-6 text-red-500 dark:text-red-500 flex-shrink-0 mt-0.5" />
-                    <div class="flex-1">
-                        <h3 class="text-base font-semibold text-red-500 dark:text-red-400">Missing Payroll Submissions</h3>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-300 mt-1">
-                            You have {{ $missingSubmissions->count() }} {{ Str::plural('month', $missingSubmissions->count()) }} from the past 6 months with NO payroll submission.
-                        </p>
-                        <div class="mt-3 space-y-2">
-                            @foreach($missingSubmissions as $index => $missing)
-                            <div class="bg-white dark:bg-zinc-800 rounded-lg overflow-hidden">
-                                <button onclick="toggleWorkerDetails('missing-{{ $index }}')"
-                                    class="w-full p-3 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors">
-                                    <div class="flex items-center gap-3 flex-1">
-                                        <flux:icon.chevron-right class="size-4 text-zinc-400 transition-transform chevron-icon" id="chevron-missing-{{ $index }}" />
-                                        <div class="text-left">
-                                            <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ $missing['month_label'] }}</p>
-                                            <p class="text-xs text-zinc-600 dark:text-zinc-400">All {{ $missing['total_workers'] }} workers not submitted</p>
-                                        </div>
-                                    </div>
-                                    <flux:button variant="outline" size="sm" href="{{ route('timesheet', ['month' => $missing['month'], 'year' => $missing['year']]) }}" wire:navigate onclick="event.stopPropagation()">
-                                        Submit Now
-                                    </flux:button>
-                                </button>
-                                <div id="missing-{{ $index }}" class="hidden border-t border-zinc-200 dark:border-zinc-700">
-                                    <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50">
-                                        <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Workers that need submission:</p>
-                                        <div class="space-y-1.5 max-h-60 overflow-y-auto">
-                                            @foreach($missing['missing_worker_details'] as $worker)
-                                            <div class="flex items-center justify-between p-2 rounded text-sm">
-                                                <div class="flex items-center gap-2">
-                                                    <flux:avatar size="xs" name="{{ $worker['name'] }}" />
-                                                    <div>
-                                                        <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ $worker['name'] }}</p>
-                                                        <p class="text-xs text-zinc-600 dark:text-zinc-400">ID: {{ $worker['worker_id'] }} • Passport: {{ $worker['passport'] }}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            </flux:card>
-            @endif
         @endif
 
         <!-- Statistics Cards -->

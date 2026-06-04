@@ -189,33 +189,11 @@
                             @endif
                         </flux:table.cell>
 
-                        <flux:table.cell>
+                        <flux:table.cell variant="strong">
                             @if($hasTransactions)
-                                <div class="text-xs space-y-0.5">
-                                    @if($submission->total_accommodation > 0)
-                                        <div class="text-amber-600 dark:text-amber-400">Acc: -RM {{ number_format($submission->total_accommodation, 2) }}</div>
-                                    @endif
-                                    @if($submission->total_advance > 0)
-                                        <div class="text-red-600 dark:text-red-400">Adv: -RM {{ number_format($submission->total_advance, 2) }}</div>
-                                    @endif
-                                    @if($submission->total_deduction > 0)
-                                        <div class="text-red-600 dark:text-red-400">Ded: -RM {{ number_format($submission->total_deduction, 2) }}</div>
-                                    @endif
-                                    @if($submission->total_npl > 0)
-                                        <div class="text-purple-600 dark:text-purple-400">NPL: {{ number_format($submission->total_npl, 1) }} days</div>
-                                    @endif
-                                    @if($submission->total_allowance > 0)
-                                        <div class="text-green-600 dark:text-green-400">Alw: +RM {{ number_format($submission->total_allowance, 2) }}</div>
-                                    @endif
-                                    @if($submission->total_backpay > 0)
-                                        <div class="text-cyan-600 dark:text-cyan-400">Bpay: +RM {{ number_format($submission->total_backpay, 2) }}</div>
-                                    @endif
-                                    @if(($submission->total_medical_claim ?? 0) > 0)
-                                        <div class="text-lime-600 dark:text-lime-400">Med: +RM {{ number_format($submission->total_medical_claim, 2) }}</div>
-                                    @endif
-                                </div>
+                                {{ $submission->transactions_count }} {{ Str::plural('Transaction', $submission->transactions_count) }}                            
                             @else
-                                <span class="text-zinc-400 dark:text-zinc-500 text-xs">None</span>
+                                <span class="text-zinc-400 dark:text-zinc-500">None</span>
                             @endif
                         </flux:table.cell>
 
@@ -372,6 +350,7 @@
                         $allTransactions = $selectedEntries->flatMap(function($entry) {
                             return $entry->transactions->map(function($t) use ($entry) {
                                 $t->worker_name = $entry->worker_name;
+                                $t->worker_passport = $entry->worker_passport;
                                 return $t;
                             });
                         });
@@ -383,6 +362,7 @@
                                 <thead class="bg-zinc-50 dark:bg-zinc-800">
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Worker</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Passport No</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Type</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Amount</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Remarks</th>
@@ -392,6 +372,7 @@
                                     @foreach($allTransactions as $transaction)
                                         <tr>
                                             <td class="px-3 py-2 text-zinc-900 dark:text-zinc-100">{{ $transaction->worker_name }}</td>
+                                            <td class="px-3 py-2 text-zinc-600 dark:text-zinc-400">{{ $transaction->worker_passport ?? '-' }}</td>
                                             <td class="px-3 py-2">
                                                 @if($transaction->type === 'accommodation')
                                                     <flux:badge color="amber" size="sm">Accommodation</flux:badge>

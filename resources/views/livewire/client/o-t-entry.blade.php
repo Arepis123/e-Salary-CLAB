@@ -20,6 +20,37 @@
             </div>
         </div>
 
+        <!-- Sequential Payroll Queue Notice -->
+        @if(!$isLoading && $isBlocked && count($blockReasons) > 0)
+            <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg border-2 border-orange-200 dark:border-orange-800">
+                <div class="flex items-start gap-3">
+                    <flux:icon.queue-list class="size-6 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">Settle Outstanding Payroll First</h3>
+                            <flux:badge color="zinc" size="sm">{{ $totalOutstandingCount }} {{ \Str::plural('month', $totalOutstandingCount) }} remaining</flux:badge>
+                        </div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                            OT &amp; transaction entry is locked until your outstanding payroll is settled. {{ $blockReasons[0]['message'] }}
+                        </p>
+
+                        <div class="mt-4">
+                            <flux:button
+                                variant="primary"
+                                size="sm"
+                                href="{{ $blockReasons[0]['redirect_url'] }}"
+                                wire:navigate
+                                class="w-full sm:w-auto"
+                            >
+                                {{ $blockReasons[0]['action_text'] }}
+                            </flux:button>
+                        </div>
+                    </div>
+                </div>
+            </flux:card>
+        @endif
+
+        @unless(!$isLoading && $isBlocked)
         <!-- Entry Window Status Card -->
         <flux:card id="entry-window-status" class="p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
@@ -702,4 +733,5 @@
                 </div>
             </flux:modal>
         @endif
+        @endunless
     </div>

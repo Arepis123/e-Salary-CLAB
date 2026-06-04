@@ -41,6 +41,7 @@ class PayrollReminderMail extends Mailable
     public function build()
     {
         return $this->subject('Payroll Submission Reminder - '.$this->periodMonth)
-            ->view('emails.payroll-reminder');
+            ->view('emails.payroll-reminder')
+            ->text('emails.payroll-reminder-text');
     }
 }

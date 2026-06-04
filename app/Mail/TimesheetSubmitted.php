@@ -40,6 +40,7 @@ class TimesheetSubmitted extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.timesheet-submitted',
+            text: 'emails.timesheet-submitted-text',
         );
     }
 

@@ -3,6 +3,7 @@
 namespace App\Livewire\Client;
 
 use App\Services\OTEntryService;
+use App\Services\OutstandingPayrollService;
 use App\Traits\LogsActivity;
 use Flux;
 use Livewire\Attributes\Title;
@@ -61,6 +62,14 @@ class OTEntry extends Component
 
     public bool $isLoading = true;
 
+    // Sequential payroll blocking — OT entry is hidden until outstanding (unpaid)
+    // payroll is settled, mirroring the Timesheet page.
+    public bool $isBlocked = false;
+
+    public array $blockReasons = [];
+
+    public int $totalOutstandingCount = 0;
+
     protected $otEntryService;
 
     public function boot(OTEntryService $otEntryService)
@@ -89,6 +98,20 @@ class OTEntry extends Component
                 heading: 'Error',
                 text: 'No contractor CLAB number assigned to your account.'
             );
+            $this->isLoading = false;
+
+            return;
+        }
+
+        // Block OT entry while the contractor has outstanding (unpaid) payroll.
+        // They must settle the oldest period first, same rule as the Timesheet page.
+        $service = app(OutstandingPayrollService::class);
+        $outstandingPeriods = $service->getOutstandingPeriods($clabNo);
+        $this->totalOutstandingCount = $service->countOutstandingMonths($outstandingPeriods);
+
+        if ($outstandingPeriods->isNotEmpty()) {
+            $this->isBlocked = true;
+            $this->blockReasons[] = $service->buildBlockReason($outstandingPeriods->first());
             $this->isLoading = false;
 
             return;

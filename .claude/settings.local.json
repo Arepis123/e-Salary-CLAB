@@ -58,7 +58,15 @@
       "PowerShell(php artisan migrate --force 2>&1 | Select-Object -Last 20)",
       "PowerShell(php -l app/Livewire/Admin/SalaryDetail.php; php -l app/Models/PayrollPayment.php)",
       "PowerShell(php artisan view:clear; php artisan optimize:clear 2>&1 | Select-Object -Last 3)",
-      "PowerShell(php -l app/Livewire/Admin/SalaryDetail.php)"
+      "PowerShell(php -l app/Livewire/Admin/SalaryDetail.php)",
+      "WebFetch(domain:developers.brevo.com)",
+      "PowerShell(composer require *)",
+      "Bash(sed -n '/public function __construct/,/^    }/p' Brevo.php)",
+      "Bash(sed -n '/function sendTransacEmail/,/^    }/p' TransactionalEmails/TransactionalEmailsClient.php)",
+      "Bash(sed -n '/public function __construct/,/^    }/p' TransactionalEmails/Types/SendTransacEmailRequestSender.php)",
+      "Bash(sed -n '/public function __construct/,/^    }/p' TransactionalEmails/Types/SendTransacEmailRequestToItem.php)",
+      "Read(//c/c/xampp/htdocs/e-payroll/app/**)",
+      "Read(//c/c/xampp/htdocs/**)"
     ],
     "deny": [],
     "ask": []

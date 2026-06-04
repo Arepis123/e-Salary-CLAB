@@ -299,13 +299,7 @@
                                     @endif
                                 </td>
                                 <td class="py-3">
-                                    @if($primaryLog->status === 'sent')
-                                        <flux:badge color="green" size="sm">Sent</flux:badge>
-                                    @elseif($primaryLog->status === 'failed')
-                                        <flux:badge color="red" size="sm">Failed</flux:badge>
-                                    @else
-                                        <flux:badge color="yellow" size="sm">Pending</flux:badge>
-                                    @endif
+                                    @include('livewire.admin.partials.notification-status-badge', ['log' => $primaryLog])
                                 </td>
                             </tr>
 
@@ -319,13 +313,7 @@
                                         @foreach($recipients as $log)
                                             <div class="flex items-center justify-between p-2 rounded border border-zinc-200 dark:border-zinc-700">
                                                 <span class="text-sm">{{ $log->recipient ? $log->recipient->name : $log->recipient_email }}</span>
-                                                @if($log->status === 'sent')
-                                                    <flux:badge color="green" size="sm">Sent</flux:badge>
-                                                @elseif($log->status === 'failed')
-                                                    <flux:badge color="red" size="sm">Failed</flux:badge>
-                                                @else
-                                                    <flux:badge color="yellow" size="sm">Pending</flux:badge>
-                                                @endif
+                                                @include('livewire.admin.partials.notification-status-badge', ['log' => $log])
                                             </div>
                                         @endforeach
                                     </div>

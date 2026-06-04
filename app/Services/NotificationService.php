@@ -50,13 +50,15 @@ class NotificationService
 
         // Send based on type
         try {
+            $messageId = null;
             if ($template->type === 'email') {
-                $this->sendEmail($log);
+                $messageId = $this->sendEmail($log);
             }
 
             $log->update([
                 'status' => 'sent',
                 'sent_at' => now(),
+                'message_id' => $messageId,
             ]);
         } catch (\Exception $e) {
             $log->update([
@@ -94,13 +96,15 @@ class NotificationService
         ]);
 
         try {
+            $messageId = null;
             if ($type === 'email') {
-                $this->sendEmail($log);
+                $messageId = $this->sendEmail($log);
             }
 
             $log->update([
                 'status' => 'sent',
                 'sent_at' => now(),
+                'message_id' => $messageId,
             ]);
         } catch (\Exception $e) {
             $log->update([
@@ -113,14 +117,19 @@ class NotificationService
     }
 
     /**
-     * Send email notification
+     * Send email notification.
+     *
+     * Returns the Brevo message-id (set by the Brevo API transport) so the
+     * caller can persist it and later correlate delivery webhook events.
      */
-    protected function sendEmail(NotificationLog $log): void
+    protected function sendEmail(NotificationLog $log): ?string
     {
         $attachments = $log->attachments ?? [];
 
-        Mail::to($log->recipient_email)
+        $sent = Mail::to($log->recipient_email)
             ->send(new NotificationEmail($log->subject, $log->body, $attachments));
+
+        return $sent?->getMessageId();
     }
 
     /**

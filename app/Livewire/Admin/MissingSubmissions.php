@@ -12,13 +12,25 @@ use App\Models\PayrollWorker;
 use App\Models\User;
 use App\Services\PayrollService;
 use Flux\Flux;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Response;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class MissingSubmissions extends Component
 {
+    use WithPagination;
+
+    /**
+     * Day of the month the auto-submit scheduler runs (see routes/console.php).
+     * Before this day, the current month's "Not Submit" list is not meaningful
+     * because contractors are still within their submission window.
+     */
+    const AUTO_SUBMIT_DAY = 16;
+
     public $missingContractors = [];
 
     protected $activeWorkerSubquery = null;
@@ -56,13 +68,14 @@ class MissingSubmissions extends Component
     public $activeTab = 'not_submitted';
 
     // Pagination
-    public $historicalPage = 1;
-
     public $historicalPerPage = 10;
 
-    public $currentPage = 1;
-
     public $currentPerPage = 10;
+
+    // Page-name query strings for the two independent paginators on this page
+    protected string $missingPageName = 'contractorsPage';
+
+    protected string $historicalPageName = 'historyPage';
 
     public function mount()
     {
@@ -88,7 +101,7 @@ class MissingSubmissions extends Component
     {
         $previousCount = $this->missingContractors->count();
 
-        $this->currentPage = 1;
+        $this->resetPage($this->missingPageName);
         $this->loadMissingContractors();
 
         $newCount = $this->missingContractors->count();
@@ -794,16 +807,16 @@ class MissingSubmissions extends Component
 
     public function updatedSelectedMonth()
     {
-        $this->currentPage = 1;
-        $this->historicalPage = 1;
+        $this->resetPage($this->missingPageName);
+        $this->resetPage($this->historicalPageName);
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
     }
 
     public function updatedSelectedYear()
     {
-        $this->currentPage = 1;
-        $this->historicalPage = 1;
+        $this->resetPage($this->missingPageName);
+        $this->resetPage($this->historicalPageName);
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
     }
@@ -1110,33 +1123,64 @@ class MissingSubmissions extends Component
         $this->historicalSummary = $allResults->toArray();
     }
 
-    public function getHistoricalPaginatedProperty()
+    public function getHistoricalPaginatedProperty(): LengthAwarePaginator
     {
-        $start = ($this->historicalPage - 1) * $this->historicalPerPage;
-
-        return collect($this->historicalSummary)->slice($start, $this->historicalPerPage)->values();
+        return $this->paginateCollection(
+            $this->historicalSummary,
+            $this->historicalPerPage,
+            $this->historicalPageName
+        );
     }
 
-    public function getHistoricalPaginationProperty()
+    /**
+     * Build a LengthAwarePaginator from an in-memory collection so the view can
+     * use <flux:pagination>. The current page is resolved from Livewire's
+     * pagination state for the given page-name.
+     */
+    protected function paginateCollection($items, int $perPage, string $pageName): LengthAwarePaginator
     {
-        $total = count($this->historicalSummary);
-        $lastPage = ceil($total / $this->historicalPerPage);
-        $from = (($this->historicalPage - 1) * $this->historicalPerPage) + 1;
-        $to = min($this->historicalPage * $this->historicalPerPage, $total);
+        $items = collect($items)->values();
+        $page = Paginator::resolveCurrentPage($pageName);
+        $slice = $items->slice(($page - 1) * $perPage, $perPage)->values();
 
-        return [
-            'current_page' => $this->historicalPage,
-            'per_page' => $this->historicalPerPage,
-            'total' => $total,
-            'last_page' => $lastPage,
-            'from' => $from,
-            'to' => $to,
-        ];
+        return new LengthAwarePaginator(
+            $slice,
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => $pageName,
+            ]
+        );
     }
 
     public function updatedActiveTab(): void
     {
-        $this->currentPage = 1;
+        $this->resetPage($this->missingPageName);
+    }
+
+    /**
+     * Whether the "Not Submit" list should be withheld for the selected period.
+     *
+     * The list only becomes meaningful once auto-submit has run on the 16th.
+     * It is gated only for the ongoing current month before that day — past
+     * months always show their final results.
+     */
+    public function getNotSubmitLockedProperty(): bool
+    {
+        $isCurrentPeriod = (int) $this->selectedMonth === now()->month
+            && (int) $this->selectedYear === now()->year;
+
+        return $isCurrentPeriod && now()->day < self::AUTO_SUBMIT_DAY;
+    }
+
+    /**
+     * The date auto-submit runs for the selected (current) period.
+     */
+    public function getAutoSubmitDateProperty(): \Carbon\Carbon
+    {
+        return \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, self::AUTO_SUBMIT_DAY);
     }
 
     public function getFilteredContractorsProperty()
@@ -1150,28 +1194,13 @@ class MissingSubmissions extends Component
         return $contractors->filter(fn ($c) => $c['not_submitted'] > 0)->values();
     }
 
-    public function getMissingPaginatedProperty()
+    public function getMissingPaginatedProperty(): LengthAwarePaginator
     {
-        $start = ($this->currentPage - 1) * $this->currentPerPage;
-
-        return $this->filteredContractors->slice($start, $this->currentPerPage)->values();
-    }
-
-    public function getMissingPaginationProperty()
-    {
-        $total = $this->filteredContractors->count();
-        $lastPage = max(1, ceil($total / $this->currentPerPage));
-        $from = $total > 0 ? (($this->currentPage - 1) * $this->currentPerPage) + 1 : 0;
-        $to = min($this->currentPage * $this->currentPerPage, $total);
-
-        return [
-            'current_page' => $this->currentPage,
-            'per_page' => $this->currentPerPage,
-            'total' => $total,
-            'last_page' => $lastPage,
-            'from' => $from,
-            'to' => $to,
-        ];
+        return $this->paginateCollection(
+            $this->filteredContractors,
+            $this->currentPerPage,
+            $this->missingPageName
+        );
     }
 
     public function render()

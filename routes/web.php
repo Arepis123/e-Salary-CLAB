@@ -157,6 +157,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('contractors', \App\Livewire\Admin\Contractors::class)->name('contractors');
         Route::get('contractors/{clabNo}', \App\Livewire\Admin\ContractorDetail::class)->name('contractors.detail');
         Route::get('notifications', \App\Livewire\Admin\Notifications::class)->name('notifications');
+        Route::get('email-logs', \App\Livewire\Admin\EmailLogs::class)->name('email-logs');
         Route::get('news', \App\Livewire\Admin\NewsManagement::class)->name('news');
     });
 
@@ -240,6 +241,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::post('/billplz/callback', [\App\Http\Controllers\Client\PaymentController::class, 'callback'])->name('billplz.callback');
 Route::get('/client/payment/{submission}/return', [\App\Http\Controllers\Client\PaymentController::class, 'return'])->name('client.payment.return');
+
+// Brevo transactional email delivery webhook (secured by ?token=...)
+Route::post('/webhooks/brevo/email', [\App\Http\Controllers\Webhooks\BrevoWebhookController::class, 'email'])->name('webhooks.brevo.email');
 
 // ============================================================================
 // OTHER ROUTES

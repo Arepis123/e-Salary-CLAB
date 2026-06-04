@@ -54,7 +54,7 @@
                 <flux:table.rows>
                     @foreach($this->historicalPaginated as $index => $contractor)
                         <flux:table.rows :key="$contractor['clab_no']">
-                            <flux:table.cell align="center">{{ $this->historicalPagination['from'] + $index }}</flux:table.cell>
+                            <flux:table.cell align="center">{{ $this->historicalPaginated->firstItem() + $index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">
                                 <div>
@@ -99,36 +99,7 @@
             </flux:table>
 
             <!-- Pagination -->
-            @if($this->historicalPagination['total'] > $historicalPerPage)
-            <div class="mt-4 flex items-center justify-between">
-                <div class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ $this->historicalPagination['from'] }} to {{ $this->historicalPagination['to'] }} of {{ $this->historicalPagination['total'] }} contractors
-                </div>
-                <div class="flex gap-2">
-                    <flux:button
-                        wire:click="$set('historicalPage', {{ $this->historicalPagination['current_page'] - 1 }})"
-                        variant="ghost"
-                        size="sm"
-                        icon="chevron-left"
-                        icon-variant="micro"
-                        :disabled="$this->historicalPagination['current_page'] === 1"
-                    >
-                        Previous
-                    </flux:button>
-                    <flux:button
-                        wire:click="$set('historicalPage', {{ $this->historicalPagination['current_page'] + 1 }})"
-                        variant="ghost"
-                        size="sm"
-                        icon="chevron-right"
-                        icon-trailing
-                        icon-variant="micro"
-                        :disabled="$this->historicalPagination['current_page'] >= $this->historicalPagination['last_page']"
-                    >
-                        Next
-                    </flux:button>
-                </div>
-            </div>
-            @endif
+            <flux:pagination :paginator="$this->historicalPaginated" class="mt-5" />
         </div>
         @endif
     </flux:card>
@@ -165,7 +136,7 @@
             <flux:tabs wire:model.live="activeTab" class="mb-4">
                 <flux:tab name="not_submitted" icon="x-circle">
                     Not Submit
-                    @if($notSubmittedCount > 0)
+                    @if(!$this->notSubmitLocked && $notSubmittedCount > 0)
                         <flux:badge color="red" size="sm" inset="top bottom" class="ml-1">{{ $notSubmittedCount }}</flux:badge>
                     @endif
                 </flux:tab>
@@ -179,7 +150,24 @@
 
             {{-- Tab 1: Not Submit --}}
             <flux:tab.panel name="not_submitted">
-                @if($notSubmittedCount > 0)
+                @if($this->notSubmitLocked)
+                <div class="py-12 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-4">
+                            <flux:icon.clock class="size-10 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                Submission window still open for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}.
+                            </p>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                The Not Submit list becomes available on {{ $this->autoSubmitDate->format('d F Y') }}, after auto-submit runs.
+                                Contractors can still submit on their own until then.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @elseif($notSubmittedCount > 0)
                 <flux:table>
                     <flux:table.columns>
                         <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
@@ -193,7 +181,7 @@
                     <flux:table.rows>
                         @foreach($this->missingPaginated as $index => $contractor)
                             <flux:table.rows :key="$contractor['clab_no']">
-                                <flux:table.cell align="center">{{ $this->missingPagination['from'] + $index }}</flux:table.cell>
+                                <flux:table.cell align="center">{{ $this->missingPaginated->firstItem() + $index }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
                                 <flux:table.cell>
@@ -275,7 +263,7 @@
                     <flux:table.rows>
                         @foreach($this->missingPaginated as $index => $contractor)
                             <flux:table.rows :key="$contractor['clab_no']">
-                                <flux:table.cell align="center">{{ $this->missingPagination['from'] + $index }}</flux:table.cell>
+                                <flux:table.cell align="center">{{ $this->missingPaginated->firstItem() + $index }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
                                 <flux:table.cell>
@@ -342,25 +330,9 @@
         </flux:tab.group>
 
         <!-- Pagination -->
-        @if($this->missingPagination['total'] > $currentPerPage)
-        <div class="mt-4 flex items-center justify-between">
-            <div class="text-sm text-zinc-600 dark:text-zinc-400">
-                Showing {{ $this->missingPagination['from'] }} to {{ $this->missingPagination['to'] }} of {{ $this->missingPagination['total'] }} contractors
-            </div>
-            <div class="flex gap-2">
-                <flux:button
-                    wire:click="$set('currentPage', {{ $this->missingPagination['current_page'] - 1 }})"
-                    variant="ghost" size="sm" icon="chevron-left" icon-variant="micro"
-                    :disabled="$this->missingPagination['current_page'] === 1"
-                >Previous</flux:button>
-                <flux:button
-                    wire:click="$set('currentPage', {{ $this->missingPagination['current_page'] + 1 }})"
-                    variant="ghost" size="sm" icon="chevron-right" icon-trailing icon-variant="micro"
-                    :disabled="$this->missingPagination['current_page'] >= $this->missingPagination['last_page']"
-                >Next</flux:button>
-            </div>
-        </div>
-        @endif
+        @unless($activeTab === 'not_submitted' && $this->notSubmitLocked)
+            <flux:pagination :paginator="$this->missingPaginated" class="mt-5" />
+        @endunless
     </flux:card>
 
     @if($missingContractors->count() === 0)

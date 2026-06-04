@@ -28,6 +28,11 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'brevo' => [
+        'api_key' => env('BREVO_API_KEY'),
+        'webhook_token' => env('BREVO_WEBHOOK_TOKEN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

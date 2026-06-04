@@ -48,6 +48,8 @@ class NotificationEmail extends Mailable
 
         return new Content(
             htmlString: $formattedBody,
+            text: 'emails.notification-text',
+            with: ['textBody' => $this->emailBody],
         );
     }
 

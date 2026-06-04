@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\TracksEmailDelivery;
 use Illuminate\Database\Eloquent\Model;
 
 class NotificationLog extends Model
 {
+    use TracksEmailDelivery;
+
     protected $fillable = [
         'notification_template_id',
         'user_id',
@@ -16,8 +19,13 @@ class NotificationLog extends Model
         'body',
         'attachments',
         'status',
+        'message_id',
         'error_message',
         'sent_at',
+        'delivered_at',
+        'opened_at',
+        'bounced_at',
+        'bounce_reason',
         'reference_type',
         'reference_id',
         'sent_by',
@@ -25,6 +33,9 @@ class NotificationLog extends Model
 
     protected $casts = [
         'sent_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'opened_at' => 'datetime',
+        'bounced_at' => 'datetime',
         'attachments' => 'array',
     ];
 
