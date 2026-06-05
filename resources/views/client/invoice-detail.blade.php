@@ -101,7 +101,13 @@
                         @if($invoice->payment->transaction_id)
                         <div class="flex justify-between text-sm">
                             <span class="text-zinc-600 dark:text-zinc-400">Transaction ID:</span>
-                            <span class="font-mono text-xs text-zinc-900 dark:text-zinc-100">{{ $invoice->payment->transaction_id }}</span>
+                            <span class="font-mono text-zinc-900 dark:text-zinc-100">{{ $invoice->payment->transaction_id }}</span>
+                        </div>
+                        @endif
+                        @if($invoice->payment->completed_at)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-zinc-600 dark:text-zinc-400">Paid On:</span>
+                            <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $invoice->payment->completed_at->format('F d, Y h:i A') }}</span>
                         </div>
                         @endif
                         @endif
@@ -147,37 +153,37 @@
         <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
             <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Invoice Summary</h3>
 
-            <div class="space-y-3">
+            <div class="space-y-2">
                 <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }}):</span>
-                    <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount, 2) }}</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount, 2) }}</span>
                 </div>
 
-                <div class="flex justify-between py-2">
+                <div class="flex justify-between py-1">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $invoice->billable_workers_count }} {{ Str::plural('worker', $invoice->billable_workers_count) }}):</span>
                     <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->calculated_service_charge, 2) }}</span>
                 </div>
 
-                <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
+                <div class="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-700">
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">SST (8%):</span>
                     <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->calculated_sst, 2) }}</span>
                 </div>
 
                 @if($invoice->has_penalty)
-                    <div class="flex justify-between py-2 bg-zinc-50 dark:bg-zinc-800 px-4 rounded">
-                        <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Subtotal:</span>
-                        <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->client_total, 2) }}</span>
+                    <div class="flex justify-between py-1">
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Subtotal:</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->client_total, 2) }}</span>
                     </div>
 
-                    <div class="flex justify-between py-2">
-                        <span class="text-sm text-red-600 dark:text-red-400">Late Payment Penalty (8%):</span>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%):</span>
                         <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->has_penalty && $invoice->penalty_amount > 0 ? $invoice->penalty_amount : $invoice->calculatePenalty(), 2) }}</span>
                     </div>
                 @endif
 
-                <div class="flex justify-between py-2">
-                    <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
-                    <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->total_due, 2) }}</span>
+                <div class="flex justify-between py-1">
+                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
+                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->total_due, 2) }}</span>
                 </div>
             </div>
         </flux:card>
@@ -200,33 +206,7 @@
                         </flux:button>
                     </form>
                 </div>
-            </flux:card>
-        @elseif($invoice->status === 'paid')
-            {{-- <flux:card class="p-6 dark:bg-zinc-900 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                <div class="flex gap-3">
-                    <flux:icon.check-circle class="size-6 flex-shrink-0 text-green-600 dark:text-green-400" />
-                    <div>
-                        <h3 class="text-lg font-semibold text-green-900 dark:text-green-100">Invoice Paid</h3>
-                        <p class="text-sm text-green-700 dark:text-green-300 mt-1">
-                            This invoice was paid on {{ $invoice->payment->completed_at?->format('F d, Y h:i A') }}
-                            @if($invoice->payment->transaction_id)
-                                <br>Transaction ID: {{ $invoice->payment->transaction_id }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-            </flux:card> --}}
-            <flux:callout icon="check-circle" color="emerald">
-                <flux:callout.heading>Invoice Paid</flux:callout.heading>
-                <flux:callout.text>
-                    <p>
-                        This invoice was paid on {{ $invoice->payment->completed_at?->format('F d, Y h:i A') }}
-                        @if($invoice->payment->transaction_id)
-                            <br>Transaction ID: {{ $invoice->payment->transaction_id }}
-                        @endif
-                    </p>
-                </flux:callout.text>
-            </flux:callout>             
+            </flux:card>        
         @endif
 
         <!-- Payment Method Notice -->
@@ -253,7 +233,7 @@
             }
             $previousMonthName = \Carbon\Carbon::create($previousYear, $previousMonth, 1)->format('F Y');
         @endphp
-        <flux:callout icon="information-circle" color="blue">
+        <flux:callout icon="information-circle">
             <flux:callout.heading>Previous Month OT Payment</flux:callout.heading>
             <flux:callout.text>
                 <p>

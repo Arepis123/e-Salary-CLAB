@@ -236,7 +236,7 @@
                                         <flux:menu.item icon="document-arrow-down" href="{{ route('payroll.payslip.download', $invoice->id) }}">Download Payslip</flux:menu.item>
                                     @endif
                                     @if($invoice->status === 'paid' && $invoice->hasTaxInvoice())
-                                        <flux:menu.item icon="receipt-percent" href="{{ route('invoices.receipt', $invoice->id) }}">Download Receipt</flux:menu.item>
+                                        <flux:menu.item icon="document-arrow-down" href="{{ route('invoices.receipt', $invoice->id) }}">Download Receipt</flux:menu.item>
                                     @endif
                                     @if($invoice->status === 'draft')
                                         <flux:menu.separator />

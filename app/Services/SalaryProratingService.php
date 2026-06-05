@@ -18,6 +18,33 @@ class SalaryProratingService
     public const MINIMUM_SALARY = 1700.00;
 
     /**
+     * Day of the month used as the payroll cut-off (matches the monthly
+     * auto-submit on the 16th). A worker whose contract starts on or after
+     * this day has their first partial month waived — see isFirstMonthWaived().
+     */
+    public const FIRST_MONTH_CUTOFF_DAY = 16;
+
+    /**
+     * Whether a worker's contract-start month should be waived from the payroll
+     * queue. When a contract starts on or after the monthly cut-off day, the
+     * partial first month is not treated as its own required payroll period;
+     * the contractor pays those days within the following month's payroll.
+     *
+     * Only applies to the contract-start month itself — every later month is
+     * a normal required period.
+     *
+     * @param  Carbon  $contractStart  Contract start date
+     * @param  int  $month  Payroll month being checked (1-12)
+     * @param  int  $year  Payroll year being checked
+     */
+    public function isFirstMonthWaived(Carbon $contractStart, int $month, int $year): bool
+    {
+        return $contractStart->year === $year
+            && $contractStart->month === $month
+            && $contractStart->day >= self::FIRST_MONTH_CUTOFF_DAY;
+    }
+
+    /**
      * Calculate pro-rated basic salary for a worker in a specific payroll month.
      *
      * Formula: (baseSalary / daysInMonth) × daysWorked

@@ -66,7 +66,12 @@
       "Bash(sed -n '/public function __construct/,/^    }/p' TransactionalEmails/Types/SendTransacEmailRequestSender.php)",
       "Bash(sed -n '/public function __construct/,/^    }/p' TransactionalEmails/Types/SendTransacEmailRequestToItem.php)",
       "Read(//c/c/xampp/htdocs/e-payroll/app/**)",
-      "Read(//c/c/xampp/htdocs/**)"
+      "Read(//c/c/xampp/htdocs/**)",
+      "PowerShell($ini = \\(php --ini | Select-String \"Loaded Configuration File\"\\).ToString\\(\\); Write-Output $ini; Write-Output \"=== Xdebug / OPcache \\(loaded values\\) ===\"; php -r \"echo 'xdebug_loaded=' . \\(extension_loaded\\('xdebug'\\) ? 'YES' : 'no'\\) . PHP_EOL; if\\(extension_loaded\\('xdebug'\\)\\){ echo 'xdebug.mode=' . ini_get\\('xdebug.mode'\\) . PHP_EOL; } echo 'opcache.enable=' . ini_get\\('opcache.enable'\\) . PHP_EOL; echo 'opcache.enable_cli=' . ini_get\\('opcache.enable_cli'\\) . PHP_EOL; echo 'opcache.jit=' . ini_get\\('opcache.jit'\\) . PHP_EOL; echo 'validate_timestamps=' . ini_get\\('opcache.validate_timestamps'\\) . PHP_EOL; echo 'memory_consumption=' . ini_get\\('opcache.memory_consumption'\\) . PHP_EOL; echo 'php_version=' . PHP_VERSION . PHP_EOL;\")",
+      "PowerShell(php -r \"echo 'opcache_ext_loaded=' . \\(extension_loaded\\('Zend OPcache'\\) ? 'YES' : 'NO'\\) . PHP_EOL; echo 'opcache.enable=' . ini_get\\('opcache.enable'\\) . PHP_EOL; echo 'max_files=' . ini_get\\('opcache.max_accelerated_files'\\) . PHP_EOL;\" 2>&1; Write-Output \"=== php config test \\(errors if any\\) ===\"; php -v 2>&1 | Select-Object -First 3)",
+      "PowerShell($out = & php -r \"echo 'ok';\" 2>&1; Write-Output \"stdout/err: $out\"; Write-Output \"exitcode: $LASTEXITCODE\")",
+      "PowerShell(foreach \\($h in @\\('110.4.45.227','103.6.196.135'\\)\\) { $r = Test-Connection -ComputerName $h -Count 4 -ErrorAction SilentlyContinue; if \\($r\\) { $avg = \\($r | Measure-Object -Property ResponseTime -Average\\).Average; Write-Output \\(\"{0} -> avg {1} ms\" -f $h, [math]::Round\\($avg,1\\)\\) } else { Write-Output \"$h -> no ICMP reply \\(may still accept DB connections\\)\" } })",
+      "Bash(vendor/bin/pint app/Services/OutstandingPayrollService.php app/Services/SalaryProratingService.php app/Console/Commands/AutoSubmitTimesheets.php --test)"
     ],
     "deny": [],
     "ask": []

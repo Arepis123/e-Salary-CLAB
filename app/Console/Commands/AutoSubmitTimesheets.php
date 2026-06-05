@@ -196,7 +196,22 @@ class AutoSubmitTimesheets extends Command
                     ->where('con_start', '<=', $targetDate->copy()->endOfMonth()->toDateString())
                     ->first();
 
-                return $contract !== null;
+                if ($contract === null) {
+                    return false;
+                }
+
+                // Skip a worker's contract-start month when it starts on/after the
+                // monthly cut-off — those partial days are paid in the following
+                // month's payroll, not auto-submitted as a standalone period.
+                if ($this->proratingService->isFirstMonthWaived(
+                    Carbon::parse($contract->con_start),
+                    $month,
+                    $year
+                )) {
+                    return false;
+                }
+
+                return true;
             });
 
         // Also include workers with pending OT

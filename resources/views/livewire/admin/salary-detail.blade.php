@@ -131,18 +131,18 @@
                     <span class="text-zinc-600 dark:text-zinc-400">SST (8% of service charge):</span>
                     <span class="font-medium">RM {{ number_format($submission->calculated_sst, 2) }}</span>
                 </div>
-                <div class="border-t border-green-200 dark:border-green-700 pt-2 mt-2 flex justify-between">
-                    <span class="font-bold text-zinc-900 dark:text-zinc-100">Client Total:</span>
-                    <span class="font-bold text-base text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
+                <div class="border-t pt-2 mt-2 flex justify-between">
+                    <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ ($submission->has_penalty || $submission->isOverdue()) ? 'Subtotal:' : 'Total Amount Due:' }}</span>
+                    <span class="font-medium">RM {{ number_format($submission->client_total, 2) }}</span>
                 </div>
                 @if($submission->has_penalty || $submission->isOverdue())
-                <div class="flex justify-between mt-2">
-                    <span class="text-red-600 dark:text-red-400">Late Payment Penalty (8%):</span>
-                    <span class="font-medium text-red-600 dark:text-red-400">+ RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
+                <div class="flex justify-between">
+                    <span class="text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%):</span>
+                    <span class="font-medium">RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
                 </div>
-                <div class="border-t border-red-200 dark:border-red-700 pt-2 mt-2 flex justify-between">
-                    <span class="font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
-                    <span class="font-bold text-base text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</span>
+                <div class="border-t pt-2 mt-2 flex justify-between">
+                    <span class="font-medium text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
+                    <span class="font-medium">RM {{ number_format($submission->total_due, 2) }}</span>
                 </div>
                 @endif
             </div>
@@ -630,13 +630,6 @@
                 Update the payroll amount and/or breakdown file for {{ $submission->month_year }}
             </flux:subheading>
 
-            <!-- Warning Callout -->
-            <flux:callout icon="exclamation-triangle" color="amber" class="mb-4">
-                <flux:callout.text>
-                    <p class="text-sm">Changes will update the client's payment amount. Service charge, SST, and penalties will be recalculated automatically.</p>
-                </flux:callout.text>
-            </flux:callout>
-
             <div class="grid gap-4 md:grid-cols-2">
                 <!-- Current Amount -->
                 <div class="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
@@ -664,9 +657,8 @@
             </flux:field>
 
             <!-- New Breakdown File -->
-            <flux:field class="mt-3">
+            <flux:field class="mt-4">
                 <flux:label>Replace Breakdown File (Excel)</flux:label>
-                <flux:description>Amount calculated automatically. Leave blank to keep existing.</flux:description>
                 <input type="file" wire:model="newBreakdownFile" accept=".xlsx,.xls"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="newBreakdownFile" />
@@ -735,9 +727,8 @@
             @endif
 
             <!-- Reason for Update -->
-            <flux:field class="mt-3">
+            <flux:field class="mt-4">
                 <flux:label required>Reason for Changes</flux:label>
-                <flux:description>Explain what you're changing and why (required for audit trail)</flux:description>
                 <flux:textarea wire:model="editAmountNotes" rows="3" placeholder="e.g., Corrected calculation error, replaced file with updated breakdown..." />
                 <flux:error name="editAmountNotes" />
             </flux:field>
@@ -810,14 +801,8 @@
         <form wire:submit.prevent="recordManualPayment">
             <flux:heading size="lg">Record Manual Payment</flux:heading>
             <flux:subheading class="mb-4">
-                Record a payment made directly into the company bank account (outside Billplz FPX) for {{ $submission->month_year }}.
+                Record a payment made directly into the company bank account for {{ $submission->month_year }}.
             </flux:subheading>
-
-            <flux:callout icon="exclamation-triangle" color="amber" class="mb-4">
-                <flux:callout.text>
-                    <p class="text-sm">This will mark the payroll as <strong>paid</strong> and generate the official receipt. Only use this once you have confirmed the funds were received in your bank account.</p>
-                </flux:callout.text>
-            </flux:callout>
 
             <!-- Amount Due reference -->
             <div class="mb-4 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-between items-center">
@@ -836,7 +821,7 @@
                 <!-- Payment Date -->
                 <flux:field>
                     <flux:label required>Date Received</flux:label>
-                    <flux:input type="date" wire:model="manualPaymentDate" max="{{ now()->format('Y-m-d') }}" />
+                    <flux:date-picker wire:model="manualPaymentDate" max="today" placeholder="Select date" />
                     <flux:error name="manualPaymentDate" />
                 </flux:field>
 
@@ -858,7 +843,6 @@
             <!-- Proof of Payment -->
             <flux:field class="mt-3">
                 <flux:label>Proof of Payment</flux:label>
-                <flux:description>Upload the bank-in slip / transfer confirmation (PDF or image)</flux:description>
                 <input type="file" wire:model="manualPaymentProof" accept=".pdf,.jpg,.jpeg,.png"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="manualPaymentProof" />
@@ -874,7 +858,7 @@
 
             <!-- Notes -->
             <flux:field class="mt-3">
-                <flux:label>Notes (Optional)</flux:label>
+                <flux:label>Notes <span class="ms-1 text-zinc-500 dark:text-zinc-400">(Optional)</span></flux:label>
                 <flux:textarea wire:model="manualPaymentNotes" rows="2" placeholder="Any additional notes for the audit trail..." />
                 <flux:error name="manualPaymentNotes" />
             </flux:field>
@@ -882,7 +866,7 @@
             <div class="flex gap-2 mt-6">
                 <flux:button type="submit" variant="primary" icon="check-circle" :disabled="$isRecordingPayment" wire:loading.attr="disabled" wire:target="manualPaymentProof, recordManualPayment">
                     <span wire:loading.remove wire:target="manualPaymentProof, recordManualPayment">
-                        Record Payment & Mark Paid
+                        Record Payment
                     </span>
                     <span wire:loading wire:target="manualPaymentProof">
                         Uploading file...

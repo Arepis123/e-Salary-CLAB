@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ContractWorker;
 use App\Models\PayrollSubmission;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -16,6 +17,10 @@ use Illuminate\Support\Collection;
  */
 class OutstandingPayrollService
 {
+    public function __construct(
+        protected SalaryProratingService $proratingService
+    ) {}
+
     /**
      * Collect all outstanding payroll periods for a contractor, sorted oldest-first.
      */
@@ -82,6 +87,15 @@ class OutstandingPayrollService
             $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                 ->where('con_end', '>=', $checkDate->copy()->startOfMonth()->toDateString())
                 ->where('con_start', '<=', $checkDate->copy()->endOfMonth()->toDateString())
+                ->get(['con_wkr_id', 'con_start'])
+                // Waive a worker's contract-start month when it starts on/after the
+                // monthly cut-off — those days are paid in the following month, so the
+                // start month should not block the queue as a "missing" period.
+                ->reject(fn ($contract) => $this->proratingService->isFirstMonthWaived(
+                    Carbon::parse($contract->con_start),
+                    $month,
+                    $year
+                ))
                 ->pluck('con_wkr_id')
                 ->unique();
 
