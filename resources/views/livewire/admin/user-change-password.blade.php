@@ -8,9 +8,9 @@
                 </flux:text>
             </div>
 
-            <flux:input wire:model="password" label="{{ __('New Password') }}" type="password" required />
+            <flux:input wire:model="password" label="{{ __('New Password') }}" type="password" viewable required />
 
-            <flux:input wire:model="password_confirmation" label="{{ __('Confirm New Password') }}" type="password" required />
+            <flux:input wire:model="password_confirmation" label="{{ __('Confirm New Password') }}" type="password" viewable required />
 
             <div class="flex gap-2">
                 <flux:spacer />

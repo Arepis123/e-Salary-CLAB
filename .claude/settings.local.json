@@ -71,7 +71,9 @@
       "PowerShell(php -r \"echo 'opcache_ext_loaded=' . \\(extension_loaded\\('Zend OPcache'\\) ? 'YES' : 'NO'\\) . PHP_EOL; echo 'opcache.enable=' . ini_get\\('opcache.enable'\\) . PHP_EOL; echo 'max_files=' . ini_get\\('opcache.max_accelerated_files'\\) . PHP_EOL;\" 2>&1; Write-Output \"=== php config test \\(errors if any\\) ===\"; php -v 2>&1 | Select-Object -First 3)",
       "PowerShell($out = & php -r \"echo 'ok';\" 2>&1; Write-Output \"stdout/err: $out\"; Write-Output \"exitcode: $LASTEXITCODE\")",
       "PowerShell(foreach \\($h in @\\('110.4.45.227','103.6.196.135'\\)\\) { $r = Test-Connection -ComputerName $h -Count 4 -ErrorAction SilentlyContinue; if \\($r\\) { $avg = \\($r | Measure-Object -Property ResponseTime -Average\\).Average; Write-Output \\(\"{0} -> avg {1} ms\" -f $h, [math]::Round\\($avg,1\\)\\) } else { Write-Output \"$h -> no ICMP reply \\(may still accept DB connections\\)\" } })",
-      "Bash(vendor/bin/pint app/Services/OutstandingPayrollService.php app/Services/SalaryProratingService.php app/Console/Commands/AutoSubmitTimesheets.php --test)"
+      "Bash(vendor/bin/pint app/Services/OutstandingPayrollService.php app/Services/SalaryProratingService.php app/Console/Commands/AutoSubmitTimesheets.php --test)",
+      "Bash(vendor/bin/pint app/Livewire/Admin/Users.php --test)",
+      "Bash(vendor/bin/pint app/Livewire/Admin/Dashboard.php --test)"
     ],
     "deny": [],
     "ask": []

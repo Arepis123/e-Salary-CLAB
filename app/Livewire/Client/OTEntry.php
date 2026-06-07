@@ -445,6 +445,10 @@ class OTEntry extends Component
 
             // Update modal's local transactions
             $this->transactions = $currentTransactions;
+
+            // Persist immediately so the transaction survives a page refresh even
+            // if the modal is closed without clicking "Save Transactions"
+            $this->autoSaveDraft($this->currentWorkerIndex);
         }
 
         // Log activity

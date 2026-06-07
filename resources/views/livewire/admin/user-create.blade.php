@@ -16,15 +16,16 @@
 
             <flux:input wire:model="person_in_charge" label="{{ __('Person in Charge') }}" placeholder="Manager Name" />
 
-            <flux:select wire:model="role" label="{{ __('Role') }}" placeholder="{{ __('Select role') }}" required>
-                <option value="admin">{{ __('Admin') }}</option>
-                <option value="finance">{{ __('Finance') }}</option>
-                <option value="super_admin">{{ __('Super Admin') }}</option>
-            </flux:select>
+            <flux:select wire:model="role" label="Role" variant="listbox" placeholder="{{ __('Select Role') }}">
+                <flux:select.option value="">{{ __('All Roles') }}</flux:select.option>
+                <flux:select.option value="super_admin">{{ __('Super Admin') }}</flux:select.option>
+                <flux:select.option value="admin">{{ __('Admin') }}</flux:select.option>
+                <flux:select.option value="finance">{{ __('Finance') }}</flux:select.option>
+            </flux:select>            
 
-            <flux:input wire:model="password" label="{{ __('Password') }}" type="password" required />
+            <flux:input wire:model="password" label="{{ __('Password') }}" type="password" viewable required />
 
-            <flux:input wire:model="password_confirmation" label="{{ __('Confirm Password') }}" type="password" required />
+            <flux:input wire:model="password_confirmation" label="{{ __('Confirm Password') }}" type="password" viewable required />
 
             <div class="flex gap-2">
                 <flux:spacer />

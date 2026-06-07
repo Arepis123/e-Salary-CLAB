@@ -5,13 +5,36 @@ namespace App\Livewire\Admin;
 use App\Models\User;
 use Flux\Flux;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Users extends Component
 {
-    public $users;
+    use WithPagination;
+
+    #[Url]
+    public $search = '';
+
+    #[Url]
+    public $roleFilter = '';
+
+    #[Url]
+    public $sortBy = 'name';
+
+    #[Url]
+    public $sortDirection = 'asc';
+
+    public $showFilters = true;
+
+    public $perPage = 10;
 
     public $userIdToDelete;
+
+    /**
+     * Columns that may be sorted at the database level.
+     */
+    protected array $sortableColumns = ['username', 'name', 'email', 'role'];
 
     public function mount()
     {
@@ -19,28 +42,88 @@ class Users extends Component
         if (! auth()->user()->isSuperAdmin()) {
             abort(403, 'Unauthorized access. Only Super Admin can access this page.');
         }
+    }
 
-        $this->loadUsers();
+    public function toggleFilters()
+    {
+        $this->showFilters = ! $this->showFilters;
+    }
+
+    public function clearFilters()
+    {
+        $this->search = '';
+        $this->roleFilter = '';
+        $this->resetPage();
+    }
+
+    public function sortByColumn($column)
+    {
+        if (! in_array($column, $this->sortableColumns)) {
+            return;
+        }
+
+        if ($this->sortBy === $column) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = 'asc';
+        }
+        $this->resetPage();
+    }
+
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingRoleFilter()
+    {
+        $this->resetPage();
     }
 
     public function render()
     {
-        return view('livewire.admin.users')
+        // All non-client users (admin / super admin / finance)
+        $baseQuery = User::where('role', '!=', 'client');
+
+        // Search across username, name and email
+        if ($this->search !== '') {
+            $baseQuery->where(function ($q) {
+                $q->where('username', 'like', '%'.$this->search.'%')
+                    ->orWhere('name', 'like', '%'.$this->search.'%')
+                    ->orWhere('email', 'like', '%'.$this->search.'%');
+            });
+        }
+
+        // Role filter
+        if ($this->roleFilter !== '') {
+            $baseQuery->where('role', $this->roleFilter);
+        }
+
+        // Sorting (guarded against invalid columns)
+        $sortColumn = in_array($this->sortBy, $this->sortableColumns) ? $this->sortBy : 'name';
+        $sortDirection = $this->sortDirection === 'desc' ? 'desc' : 'asc';
+
+        $users = (clone $baseQuery)
+            ->orderBy($sortColumn, $sortDirection)
+            ->paginate($this->perPage);
+
+        $stats = [
+            'total' => User::where('role', '!=', 'client')->count(),
+            'super_admin' => User::where('role', 'super_admin')->count(),
+            'admin' => User::where('role', 'admin')->count(),
+            'finance' => User::where('role', 'finance')->count(),
+        ];
+
+        return view('livewire.admin.users', compact('users', 'stats'))
             ->layout('components.layouts.app', ['title' => __('User Management')]);
     }
 
     #[On('reloadUsers')]
     public function reloadUsers()
     {
-        $this->loadUsers();
-    }
-
-    private function loadUsers()
-    {
-        // Load all users except client users
-        $this->users = User::where('role', '!=', 'client')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        // Re-render with fresh data; reset to the first page so new users are visible.
+        $this->resetPage();
     }
 
     public function edit($id)
@@ -101,8 +184,7 @@ class Users extends Component
         // Delete the user
         $user->delete();
 
-        // Reload users and close modal
-        $this->loadUsers();
+        // Close modal; render() reloads the list with fresh data
         Flux::modal('delete-user')->close();
 
         Flux::toast(

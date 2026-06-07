@@ -16,9 +16,9 @@ class Dashboard extends Component
 
     public $recentPayments = [];
 
-    public $chartData = [];
-
     public $contractorStatusChartData = [];
+
+    public $topOverdueChartData = [];
 
     public $sectionContractors = [];
 
@@ -66,16 +66,15 @@ class Dashboard extends Component
             'payments_growth' => 0,
         ];
 
-        $this->chartData = [
-            'labels' => [],
-            'totalPayments' => [],
-            'numberOfPayments' => [],
-        ];
-
         $this->contractorStatusChartData = [
             'labels' => ['Submitted & Paid', 'Submitted - Not Paid', 'Not Submitted'],
             'data' => [0, 0, 0],
             'colors' => ['#10b981', '#f59e0b', '#ef4444'],
+        ];
+
+        $this->topOverdueChartData = [
+            'labels' => [],
+            'data' => [],
         ];
     }
 
@@ -96,8 +95,8 @@ class Dashboard extends Component
         $this->loadRecentPayments();
         $this->isLoadingRecentPayments = false;
 
-        $this->loadChartData();
         $this->loadContractorStatusChartData();
+        $this->loadTopOverdueClients();
         $this->isLoadingCharts = false;
 
         // Dispatch event to initialize charts after data is loaded
@@ -182,12 +181,11 @@ class Dashboard extends Component
             ->whereMonth('completed_at', $lastMonth)
             ->sum('amount');
 
-        // Outstanding balance (approved + pending + overdue submissions)
-        // Only count from the 16th onwards — early submissions are not allowed,
-        // so all legitimate submissions will always have submitted_at on day 16+.
-        // Use total_due accessor to include penalty calculation
+        // Outstanding balance (approved + pending + overdue submissions).
+        // The status filter already restricts this to legitimate, submitted payroll
+        // (drafts are excluded), so no date guard is needed. Use the total_due
+        // accessor to include any penalty calculation.
         $outstandingSubmissions = PayrollSubmission::whereIn('status', ['approved', 'pending_payment', 'overdue'])
-            ->whereRaw('DAY(submitted_at) >= 16')
             ->get();
 
         $outstandingBalance = $outstandingSubmissions->sum(function ($submission) {
@@ -249,45 +247,6 @@ class Dashboard extends Component
         })->toArray();
     }
 
-    protected function loadChartData()
-    {
-        $labels = [];
-        $totalPayments = [];
-        $numberOfPayments = [];
-
-        // Get data for last 5 months + current month (6 months total)
-        $startOfMonth = now()->startOfMonth();
-        for ($i = 5; $i >= 0; $i--) {
-            $date = $startOfMonth->copy()->subMonths($i);
-            $month = $date->month;
-            $year = $date->year;
-
-            $labels[] = $date->format('M Y');
-
-            // Total payment amount for the month
-            $monthTotal = PayrollPayment::where('status', 'completed')
-                ->whereYear('completed_at', $year)
-                ->whereMonth('completed_at', $month)
-                ->sum('amount');
-
-            $totalPayments[] = (float) $monthTotal;
-
-            // Number of payments for the month
-            $monthCount = PayrollPayment::where('status', 'completed')
-                ->whereYear('completed_at', $year)
-                ->whereMonth('completed_at', $month)
-                ->count();
-
-            $numberOfPayments[] = $monthCount;
-        }
-
-        $this->chartData = [
-            'labels' => $labels,
-            'totalPayments' => $totalPayments,
-            'numberOfPayments' => $numberOfPayments,
-        ];
-    }
-
     protected function loadContractorStatusChartData()
     {
         // Use selected month/year instead of current
@@ -334,6 +293,52 @@ class Dashboard extends Component
             'labels' => ['Submitted & Paid', 'Submitted - Not Paid', 'Not Submitted'],
             'data' => [$submittedAndPaid, $submittedNotPaid, $notSubmitted],
             'colors' => ['#10b981', '#f59e0b', '#ef4444'], // green, orange, red
+        ];
+    }
+
+    /**
+     * Top 5 clients who most frequently miss their payroll payment deadline.
+     *
+     * A submission counts as overdue when it is either:
+     *  - still unsettled past its deadline (currently overdue), or
+     *  - paid, but settled after the deadline (historically late).
+     */
+    protected function loadTopOverdueClients()
+    {
+        $overdueSubmissions = PayrollSubmission::query()
+            ->with('user')
+            ->whereNotNull('payment_deadline')
+            ->where(function ($q) {
+                // Currently overdue: deadline passed and not yet settled
+                $q->where(function ($q2) {
+                    $q2->whereNotIn('status', ['paid', 'draft'])
+                        ->whereDate('payment_deadline', '<', now()->startOfDay());
+                })
+                    // Or paid, but settled after the deadline (late payment)
+                    ->orWhere(function ($q2) {
+                        $q2->where('status', 'paid')
+                            ->whereColumn('paid_at', '>', 'payment_deadline');
+                    });
+            })
+            ->get();
+
+        $topClients = $overdueSubmissions
+            ->groupBy('contractor_clab_no')
+            ->map(function ($group) {
+                $first = $group->first();
+
+                return [
+                    'name' => $first->user->name ?? ('Client '.$first->contractor_clab_no),
+                    'count' => $group->count(),
+                ];
+            })
+            ->sortByDesc('count')
+            ->take(5)
+            ->values();
+
+        $this->topOverdueChartData = [
+            'labels' => $topClients->pluck('name')->toArray(),
+            'data' => $topClients->pluck('count')->toArray(),
         ];
     }
 

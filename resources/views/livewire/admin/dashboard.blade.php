@@ -132,7 +132,7 @@
             <flux:card class="order-last lg:order-first lg:col-span-2 min-w-0 overflow-hidden p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg">
                 <div class="mb-4 flex items-center justify-between">
                     <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent Payments</h2>
-                    <flux:button variant="ghost" size="sm" href="#" wire:navigate>View all</flux:button>
+                    <flux:button variant="ghost" size="sm" href="{{ route('payroll') }}" wire:navigate>View all</flux:button>
                 </div>
 
                 @if($isLoadingRecentPayments)
@@ -322,23 +322,27 @@
                 @endif
             </flux:card>
 
-            <!-- Payment Overview Chart -->
+            <!-- Top Overdue Clients Chart -->
             <flux:card class="p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg">
                 <div class="mb-4">
-                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Payment Overview</h2>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Last 6 months payment trends</p>
+                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Top 5 Overdue Clients</h2>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Clients who most frequently miss their payment deadline</p>
                 </div>
                 @if($isLoadingCharts)
                     <flux:skeleton animate="shimmer" class="h-64 w-full rounded-lg" />
-                @else
-                    <!-- Data container for Payment Overview chart -->
-                    <div id="paymentChartDataContainer"
-                        data-labels='@json($chartData["labels"])'
-                        data-total-payments='@json($chartData["totalPayments"])'
-                        data-number-of-payments='@json($chartData["numberOfPayments"])'
+                @elseif(count($topOverdueChartData['labels'] ?? []) > 0)
+                    <!-- Data container for Top Overdue Clients chart -->
+                    <div id="topOverdueChartDataContainer"
+                        data-labels='@json($topOverdueChartData["labels"])'
+                        data-counts='@json($topOverdueChartData["data"])'
                         style="display: none;"></div>
                     <div class="relative h-64">
-                        <canvas id="paymentOverviewChart" wire:ignore></canvas>
+                        <canvas id="topOverdueChart" wire:ignore></canvas>
+                    </div>
+                @else
+                    <div class="flex h-64 flex-col items-center justify-center gap-2 text-center">
+                        <flux:icon.check-circle class="size-10 text-green-500" />
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">No overdue payrolls. Every client is on time.</p>
                     </div>
                 @endif
             </flux:card>
@@ -481,24 +485,24 @@
         }
 
         // Store chart instance globally to destroy before re-creating
-        window.paymentOverviewChartInstance = null;
+        window.topOverdueChartInstance = null;
 
-        function initDashboardChart() {
+        function initTopOverdueChart() {
             if (typeof Chart === 'undefined') {
-                setTimeout(initDashboardChart, 50);
+                setTimeout(initTopOverdueChart, 50);
                 return;
             }
 
-            const ctx = document.getElementById('paymentOverviewChart');
+            const ctx = document.getElementById('topOverdueChart');
             if (!ctx) return;
 
             // Get data from the data container
-            const dataContainer = document.getElementById('paymentChartDataContainer');
+            const dataContainer = document.getElementById('topOverdueChartDataContainer');
             if (!dataContainer) return;
 
             // Destroy existing chart instance if it exists
-            if (window.paymentOverviewChartInstance) {
-                window.paymentOverviewChartInstance.destroy();
+            if (window.topOverdueChartInstance) {
+                window.topOverdueChartInstance.destroy();
             }
 
             // Get theme colors
@@ -506,65 +510,39 @@
             const textColor = isDark ? '#d4d4d8' : '#3f3f46';
             const gridColor = isDark ? '#3f3f46' : '#e4e4e7';
 
-            const chartData = {
+            const overdueData = {
                 labels: JSON.parse(dataContainer.dataset.labels),
-                totalPayments: JSON.parse(dataContainer.dataset.totalPayments),
-                numberOfPayments: JSON.parse(dataContainer.dataset.numberOfPayments)
+                counts: JSON.parse(dataContainer.dataset.counts)
             };
 
-            console.log('Initializing Payment Overview Chart:', chartData);
+            // Give the axis ~40% headroom above the largest value so the longest
+            // bar never spans the full width (keeps integer ticks via stepSize: 1).
+            const maxCount = Math.max(0, ...overdueData.counts);
+            const suggestedMax = maxCount > 0 ? Math.ceil(maxCount * 1.4) : 1;
 
-            window.paymentOverviewChartInstance = new Chart(ctx, {
-                type: 'line',
+            console.log('Initializing Top Overdue Clients Chart:', overdueData);
+
+            window.topOverdueChartInstance = new Chart(ctx, {
+                type: 'bar',
                 data: {
-                    labels: chartData.labels,
+                    labels: overdueData.labels,
                     datasets: [{
-                        label: 'Total Payments (RM)',
-                        data: chartData.totalPayments,
-                        borderColor: '#8b5cf6',
-                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#8b5cf6',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }, {
-                        label: 'Number of Payments',
-                        data: chartData.numberOfPayments,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#3b82f6',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        yAxisID: 'y1'
+                        label: 'Overdue Payrolls',
+                        data: overdueData.counts,
+                        backgroundColor: '#f59e0b',
+                        hoverBackgroundColor: '#d97706',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        maxBarThickness: 30
                     }]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: textColor,
-                                usePointStyle: true,
-                                padding: 15,
-                                font: {
-                                    family: 'Inter, ui-sans-serif, system-ui, sans-serif',
-                                    size: 12
-                                }
-                            }
+                            display: false
                         },
                         tooltip: {
                             backgroundColor: isDark ? '#18181b' : '#ffffff',
@@ -573,7 +551,7 @@
                             borderColor: gridColor,
                             borderWidth: 1,
                             padding: 12,
-                            displayColors: true,
+                            displayColors: false,
                             titleFont: {
                                 family: 'Inter, ui-sans-serif, system-ui, sans-serif',
                                 size: 13
@@ -584,30 +562,23 @@
                             },
                             callbacks: {
                                 label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        if (context.datasetIndex === 0) {
-                                            label += 'RM ' + context.parsed.y.toLocaleString();
-                                        } else {
-                                            label += context.parsed.y;
-                                        }
-                                    }
-                                    return label;
+                                    const value = context.parsed.x;
+                                    return ' ' + value + ' overdue ' + (value === 1 ? 'payroll' : 'payrolls');
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
+                            beginAtZero: true,
+                            suggestedMax: suggestedMax,
                             grid: {
-                                color: gridColor,
-                                display: false
+                                color: gridColor
                             },
                             ticks: {
                                 color: textColor,
+                                precision: 0,
+                                stepSize: 1,
                                 font: {
                                     family: 'Inter, ui-sans-serif, system-ui, sans-serif',
                                     size: 11
@@ -615,29 +586,8 @@
                             }
                         },
                         y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
                             grid: {
-                                color: gridColor
-                            },
-                            ticks: {
-                                color: textColor,
-                                font: {
-                                    family: 'Inter, ui-sans-serif, system-ui, sans-serif',
-                                    size: 11
-                                },
-                                callback: function(value) {
-                                    return 'RM ' + (value / 1000) + 'k';
-                                }
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            grid: {
-                                drawOnChartArea: false,
+                                display: false
                             },
                             ticks: {
                                 color: textColor,
@@ -653,22 +603,28 @@
         }
 
         // Track if charts have been initialized
-        window.chartsInitialized = false;
+        window.contractorChartInitialized = false;
+        window.topOverdueChartInitialized = false;
 
-        // Function to initialize charts if ready
+        // Function to initialize charts if ready. Each chart is initialized
+        // independently so the top-overdue chart being absent (empty state) does
+        // not prevent the contractor status chart from rendering, and vice versa.
         function tryInitCharts() {
-            const contractorDataContainer = document.getElementById('chartDataContainer');
-            const paymentDataContainer = document.getElementById('paymentChartDataContainer');
-            const contractorChart = document.getElementById('contractorStatusChart');
-            const paymentChart = document.getElementById('paymentOverviewChart');
-
-            // Only initialize if all elements exist and charts haven't been initialized
-            if (contractorDataContainer && paymentDataContainer && contractorChart && paymentChart && !window.chartsInitialized) {
-                console.log('Charts containers found, initializing...');
-                window.chartsInitialized = true;
+            if (!window.contractorChartInitialized &&
+                document.getElementById('chartDataContainer') &&
+                document.getElementById('contractorStatusChart')) {
+                console.log('Contractor status chart container found, initializing...');
+                window.contractorChartInitialized = true;
                 window.initContractorStatusChart();
-                initDashboardChart();
                 setupChartObserver();
+            }
+
+            if (!window.topOverdueChartInitialized &&
+                document.getElementById('topOverdueChartDataContainer') &&
+                document.getElementById('topOverdueChart')) {
+                console.log('Top overdue chart container found, initializing...');
+                window.topOverdueChartInitialized = true;
+                initTopOverdueChart();
             }
         }
 
@@ -686,13 +642,13 @@
             });
         });
 
-        // Poll for chart containers (handles initial load and navigate)
+        // Poll for chart containers (handles initial load and navigate).
+        // Keep polling until the always-present contractor chart is up; the
+        // top-overdue chart is initialized opportunistically when present.
         function pollForCharts() {
-            if (!window.chartsInitialized) {
-                tryInitCharts();
-                if (!window.chartsInitialized) {
-                    setTimeout(pollForCharts, 200);
-                }
+            tryInitCharts();
+            if (!window.contractorChartInitialized) {
+                setTimeout(pollForCharts, 200);
             }
         }
 
@@ -703,9 +659,10 @@
             pollForCharts();
         }
 
-        // Reset initialization flag when navigating away (for wire:navigate)
+        // Reset initialization flags when navigating away (for wire:navigate)
         document.addEventListener('livewire:navigating', function() {
-            window.chartsInitialized = false;
+            window.contractorChartInitialized = false;
+            window.topOverdueChartInitialized = false;
         });
 
         // Setup MutationObserver to watch for data changes
@@ -740,7 +697,7 @@
                     // Reinitialize both charts with new theme colors
                     setTimeout(function() {
                         window.initContractorStatusChart();
-                        initDashboardChart();
+                        initTopOverdueChart();
                     }, 100);
                 }
             });
