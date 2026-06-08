@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\PayslipReady;
 use App\Models\PayrollSubmission;
 use App\Models\User;
+use App\Models\Worker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -145,5 +146,85 @@ class PayslipNotifyController extends Controller
             'is_reupload'     => $isReupload,
             'email_sent'      => $emailSent,
         ]);
+    }
+
+    /**
+     * Look up the current contractor (company) name for a batch of worker
+     * passport / IC numbers.
+     *
+     * Resolution chain (all in worker_db):
+     *   workers.wkr_passno → workers.wkr_currentemp → contractors.ctr_clab_no → contractors.ctr_comp_name
+     *
+     * Expected request body (JSON):
+     * {
+     *   "ic_numbers": ["A1234567", "880123081234", "B7654321", "950505105566"]
+     * }
+     *
+     * Required header:
+     *   X-Payslip-Token: <PAYSLIP_API_SECRET from .env>
+     */
+    public function contractorsByIc(Request $request)
+    {
+        // --- Authenticate via shared secret token ---
+        $secret = config('services.payslip_api.secret');
+        if (! $secret || $request->header('X-Payslip-Token') !== $secret) {
+            return response()->json(['success' => false, 'error' => 'Invalid token'], 401);
+        }
+
+        // --- Validate input ---
+        $icNumbers = $request->input('ic_numbers');
+        if (! is_array($icNumbers) || count($icNumbers) === 0) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'ic_numbers must be a non-empty array',
+            ], 400);
+        }
+
+        // Normalise: trim, drop blanks, de-duplicate (preserve original order)
+        $icNumbers = array_values(array_unique(array_filter(
+            array_map(fn ($ic) => trim((string) $ic), $icNumbers),
+            fn ($ic) => $ic !== ''
+        )));
+
+        if (count($icNumbers) === 0) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'ic_numbers must be a non-empty array',
+            ], 400);
+        }
+
+        try {
+            // Single join across worker_db: passport → current employer → company name
+            $rows = Worker::query()
+                ->whereIn('workers.wkr_passno', $icNumbers)
+                ->leftJoin('contractors', 'workers.wkr_currentemp', '=', 'contractors.ctr_clab_no')
+                ->get(['workers.wkr_passno', 'contractors.ctr_comp_name']);
+
+            $results = [];
+            foreach ($rows as $row) {
+                // Only treat as resolved when a company name actually exists
+                if (! empty($row->ctr_comp_name)) {
+                    $results[$row->wkr_passno] = $row->ctr_comp_name;
+                }
+            }
+
+            $notFound = array_values(array_diff($icNumbers, array_keys($results)));
+
+            return response()->json([
+                'success'   => true,
+                'results'   => (object) $results,
+                'not_found' => $notFound,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('contractors-by-ic lookup failed', [
+                'error' => $e->getMessage(),
+                'count' => count($icNumbers),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Database unavailable',
+            ], 500);
+        }
     }
 }
