@@ -5,6 +5,10 @@
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" readonly/>
 
+            @if($clabId !== '')
+                <flux:input wire:model="clabId" :label="__('CLAB ID')" type="text" readonly />
+            @endif
+
             <div>
                 <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="email" />
 

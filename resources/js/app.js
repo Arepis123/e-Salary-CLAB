@@ -231,6 +231,22 @@ const tutorialConfigs = {
                 }
             },
             {
+                element: '[href*="faq"]',
+                popover: {
+                    title: 'FAQ',
+                    description: 'Have a question? Click FAQ to open our answers to common questions about timesheets, OT entry, payments and invoices in a new tab. We keep it updated.',
+                    side: 'right'
+                }
+            },
+            {
+                element: '[href*="settings"]',
+                popover: {
+                    title: 'Settings',
+                    description: 'Update your profile and adjust appearance preferences (light/dark mode) here.',
+                    side: 'right'
+                }
+            },
+            {
                 element: '#tutorial-button',
                 popover: {
                     title: 'Need Help Again?',
@@ -713,6 +729,16 @@ window.startTutorial = function(page = 'dashboard') {
         return;
     }
 
+    // Only keep steps whose target element is actually on the page. Some items are
+    // conditional (e.g. the FAQ sidebar link only appears when a FAQ document is uploaded),
+    // so this prevents the tour from breaking when an element is missing.
+    const steps = config.steps.filter(step => {
+        if (!step.element || step.element === 'body') {
+            return true;
+        }
+        return document.querySelector(step.element) !== null;
+    });
+
     const driverObj = driver({
         showProgress: true,
         showButtons: ['next', 'previous', 'close'],
@@ -721,7 +747,7 @@ window.startTutorial = function(page = 'dashboard') {
         prevBtnText: 'Previous',
         doneBtnText: 'Finish',
         popoverClass: 'driver-popover-custom',
-        steps: config.steps,
+        steps: steps,
         onDestroyed: () => {
             // Mark tutorial as completed for this specific page
             fetch('/tutorial/complete', {

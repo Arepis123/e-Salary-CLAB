@@ -35,7 +35,7 @@
                         <flux:select.option value="payment">Payment Summary</flux:select.option>
                         <flux:select.option value="worker">Worker Payroll</flux:select.option>
                         <flux:select.option value="client">Client Summary</flux:select.option>
-                        <flux:select.option value="ot_transaction">OT & Transaction</flux:select.option>
+                        {{-- <flux:select.option value="ot_transaction">OT & Transaction</flux:select.option> --}}
                         <flux:select.option value="timesheet">Timesheet Report</flux:select.option>
                         <flux:select.option value="tax">Official Receipt Report</flux:select.option>
                         <flux:select.option value="paid_payroll">Paid Payroll Report</flux:select.option>
@@ -54,13 +54,11 @@
 
                 <flux:field>
                     <flux:label>Client</flux:label>
-                    <flux:select wire:model.live="clientFilter" variant="listbox" placeholder="All Clients">
+                    <flux:select wire:model.live="clientFilter" variant="listbox" searchable placeholder="All Clients">
                         <flux:select.option value="">All Clients</flux:select.option>
-                        @if($reportGenerated)
-                            @foreach($clientPayments as $client)
-                                <flux:select.option value="{{ $client['client'] }}">{{ $client['client'] }}</flux:select.option>
-                            @endforeach
-                        @endif
+                        @foreach($allClients as $client)
+                            <flux:select.option value="{{ $client }}">{{ $client }}</flux:select.option>
+                        @endforeach
                     </flux:select>
                 </flux:field>
 
@@ -532,15 +530,20 @@
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Employee Name</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Department</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Salary</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Allowance</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Client Deduction</th>
-                                    @foreach($allTemplateNames as $templateName)
-                                        <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ $templateName }}</th>
-                                    @endforeach
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Normal OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest OT</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Public OT</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Total OT</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Allowance</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Backpay</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Advance</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Deduction</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">NPL</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Accommodation</th>
+                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Medical Claim</th>
+                                    @foreach($allTemplateNames as $templateName)
+                                        <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ $templateName }}</th>
+                                    @endforeach
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
                                     <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Remarks</th>
                                 </tr>
@@ -558,39 +561,6 @@
                                                 -
                                             @endif
                                         </td>
-                                        <td class="py-3 text-sm text-green-600 dark:text-green-400">
-                                            @if($entry['allowance'] > 0)
-                                                RM {{ number_format($entry['allowance'], 2) }}
-                                            @else
-                                                -
-                                            @endif
-                                        </td>
-                                        <td class="py-3 text-sm text-amber-600 dark:text-amber-400">
-                                            @if($entry['advance_salary'] > 0)
-                                                RM {{ number_format($entry['advance_salary'], 2) }}
-                                            @else
-                                                -
-                                            @endif
-                                        </td>
-                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
-                                            @if($entry['client_deduction'] > 0)
-                                                RM {{ number_format($entry['client_deduction'], 2) }}
-                                            @else
-                                                -
-                                            @endif
-                                        </td>
-                                        @foreach($allTemplateNames as $templateName)
-                                            @php
-                                                $templateDeduction = collect($entry['template_deductions'])->firstWhere('name', $templateName);
-                                            @endphp
-                                            <td class="py-3 text-sm text-red-600 dark:text-red-400">
-                                                @if($templateDeduction)
-                                                    RM {{ number_format($templateDeduction['amount'], 2) }}
-                                                @else
-                                                    -
-                                                @endif
-                                            </td>
-                                        @endforeach
                                         <td class="py-3 text-sm text-blue-600 dark:text-blue-400">
                                             @if($entry['ot_normal'] > 0)
                                                 {{ number_format($entry['ot_normal'], 1) }}h
@@ -612,6 +582,74 @@
                                                 -
                                             @endif
                                         </td>
+                                        <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                            @if($entry['ot_total'] > 0)
+                                                {{ number_format($entry['ot_total'], 1) }}h
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-green-600 dark:text-green-400">
+                                            @if($entry['allowance'] > 0)
+                                                RM {{ number_format($entry['allowance'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-green-600 dark:text-green-400">
+                                            @if($entry['backpay'] > 0)
+                                                RM {{ number_format($entry['backpay'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-amber-600 dark:text-amber-400">
+                                            @if($entry['advance_salary'] > 0)
+                                                RM {{ number_format($entry['advance_salary'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                            @if($entry['client_deduction'] > 0)
+                                                RM {{ number_format($entry['client_deduction'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                            @if($entry['npl'] > 0)
+                                                {{ number_format($entry['npl'], 1) }}d
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-yellow-600 dark:text-yellow-400">
+                                            @if($entry['accommodation'] > 0)
+                                                RM {{ number_format($entry['accommodation'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="py-3 text-sm text-teal-600 dark:text-teal-400">
+                                            @if($entry['medical_claim'] > 0)
+                                                RM {{ number_format($entry['medical_claim'], 2) }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        @foreach($allTemplateNames as $templateName)
+                                            @php
+                                                $templateDeduction = collect($entry['template_deductions'])->firstWhere('name', $templateName);
+                                            @endphp
+                                            <td class="py-3 text-sm text-red-600 dark:text-red-400">
+                                                @if($templateDeduction)
+                                                    RM {{ number_format($templateDeduction['amount'], 2) }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                        @endforeach
                                         <td class="py-3">
                                             <flux:badge color="{{ $entry['status'] === 'locked' ? 'green' : 'blue' }}" size="sm">
                                                 {{ ucfirst($entry['status']) }}
@@ -633,9 +671,17 @@
                             Total: {{ count($timesheetData) }} {{ Str::plural('entry', count($timesheetData)) }}
                         </div>
                         <div class="flex flex-wrap gap-4">
-                            <span>Allowances: RM {{ number_format(collect($timesheetData)->sum('allowance'), 2) }}</span>
-                            <span>Advances: RM {{ number_format(collect($timesheetData)->sum('advance_salary'), 2) }}</span>
-                            <span class="text-red-600 dark:text-red-400">Client Deductions: RM {{ number_format(collect($timesheetData)->sum('client_deduction'), 2) }}</span>
+                            <span>Total Normal OT: {{ number_format(collect($timesheetData)->sum('ot_normal'), 1) }}h</span>
+                            <span>Total Rest OT: {{ number_format(collect($timesheetData)->sum('ot_rest'), 1) }}h</span>
+                            <span>Total Public OT: {{ number_format(collect($timesheetData)->sum('ot_public'), 1) }}h</span>
+                            <span>Total OT: {{ number_format(collect($timesheetData)->sum('ot_total'), 1) }}h</span>
+                            <span class="text-green-600 dark:text-green-400">Allowances: RM {{ number_format(collect($timesheetData)->sum('allowance'), 2) }}</span>
+                            <span class="text-green-600 dark:text-green-400">Backpay: RM {{ number_format(collect($timesheetData)->sum('backpay'), 2) }}</span>
+                            <span class="text-amber-600 dark:text-amber-400">Advances: RM {{ number_format(collect($timesheetData)->sum('advance_salary'), 2) }}</span>
+                            <span class="text-red-600 dark:text-red-400">Deductions: RM {{ number_format(collect($timesheetData)->sum('client_deduction'), 2) }}</span>
+                            <span class="text-red-600 dark:text-red-400">NPL: {{ number_format(collect($timesheetData)->sum('npl'), 1) }}d</span>
+                            <span class="text-yellow-600 dark:text-yellow-400">Accommodation: RM {{ number_format(collect($timesheetData)->sum('accommodation'), 2) }}</span>
+                            <span class="text-teal-600 dark:text-teal-400">Medical Claim: RM {{ number_format(collect($timesheetData)->sum('medical_claim'), 2) }}</span>
                             @foreach($allTemplateNames as $templateName)
                                 @php
                                     $templateTotal = collect($timesheetData)->sum(function($e) use ($templateName) {

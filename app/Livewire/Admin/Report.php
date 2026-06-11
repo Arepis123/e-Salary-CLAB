@@ -157,33 +157,57 @@ class Report extends Component
         }
     }
 
+    /**
+     * Resolve the selected client-name filter to the matching contractor CLAB number(s).
+     * Returns null when no client filter is active (so callers can skip the constraint).
+     */
+    protected function filteredClabNos(): ?array
+    {
+        if (blank($this->clientFilter)) {
+            return null;
+        }
+
+        return \App\Models\User::where('role', 'client')
+            ->get()
+            ->filter(fn ($u) => ($u->company_name ?: $u->name) === $this->clientFilter)
+            ->pluck('contractor_clab_no')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     protected function loadStats()
     {
         $selectedMonth = $this->selectedMonth ?? now()->month;
         $selectedYear = $this->selectedYear ?? now()->year;
+        $clabs = $this->filteredClabNos();
 
         // Total paid for selected month
         $totalPaid = PayrollPayment::where('status', 'completed')
             ->whereYear('completed_at', $selectedYear)
             ->whereMonth('completed_at', $selectedMonth)
+            ->when($clabs, fn ($q) => $q->whereHas('payrollSubmission', fn ($s) => $s->whereIn('contractor_clab_no', $clabs)))
             ->sum('amount');
 
         // Pending amount for selected month
         $pendingAmount = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
             ->where('year', $selectedYear)
             ->where('month', $selectedMonth)
+            ->when($clabs, fn ($q) => $q->whereIn('contractor_clab_no', $clabs))
             ->sum('total_with_penalty');
 
         // Average salary (from all paid submissions)
-        $totalWorkers = PayrollWorker::whereHas('submission', function ($query) use ($selectedYear, $selectedMonth) {
+        $totalWorkers = PayrollWorker::whereHas('submission', function ($query) use ($selectedYear, $selectedMonth, $clabs) {
             $query->where('year', $selectedYear)
-                ->where('month', $selectedMonth);
+                ->where('month', $selectedMonth)
+                ->when($clabs, fn ($s) => $s->whereIn('contractor_clab_no', $clabs));
         })->count();
 
         $averageSalary = $totalWorkers > 0
-            ? PayrollWorker::whereHas('submission', function ($query) use ($selectedYear, $selectedMonth) {
+            ? PayrollWorker::whereHas('submission', function ($query) use ($selectedYear, $selectedMonth, $clabs) {
                 $query->where('year', $selectedYear)
-                    ->where('month', $selectedMonth);
+                    ->where('month', $selectedMonth)
+                    ->when($clabs, fn ($s) => $s->whereIn('contractor_clab_no', $clabs));
             })->avg('net_salary')
             : 0;
 
@@ -191,11 +215,13 @@ class Report extends Component
         $completedPayments = PayrollPayment::where('status', 'completed')
             ->whereYear('completed_at', $selectedYear)
             ->whereMonth('completed_at', $selectedMonth)
+            ->when($clabs, fn ($q) => $q->whereHas('payrollSubmission', fn ($s) => $s->whereIn('contractor_clab_no', $clabs)))
             ->count();
 
         $pendingPayments = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
             ->where('year', $selectedYear)
             ->where('month', $selectedMonth)
+            ->when($clabs, fn ($q) => $q->whereIn('contractor_clab_no', $clabs))
             ->count();
 
         $this->stats = [
@@ -214,8 +240,10 @@ class Report extends Component
         $currentYear = $this->selectedYear ?? now()->year;
 
         // Get all submissions for selected month/year grouped by contractor
+        $clabs = $this->filteredClabNos();
         $submissions = PayrollSubmission::where('month', $currentMonth)
             ->where('year', $currentYear)
+            ->when($clabs, fn ($q) => $q->whereIn('contractor_clab_no', $clabs))
             ->with(['workers', 'user'])
             ->get()
             ->groupBy('contractor_clab_no');
@@ -303,9 +331,11 @@ class Report extends Component
         $currentYear = $this->selectedYear ?? now()->year;
 
         // Get top 5 workers by total salary (including overtime) for selected month
-        $topWorkers = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($currentMonth, $currentYear) {
+        $clabs = $this->filteredClabNos();
+        $topWorkers = PayrollWorker::whereHas('payrollSubmission', function ($query) use ($currentMonth, $currentYear, $clabs) {
             $query->where('month', $currentMonth)
-                ->where('year', $currentYear);
+                ->where('year', $currentYear)
+                ->when($clabs, fn ($s) => $s->whereIn('contractor_clab_no', $clabs));
         })
             ->with(['payrollSubmission.user', 'worker'])
             ->get()
@@ -340,6 +370,7 @@ class Report extends Component
         $trendLabels = [];
         $trendData = [];
 
+        $clabs = $this->filteredClabNos();
         $startOfMonth = now()->startOfMonth();
         for ($i = 5; $i >= 0; $i--) {
             $date = $startOfMonth->copy()->subMonths($i);
@@ -350,6 +381,7 @@ class Report extends Component
 
             $total = PayrollSubmission::where('month', $month)
                 ->where('year', $year)
+                ->when($clabs, fn ($q) => $q->whereIn('contractor_clab_no', $clabs))
                 ->sum('total_with_penalty');
 
             $trendData[] = round($total, 2);
@@ -537,6 +569,7 @@ class Report extends Component
         // Count submissions first
         $submissionCount = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->count();
 
         // Check if there are submissions to export
@@ -557,6 +590,7 @@ class Report extends Component
         // Get all submissions for selected period with optimized loading
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->with([
                 'user',
                 'payment',
@@ -588,6 +622,7 @@ class Report extends Component
         $invoices = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
             ->where('status', 'paid')
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->with(['user', 'payment', 'workers'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -654,7 +689,9 @@ class Report extends Component
         $selectedYear = $this->selectedYear ?? now()->year;
 
         // Get all contractors with active workers from ContractWorker
+        $clabs = $this->filteredClabNos();
         $allContractWorkers = \App\Models\ContractWorker::active()
+            ->when($clabs, fn ($q) => $q->whereIn('con_ctr_clab_no', $clabs))
             ->with(['worker', 'contractor'])
             ->orderBy('con_ctr_clab_no')
             ->get();
@@ -766,19 +803,31 @@ class Report extends Component
                 $otKey = $clabNo.'_'.$workerId;
                 $otEntry = isset($otEntries[$otKey]) ? $otEntries[$otKey]->first() : null;
 
-                // Get allowance, advance, and client deduction from OT entry transactions
+                // Get all transaction types from OT entry transactions
                 $allowance = 0;
+                $backpay = 0;
                 $advanceSalary = 0;
                 $clientDeduction = 0;
+                $npl = 0;
+                $accommodation = 0;
+                $medicalClaim = 0;
 
                 if ($otEntry) {
                     foreach ($otEntry->transactions as $transaction) {
                         if ($transaction->type === 'allowance') {
                             $allowance += $transaction->amount;
+                        } elseif ($transaction->type === 'backpay') {
+                            $backpay += $transaction->amount;
                         } elseif ($transaction->type === 'advance_payment') {
                             $advanceSalary += $transaction->amount;
                         } elseif ($transaction->type === 'deduction') {
                             $clientDeduction += $transaction->amount;
+                        } elseif ($transaction->type === 'npl') {
+                            $npl += $transaction->amount;
+                        } elseif ($transaction->type === 'accommodation') {
+                            $accommodation += $transaction->amount;
+                        } elseif ($transaction->type === 'medical_claim') {
+                            $medicalClaim += $transaction->amount;
                         }
                     }
                 }
@@ -830,12 +879,17 @@ class Report extends Component
                     'contractor_state' => $contractor->state ?? '',
                     'salary' => $salary,
                     'allowance' => $allowance,
+                    'backpay' => $backpay,
                     'advance_salary' => $advanceSalary,
                     'client_deduction' => $clientDeduction,
+                    'npl' => $npl,
+                    'accommodation' => $accommodation,
+                    'medical_claim' => $medicalClaim,
                     'template_deductions' => $templateDeductions,
                     'ot_normal' => $otNormal,
                     'ot_rest' => $otRest,
                     'ot_public' => $otPublic,
+                    'ot_total' => $otNormal + $otRest + $otPublic,
                     'status' => $isSubmitted ? $submission->status : '-',
                     'remarks' => $remarks,
                 ];
@@ -867,7 +921,9 @@ class Report extends Component
         $selectedYear = $this->selectedYear ?? now()->year;
 
         // Get all contractors with active workers from ContractWorker
+        $clabs = $this->filteredClabNos();
         $allContractWorkers = \App\Models\ContractWorker::active()
+            ->when($clabs, fn ($q) => $q->whereIn('con_ctr_clab_no', $clabs))
             ->with(['worker', 'contractor'])
             ->orderBy('con_ctr_clab_no')
             ->get();
@@ -1005,6 +1061,7 @@ class Report extends Component
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->orderBy('contractor_clab_no')
             ->orderBy('worker_name')
             ->get();
@@ -1105,6 +1162,7 @@ class Report extends Component
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->orderBy('contractor_clab_no')
             ->orderBy('worker_name')
             ->get();
@@ -1153,6 +1211,7 @@ class Report extends Component
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
             ->where('status', 'paid')
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->with(['user', 'workers', 'payment', 'payments'])
             ->orderBy('contractor_clab_no')
             ->get();
@@ -1266,6 +1325,7 @@ class Report extends Component
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
             ->whereIn('status', ['submitted', 'approved', 'pending_payment', 'overdue'])
+            ->when($this->filteredClabNos(), fn ($q, $clabs) => $q->whereIn('contractor_clab_no', $clabs))
             ->with(['user', 'workers'])
             ->orderBy('contractor_clab_no')
             ->get();
@@ -1345,6 +1405,20 @@ class Report extends Component
 
     public function render()
     {
-        return view('livewire.admin.report');
+        // Full list of client names for the Client filter dropdown, shown regardless of
+        // whether a report has been generated yet. Uses company name (falling back to the
+        // account name) to match the labels used in the generated report rows.
+        $allClients = \App\Models\User::where('role', 'client')
+            ->get()
+            ->map(fn ($u) => $u->company_name ?: $u->name)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        return view('livewire.admin.report', [
+            'allClients' => $allClients,
+        ]);
     }
 }

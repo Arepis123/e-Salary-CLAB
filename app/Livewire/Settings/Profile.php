@@ -14,6 +14,8 @@ class Profile extends Component
 
     public string $email = '';
 
+    public string $clabId = '';
+
     /**
      * Mount the component.
      */
@@ -21,6 +23,7 @@ class Profile extends Component
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->clabId = Auth::user()->contractor_clab_no ?? '';
     }
 
     /**

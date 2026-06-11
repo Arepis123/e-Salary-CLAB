@@ -77,11 +77,13 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'BACKPAY',
             'ADVANCE SALARY',
             'ACCOMODATION',
+            'MEDICAL CLAIM',
             'NPL',
             'Other Deduction',
             'Normal',
             'Rest Day',
             'Public holiday',
+            'Total OT',
         ];
 
         // Add dynamic deduction columns based on template names
@@ -97,10 +99,12 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
 
     public function map($entry): array
     {
-        // Get allowance, advance, accommodation, NPL, and other deduction from transactions
+        // Get allowance, backpay, advance, accommodation, NPL, and other deduction from transactions
         $allowance = 0;
+        $backpay = 0;
         $advanceSalary = 0;
         $accommodation = 0;
+        $medicalClaim = 0;
         $npl = 0;
         $otherDeduction = 0;
 
@@ -108,10 +112,14 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             foreach ($entry->transactions as $transaction) {
                 if ($transaction->type === 'allowance') {
                     $allowance += $transaction->amount;
+                } elseif ($transaction->type === 'backpay') {
+                    $backpay += $transaction->amount;
                 } elseif ($transaction->type === 'advance_payment') {
                     $advanceSalary += $transaction->amount;
                 } elseif ($transaction->type === 'accommodation') {
                     $accommodation += $transaction->amount;
+                } elseif ($transaction->type === 'medical_claim') {
+                    $medicalClaim += $transaction->amount;
                 } elseif ($transaction->type === 'npl') {
                     $npl += $transaction->amount;
                 } elseif ($transaction->type === 'deduction') {
@@ -119,6 +127,8 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
                 }
             }
         }
+
+        $totalOt = ($entry->ot_normal_hours ?? 0) + ($entry->ot_rest_hours ?? 0) + ($entry->ot_public_hours ?? 0);
 
         $row = [
             $entry->worker_id, // Employee ID
@@ -132,14 +142,16 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'monthly', // Salary Type
             '',
             $allowance > 0 ? $allowance : '', // General Allowance
-            '',
+            $backpay > 0 ? $backpay : '', // BACKPAY
             $advanceSalary > 0 ? $advanceSalary : '', // ADVANCE SALARY
             $accommodation > 0 ? $accommodation : '', // ACCOMODATION
+            $medicalClaim > 0 ? $medicalClaim : '', // MEDICAL CLAIM
             $npl > 0 ? $npl : '', // NPL
             $otherDeduction > 0 ? $otherDeduction : '', // Other Deduction
             $entry->ot_normal_hours > 0 ? $entry->ot_normal_hours : '', // Normal OT
             $entry->ot_rest_hours > 0 ? $entry->ot_rest_hours : '', // Rest OT
             $entry->ot_public_hours > 0 ? $entry->ot_public_hours : '', // Public holiday OT
+            $totalOt > 0 ? $totalOt : '', // Total OT
         ];
 
         // Add deduction values for each template
@@ -200,21 +212,24 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'E' => 20, // Location
             'F' => 30, // Department
             'G' => 15, // Salary
-            'H' => 10, // Worked For (month/day/hour)
+            'H' => 12, // Amount this cycle
             'I' => 15, // Salary Type
-            'J' => 18, // General Allowance
-            'K' => 10, // BACKPAY
-            'L' => 12, // ADVANCE SALARY
-            'M' => 10, // ACCOMODATION
-            'N' => 10, // NPL
-            'O' => 15, // Other Deduction
-            'P' => 15, // Normal
-            'Q' => 15, // Rest Day
-            'R' => 15, // Public holiday
+            'J' => 18, // Worked For (month/day/hour)
+            'K' => 18, // General Allowance
+            'L' => 12, // BACKPAY
+            'M' => 14, // ADVANCE SALARY
+            'N' => 14, // ACCOMODATION
+            'O' => 14, // MEDICAL CLAIM
+            'P' => 10, // NPL
+            'Q' => 15, // Other Deduction
+            'R' => 12, // Normal
+            'S' => 12, // Rest Day
+            'T' => 14, // Public holiday
+            'U' => 12, // Total OT
         ];
 
-        // Add column widths for deduction templates (starting from column P)
-        $columnIndex = 15; // P = 16th column (0-indexed = 15)
+        // Add column widths for deduction templates (starting after the fixed columns at column V)
+        $columnIndex = 21; // V = 22nd column (0-indexed = 21)
         foreach ($this->deductionTemplates as $template) {
             $columnLetter = $this->getColumnLetter($columnIndex);
             $widths[$columnLetter] = max(15, strlen($template->name) + 2);
