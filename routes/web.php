@@ -26,26 +26,9 @@ Route::post('api/payslip/notify', [\App\Http\Controllers\Api\PayslipNotifyContro
     ->middleware('api')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
-// ============================================================================
-// TESTING ROUTES (Remove these in production)
-// ============================================================================
-if (config('app.env') !== 'production') {
-    // Test 419 error page directly
-    Route::get('test-419-page', function () {
-        abort(419);
-    })->name('test.419.page');
-
-    // Test 419 error with form submission
-    Route::get('test-419-form', function () {
-        return view('test-419-form');
-    })->name('test.419.form');
-
-    // Test POST endpoint that requires CSRF token
-    Route::post('test-419-submit', function () {
-        return response()->json(['message' => 'Success! CSRF token is valid.']);
-    })->name('test.419.submit');
-}
-// ============================================================================
+Route::post('api/payslip/contractors-by-ic', [\App\Http\Controllers\Api\PayslipNotifyController::class, 'contractorsByIc'])
+    ->name('api.payslip.contractors-by-ic')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 Route::get('user-manual', \App\Livewire\UserManual::class)->name('user-manual');
 
