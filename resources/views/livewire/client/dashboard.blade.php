@@ -43,14 +43,23 @@
                                 <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">{{ $news->title }}</h2>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">{!! nl2br(e($news->description)) !!}</p>
                                 @if($news->button_text && $news->button_url)
-                                    @php $isExternal = preg_match('/^(https?:\/\/|\/\/)/', $news->button_url); @endphp
-                                    @if($isExternal)
-                                        <flux:button variant="primary" href="{{ $news->button_url }}" target="_blank" rel="noopener noreferrer" onclick="closeNewsModal()">
+                                    @php
+                                        // Open in a new tab for absolute URLs and for inline file routes
+                                        // (e.g. /faq, /documents/..) which serve binary files and can't use wire:navigate.
+                                        $opensNewTab = preg_match('/^(https?:\/\/|\/\/|\/faq\b|\/documents\/)/', $news->button_url);
+
+                                        // Resolve root-relative paths against the app base URL so they work when the
+                                        // app is served from a subfolder (e.g. /e-payroll/public). Absolute URLs are kept as-is.
+                                        $isAbsolute = preg_match('#^(https?:)?//#', $news->button_url);
+                                        $buttonHref = $isAbsolute ? $news->button_url : url($news->button_url);
+                                    @endphp
+                                    @if($opensNewTab)
+                                        <flux:button variant="primary" href="{{ $buttonHref }}" target="_blank" rel="noopener noreferrer" onclick="closeNewsModal()">
                                             {{ $news->button_text }}
                                             <flux:icon.arrow-top-right-on-square class="size-4 ml-1" />
                                         </flux:button>
                                     @else
-                                        <flux:button variant="primary" href="{{ $news->button_url }}" wire:navigate onclick="closeNewsModal()">
+                                        <flux:button variant="primary" href="{{ $buttonHref }}" wire:navigate onclick="closeNewsModal()">
                                             {{ $news->button_text }}
                                         </flux:button>
                                     @endif
