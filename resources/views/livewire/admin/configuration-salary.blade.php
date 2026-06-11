@@ -173,9 +173,7 @@
     </div>
 
     <!-- Pagination -->
-    <div class="mt-4">
-        {{ $workers->links() }}
-    </div>
+    <flux:pagination :paginator="$workers" class="mt-4" />
 </flux:card>
 
 <!-- Salary Adjustment History -->

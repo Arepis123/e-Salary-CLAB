@@ -138,6 +138,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('payroll/payslip/{submission}', [\App\Http\Controllers\PayrollPayslipController::class, 'download'])
         ->name('payroll.payslip.download');
 
+    // Uploaded Documents - Inline viewing (opens in a new tab)
+    // FAQ document (linked from the client sidebar) and admin document preview
+    Route::get('faq', [\App\Http\Controllers\DocumentController::class, 'faq'])->name('faq');
+    // The trailing {filename} segment is ignored server-side; it only controls the browser tab title
+    // when the PDF opens inline (browsers use the last URL path segment as the tab name).
+    Route::get('documents/{document}/{filename?}', [\App\Http\Controllers\DocumentController::class, 'show'])->name('documents.view');
+
     // ========================================================================
     // ADMIN-ONLY ROUTES (No client equivalent)
     // ========================================================================

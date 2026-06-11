@@ -272,11 +272,12 @@ class SalaryDetail extends Component
             'manualPaymentBank' => 'required|string|max:191',
             'manualPaymentAmount' => 'required|numeric|min:0.01',
             'manualPaymentNotes' => 'nullable|string|max:1000',
-            'manualPaymentProof' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB max
+            'manualPaymentProof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB max
         ], [
             'manualPaymentReference.required' => 'Enter the bank transaction / reference number.',
             'manualPaymentBank.required' => 'Enter the bank the transfer came from.',
             'manualPaymentDate.before_or_equal' => 'Payment date cannot be in the future.',
+            'manualPaymentProof.required' => 'Upload the proof of payment.',
         ]);
 
         try {

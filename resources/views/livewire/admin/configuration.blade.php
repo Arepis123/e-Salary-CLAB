@@ -47,6 +47,13 @@
                 <flux:icon.users class="size-5 inline sm:mr-2" />
                 <span class="hidden sm:inline">Workers</span>
             </button>
+            <button
+                wire:click="switchTab('uploads')"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'uploads' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+            >
+                <flux:icon.document-arrow-up class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Uploads</span>
+            </button>
         </nav>
     </div>
 
@@ -69,6 +76,10 @@
 
     @if($activeTab === 'workers')
         @include('livewire.admin.configuration-workers')
+    @endif
+
+    @if($activeTab === 'uploads')
+        @include('livewire.admin.configuration-uploads')
     @endif
 
     <!-- Window Action Modal -->

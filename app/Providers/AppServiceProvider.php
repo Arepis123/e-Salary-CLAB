@@ -96,6 +96,9 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('pendingNotifications', $pendingNotifications);
             $view->with('unpaidInvoicesCount', $unpaidInvoicesCount);
+
+            // Show the FAQ sidebar item only when a superadmin has uploaded an active FAQ document
+            $view->with('faqAvailable', \App\Models\UploadedDocument::active()->where('key', 'faq')->exists());
         });
     }
 }

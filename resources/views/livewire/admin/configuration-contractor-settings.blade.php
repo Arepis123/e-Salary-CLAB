@@ -57,7 +57,7 @@
                 </flux:table.columns>
 
                 <flux:table.rows>
-                    @foreach($deductionTemplates as $template)
+                    @foreach($templatesPaginated as $template)
                         <flux:table.row :key="$template->id">
                             <flux:table.cell variant="strong">
                                 <div>
@@ -202,6 +202,8 @@
                 </flux:table.rows>
             </flux:table>
         </div>
+
+        <flux:pagination :paginator="$templatesPaginated" class="mt-4" />
     @endif
 </flux:card>
 
@@ -213,6 +215,34 @@
             <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                 Configure which deduction templates apply to each contractor and manage service charge exemptions
             </p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="grid gap-4 md:grid-cols-3 mb-4">
+        <div>
+            <flux:input
+                wire:model.live.debounce.300ms="configSearch"
+                placeholder="Search by name or CLAB no..."
+                icon="magnifying-glass"
+                size="sm"
+            />
+        </div>
+        <div>
+            <flux:select wire:model.live="configContractorFilter" variant="listbox" searchable placeholder="Filter by Contractor" size="sm">
+                <flux:select.option value="">All Contractors</flux:select.option>
+                @foreach($allContractors as $contractor)
+                    <flux:select.option value="{{ $contractor->contractor_clab_no }}">
+                        {{ $contractor->contractor_name }} ({{ $contractor->contractor_clab_no }})
+                    </flux:select.option>
+                @endforeach
+            </flux:select>
+        </div>
+        <div>
+            <flux:button wire:click="clearConfigFilters" variant="filled" size="sm">
+                <flux:icon.x-mark class="size-4 inline" />
+                Clear Filters
+            </flux:button>
         </div>
     </div>
 
@@ -240,7 +270,7 @@
             </flux:table.columns>
 
             <flux:table.rows>
-                @forelse($contractorConfigs as $config)
+                @forelse($contractorConfigsPaginated as $config)
                     <flux:table.row :key="$config->id">
                         <flux:table.cell variant="strong">
                             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $config->contractor_name }}</p>
@@ -297,7 +327,11 @@
                                 <flux:icon.users class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
                                 <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No Contractors Found</p>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                                    Contractors will appear here automatically.
+                                    @if($configSearch !== '' || $configContractorFilter !== '')
+                                        No contractors match your filters.
+                                    @else
+                                        Contractors will appear here automatically.
+                                    @endif
                                 </p>
                             </div>
                         </flux:table.cell>
@@ -306,6 +340,8 @@
             </flux:table.rows>
         </flux:table>
     </div>
+
+    <flux:pagination :paginator="$contractorConfigsPaginated" class="mt-4" />
 </flux:card>
 
 <!-- Edit Contractor Configuration Modal -->
@@ -540,12 +576,11 @@
 
     <div class="space-y-4">
         <!-- Contractor Filter -->
-        <flux:select wire:model.live="workerFilterContractor" label="Select Contractor">
-            <option value="">Choose contractor...</option>
+        <flux:select wire:model.live="workerFilterContractor" variant="listbox" searchable label="Select Contractor" placeholder="Choose contractor...">
             @foreach($allContractors as $contractor)
-                <option value="{{ $contractor->contractor_clab_no }}">
+                <flux:select.option value="{{ $contractor->contractor_clab_no }}">
                     {{ $contractor->name }} ({{ $contractor->contractor_clab_no }})
-                </option>
+                </flux:select.option>
             @endforeach
         </flux:select>
 

@@ -55,6 +55,10 @@
         @elseif($submission->status === 'paid' || $submission->status === 'pending_payment' || $submission->status === 'overdue')
             <flux:badge color="orange" size="sm" icon="clock" inset="top bottom">Awaiting Payment</flux:badge>
         @endif
+
+        @if($submission->payment && $submission->payment->status === 'completed' && $submission->payment->payment_method === 'bank_transfer')
+            <flux:badge color="pink" size="sm" icon="building-library" inset="top bottom">Manual Transfer</flux:badge>
+        @endif
     </div>
 
     <!-- Awaiting Review Banner -->
@@ -77,7 +81,6 @@
     <flux:card class="p-6 bg-green-50 dark:bg-green-900/20">
         <h3 class="text-lg font-semibold text-green-900 dark:text-green-100 mb-4">
             Admin Review Completed
-            <flux:icon.check-circle class="inline size-5" />
         </h3>
         <div class="grid gap-4 md:grid-cols-3">
             <div>
@@ -116,7 +119,7 @@
         </div>
 
         <!-- Amount Breakdown for Client -->
-        <div class="mt-6 bg-white dark:bg-zinc-800 p-4 rounded-lg border border-green-200 dark:border-green-700">
+        <div class="mt-6 bg-white dark:bg-zinc-800 p-4 rounded-lg border border-green-200 dark:border-green-900">
             <h4 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Client Payment Breakdown:</h4>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
@@ -131,7 +134,7 @@
                     <span class="text-zinc-600 dark:text-zinc-400">SST (8% of service charge):</span>
                     <span class="font-medium">RM {{ number_format($submission->calculated_sst, 2) }}</span>
                 </div>
-                <div class="border-t pt-2 mt-2 flex justify-between">
+                <div class="border-t border-zinc-200 dark:border-zinc-500 pt-2 mt-2 flex justify-between">
                     <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ ($submission->has_penalty || $submission->isOverdue()) ? 'Subtotal:' : 'Total Amount Due:' }}</span>
                     <span class="font-medium">RM {{ number_format($submission->client_total, 2) }}</span>
                 </div>
@@ -140,7 +143,7 @@
                     <span class="text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%):</span>
                     <span class="font-medium">RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
                 </div>
-                <div class="border-t pt-2 mt-2 flex justify-between">
+                <div class="border-t border-zinc-200 dark:border-zinc-500 pt-2 mt-2 flex justify-between">
                     <span class="font-medium text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
                     <span class="font-medium">RM {{ number_format($submission->total_due, 2) }}</span>
                 </div>
@@ -250,6 +253,15 @@
             ->whereNotIn('status', ['redirected'])
             ->latest()
             ->first();
+
+        // Decode the manual-entry metadata (payment_response is stored as a JSON string)
+        $manualMeta = [];
+        if ($actualPayment && $actualPayment->payment_response) {
+            $manualMeta = is_array($actualPayment->payment_response)
+                ? $actualPayment->payment_response
+                : (json_decode($actualPayment->payment_response, true) ?: []);
+        }
+        $manualNotes = $manualMeta['notes'] ?? null;
     @endphp
     @if($actualPayment)
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
@@ -297,6 +309,30 @@
         @if($actualPayment->payment_method === 'bank_transfer')
             <div class="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4 grid gap-4 md:grid-cols-3">
                 <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Amount Received:</span>
+                    <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        RM {{ number_format((float) $actualPayment->amount, 2) }}
+                    </p>
+                </div>
+                <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Date Received:</span>
+                    <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {{ $actualPayment->completed_at?->format('d M Y') ?? 'N/A' }}
+                    </p>
+                </div>
+                <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Paid From (Bank):</span>
+                    <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {{ $actualPayment->bank_name ?? 'N/A' }}
+                    </p>
+                </div>
+                <div>
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Bank Reference:</span>
+                    <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {{ $actualPayment->transaction_id ?? 'N/A' }}
+                    </p>
+                </div>
+                <div>
                     <span class="text-sm text-zinc-600 dark:text-zinc-400">Recorded By:</span>
                     <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {{ $actualPayment->recordedBy?->name ?? 'N/A' }}
@@ -321,11 +357,13 @@
                     </div>
                 </div>
             </div>
-            <flux:callout icon="information-circle" color="blue" inline class="mt-4">
-                <flux:callout.text>
-                    <span class="text-sm">This payment was recorded manually (paid directly into the company bank account, outside Billplz FPX).</span>
-                </flux:callout.text>
-            </flux:callout>
+
+            @if(!empty($manualNotes))
+                <div class="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Notes:</span>
+                    <p class="mt-1 text-sm text-zinc-900 dark:text-zinc-100 whitespace-pre-line">{{ $manualNotes }}</p>
+                </div>
+            @endif
         @endif
     </flux:card>
     @endif
@@ -842,7 +880,7 @@
 
             <!-- Proof of Payment -->
             <flux:field class="mt-3">
-                <flux:label>Proof of Payment</flux:label>
+                <flux:label badge="Required">Proof of Payment</flux:label>
                 <input type="file" wire:model="manualPaymentProof" accept=".pdf,.jpg,.jpeg,.png"
                     class="block w-full text-sm text-zinc-500 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-700 dark:file:text-zinc-200 dark:hover:file:bg-zinc-600" />
                 <flux:error name="manualPaymentProof" />

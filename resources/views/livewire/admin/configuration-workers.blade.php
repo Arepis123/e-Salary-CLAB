@@ -1,15 +1,5 @@
 <!-- Worker Settings Tab -->
 <div class="space-y-6">
-    <!-- Info Card -->
-    <flux:card class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-        <div class="flex gap-3">
-            <flux:icon.information-circle class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div class="text-sm text-blue-800 dark:text-blue-200">
-                <p class="font-medium mb-1">Worker Status Management</p>
-                <p>Set workers as inactive to hide them from contractor timesheets. Inactive workers will not appear in OT entry forms or payroll submissions. This does not affect the external worker database.</p>
-            </div>
-        </div>
-    </flux:card>
 
     <!-- Stats Cards -->
     <div class="grid gap-4 md:grid-cols-3">
@@ -66,7 +56,7 @@
                 />
             </div>
             <div>
-                <flux:select wire:model.live="workerContractorFilter" variant="listbox" placeholder="Filter by Contractor" size="sm">
+                <flux:select wire:model.live="workerContractorFilter" variant="listbox" searchable placeholder="Filter by Contractor" size="sm">
                     <flux:select.option value="">All Contractors</flux:select.option>
                     @foreach($workerContractors as $contractor)
                         <flux:select.option value="{{ $contractor['clab_no'] }}">{{ $contractor['name'] }}</flux:select.option>
@@ -91,6 +81,7 @@
         <!-- Workers Table -->
         <flux:table>
             <flux:table.columns>
+                <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">#</span></flux:table.column>
                 <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Worker ID</span></flux:table.column>
                 <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Name</span></flux:table.column>
                 <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport</span></flux:table.column>
@@ -102,6 +93,10 @@
             <flux:table.rows>
                 @forelse($workersList as $worker)
                     <flux:table.rows :key="$worker['id']">
+                        <flux:table.cell>
+                            {{ $workersList->firstItem() + $loop->index }}
+                        </flux:table.cell>
+
                         <flux:table.cell variant="strong">
                             {{ $worker['id'] }}
                         </flux:table.cell>
@@ -136,7 +131,6 @@
                                     variant="filled"
                                     size="sm"
                                 >
-                                    <flux:icon.check-circle class="size-4 mr-1" />
                                     Reactivate
                                 </flux:button>
                             @else
@@ -145,7 +139,6 @@
                                     variant="filled"
                                     size="sm"
                                 >
-                                    <flux:icon.x-circle class="size-4 mr-1 inline" />
                                     Deactivate
                                 </flux:button>
                             @endif
@@ -153,7 +146,7 @@
                     </flux:table.rows>
                 @empty
                     <flux:table.rows>
-                        <flux:table.cell colspan="6" class="text-center py-8">
+                        <flux:table.cell colspan="7" class="text-center py-8">
                             <div class="flex flex-col items-center gap-2">
                                 <flux:icon.users class="size-8 text-zinc-400" />
                                 <p class="text-zinc-600 dark:text-zinc-400">No workers found matching your filters.</p>
@@ -165,31 +158,7 @@
         </flux:table>
 
         <!-- Pagination -->
-        @if($workersPagination['total'] > $workersPagination['per_page'])
-            <div class="mt-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Showing {{ $workersPagination['from'] }} to {{ $workersPagination['to'] }} of {{ $workersPagination['total'] }} workers
-                </p>
-                <div class="flex gap-2">
-                    <flux:button
-                        wire:click="$set('workersPage', {{ $workersPagination['current_page'] - 1 }})"
-                        variant="ghost"
-                        size="sm"
-                        :disabled="$workersPagination['current_page'] <= 1"
-                    >
-                        Previous
-                    </flux:button>
-                    <flux:button
-                        wire:click="$set('workersPage', {{ $workersPagination['current_page'] + 1 }})"
-                        variant="ghost"
-                        size="sm"
-                        :disabled="$workersPagination['current_page'] >= $workersPagination['last_page']"
-                    >
-                        Next
-                    </flux:button>
-                </div>
-            </div>
-        @endif
+        <flux:pagination :paginator="$workersList" class="mt-4" />
     </flux:card>
 
     <!-- Inactive Workers History -->

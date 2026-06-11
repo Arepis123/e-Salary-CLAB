@@ -10,10 +10,12 @@ use Flux\Flux;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 class Configuration extends Component
 {
+    use WithFileUploads;
     use WithPagination;
 
     #[Url]
@@ -68,8 +70,18 @@ class Configuration extends Component
 
     public $windowStats = [];
 
+    // OT entry window filters
+    public $windowSearch = '';
+
+    public $windowContractorFilter = '';
+
     // Contractor configuration properties
     public $contractorConfigs = [];
+
+    // Contractor-specific settings filters
+    public $configSearch = '';
+
+    public $configContractorFilter = '';
 
     public $editingContractorClab = '';
 
@@ -157,8 +169,6 @@ class Configuration extends Component
 
     public $workerStatusFilter = '';
 
-    public $workersPage = 1;
-
     public $workersPerPage = 15;
 
     public $showDeactivateModal = false;
@@ -176,6 +186,17 @@ class Configuration extends Component
     public $showRemoveFromPayrollModal = false;
 
     public $payrollSubmissionToRemove = null;  // ['id', 'month_year', 'status']
+
+    // Uploads (document management) properties
+    public $uploadedDocuments = [];
+
+    public $uploadKey = 'faq';
+
+    public $uploadTitle = '';
+
+    public $uploadDescription = '';
+
+    public $uploadFile;
 
     public function boot(
         WorkerService $workerService,
@@ -204,6 +225,141 @@ class Configuration extends Component
         $this->loadWindowStats();
         $this->loadContractorConfigs();
         $this->loadDeductionTemplates();
+        $this->loadUploadedDocuments();
+    }
+
+    // Uploads (document management) methods
+    public function loadUploadedDocuments()
+    {
+        $this->uploadedDocuments = \App\Models\UploadedDocument::with('uploadedBy')
+            ->latest()
+            ->get();
+    }
+
+    public function uploadDocument()
+    {
+        $this->validate([
+            'uploadKey' => 'required|string|in:faq,general',
+            'uploadTitle' => 'required|string|max:255',
+            'uploadDescription' => 'nullable|string|max:1000',
+            'uploadFile' => 'required|file|mimes:pdf|max:10240', // PDF, 10MB max
+        ], [], [
+            'uploadFile' => 'document',
+        ]);
+
+        try {
+            $extension = $this->uploadFile->getClientOriginalExtension();
+            $fileName = \Illuminate\Support\Str::slug($this->uploadTitle).'_'.now()->format('YmdHis').'.'.$extension;
+            $filePath = $this->uploadFile->storeAs('documents', $fileName, 'local');
+
+            // Only the latest FAQ should be active (clients see the most recent active FAQ).
+            // Deactivate any previously active FAQ so the admin isn't confused by multiple active ones.
+            if ($this->uploadKey === 'faq') {
+                \App\Models\UploadedDocument::where('key', 'faq')
+                    ->where('is_active', true)
+                    ->update(['is_active' => false]);
+            }
+
+            \App\Models\UploadedDocument::create([
+                'key' => $this->uploadKey,
+                'title' => $this->uploadTitle,
+                'description' => $this->uploadDescription,
+                'file_path' => $filePath,
+                'file_name' => $this->uploadFile->getClientOriginalName(),
+                'file_size' => $this->uploadFile->getSize(),
+                'mime_type' => $this->uploadFile->getMimeType(),
+                'uploaded_by' => auth()->id(),
+                'is_active' => true,
+            ]);
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Document Uploaded',
+                text: "\"{$this->uploadTitle}\" has been uploaded successfully."
+            );
+
+            $this->reset(['uploadTitle', 'uploadDescription', 'uploadFile']);
+            $this->uploadKey = 'faq';
+            $this->loadUploadedDocuments();
+
+            // Clear the native file input's visible filename (Livewire cannot reset it server-side)
+            $this->dispatch('document-uploaded');
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Upload Failed',
+                text: 'Failed to upload document: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function removeUploadFile()
+    {
+        $this->reset('uploadFile');
+
+        // Clear the native receiver input so the same file can be re-selected
+        $this->dispatch('document-uploaded');
+    }
+
+    public function toggleDocument(int $documentId)
+    {
+        try {
+            $document = \App\Models\UploadedDocument::findOrFail($documentId);
+            $activating = ! $document->is_active;
+
+            // Activating a FAQ deactivates any other active FAQ — only the latest FAQ should be active.
+            if ($activating && $document->key === 'faq') {
+                \App\Models\UploadedDocument::where('key', 'faq')
+                    ->where('id', '!=', $document->id)
+                    ->where('is_active', true)
+                    ->update(['is_active' => false]);
+            }
+
+            $document->update(['is_active' => $activating]);
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Status Updated',
+                text: "\"{$document->title}\" is now ".($document->is_active ? 'active' : 'inactive').'.'
+            );
+
+            $this->loadUploadedDocuments();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to update document: '.$e->getMessage()
+            );
+        }
+    }
+
+    public function deleteDocument(int $documentId)
+    {
+        try {
+            $document = \App\Models\UploadedDocument::findOrFail($documentId);
+            $title = $document->title;
+
+            // Remove the physical file from storage
+            if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($document->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($document->file_path);
+            }
+
+            $document->delete();
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Document Deleted',
+                text: "\"{$title}\" has been deleted."
+            );
+
+            $this->loadUploadedDocuments();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to delete document: '.$e->getMessage()
+            );
+        }
     }
 
     public function loadStats()
@@ -364,6 +520,24 @@ class Configuration extends Component
         $this->activeTab = $tab;
     }
 
+    // OT entry window filter methods
+    public function updatedWindowSearch()
+    {
+        $this->resetPage('windowsPage');
+    }
+
+    public function updatedWindowContractorFilter()
+    {
+        $this->resetPage('windowsPage');
+    }
+
+    public function clearWindowFilters()
+    {
+        $this->windowSearch = '';
+        $this->windowContractorFilter = '';
+        $this->resetPage('windowsPage');
+    }
+
     public function openWindowModal(string $clabNo, string $contractorName, string $action)
     {
         $this->selectedContractorClab = $clabNo;
@@ -454,6 +628,24 @@ class Configuration extends Component
         $this->deductionTemplates = \App\Models\DeductionTemplate::with(['contractors', 'workerAssignments'])
             ->orderBy('name')
             ->get();
+    }
+
+    // Contractor-specific settings filter methods
+    public function updatedConfigSearch()
+    {
+        $this->resetPage('configsPage');
+    }
+
+    public function updatedConfigContractorFilter()
+    {
+        $this->resetPage('configsPage');
+    }
+
+    public function clearConfigFilters()
+    {
+        $this->configSearch = '';
+        $this->configContractorFilter = '';
+        $this->resetPage('configsPage');
     }
 
     public function openContractorEditModal(string $clabNo)
@@ -1371,17 +1563,17 @@ class Configuration extends Component
     // Worker settings methods
     public function updatedWorkerSearch()
     {
-        $this->workersPage = 1;
+        $this->resetPage('workersPage');
     }
 
     public function updatedWorkerContractorFilter()
     {
-        $this->workersPage = 1;
+        $this->resetPage('workersPage');
     }
 
     public function updatedWorkerStatusFilter()
     {
-        $this->workersPage = 1;
+        $this->resetPage('workersPage');
     }
 
     public function clearWorkerFilters()
@@ -1389,7 +1581,7 @@ class Configuration extends Component
         $this->workerSearch = '';
         $this->workerContractorFilter = '';
         $this->workerStatusFilter = '';
-        $this->workersPage = 1;
+        $this->resetPage('workersPage');
     }
 
     public function openDeactivateModal(string $workerId, string $workerName, string $passport, string $contractorClab)
@@ -1567,24 +1759,18 @@ class Configuration extends Component
         // Order by name
         $query->orderBy('wkr_name');
 
-        // Paginate
-        $total = $query->count();
-        $workers = $query
-            ->skip(($this->workersPage - 1) * $this->workersPerPage)
-            ->take($this->workersPerPage)
-            ->get();
-
-        // Transform to array with status
-        $workersList = $workers->map(function ($worker) use ($inactiveWorkerIds) {
-            return [
-                'id' => $worker->wkr_id,
-                'name' => $worker->wkr_name,
-                'passport' => $worker->wkr_passno,
-                'contractor_clab' => $worker->wkr_currentemp,
-                'contractor_name' => $worker->contractor?->ctr_comp_name ?? $worker->wkr_currentemp,
-                'is_inactive' => in_array($worker->wkr_id, $inactiveWorkerIds),
-            ];
-        })->toArray();
+        // Paginate (named page so it does not collide with the salary tab paginator)
+        $workersList = $query->paginate($this->workersPerPage, ['*'], 'workersPage')
+            ->through(function ($worker) use ($inactiveWorkerIds) {
+                return [
+                    'id' => $worker->wkr_id,
+                    'name' => $worker->wkr_name,
+                    'passport' => $worker->wkr_passno,
+                    'contractor_clab' => $worker->wkr_currentemp,
+                    'contractor_name' => $worker->contractor?->ctr_comp_name ?? $worker->wkr_currentemp,
+                    'is_inactive' => in_array($worker->wkr_id, $inactiveWorkerIds),
+                ];
+            });
 
         // Get contractors for filter dropdown
         $workerContractors = \App\Models\User::where('role', 'client')
@@ -1606,19 +1792,32 @@ class Configuration extends Component
                 'active' => $totalWorkers - $inactiveCount,
                 'inactive' => $inactiveCount,
             ],
-            'workersPagination' => [
-                'current_page' => $this->workersPage,
-                'per_page' => $this->workersPerPage,
-                'total' => $total,
-                'last_page' => max(1, ceil($total / $this->workersPerPage)),
-                'from' => $total > 0 ? (($this->workersPage - 1) * $this->workersPerPage) + 1 : 0,
-                'to' => min($this->workersPage * $this->workersPerPage, $total),
-            ],
             'inactiveWorkersList' => \App\Models\InactiveWorker::with('deactivatedBy')
                 ->orderBy('deactivated_at', 'desc')
                 ->limit(10)
                 ->get(),
         ];
+    }
+
+    /**
+     * Paginate an in-memory collection so it can be rendered with the Flux pagination component.
+     * Uses Livewire's WithPagination page resolver via the given page name.
+     */
+    protected function paginateCollection($items, int $perPage, string $pageName): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $items = $items instanceof \Illuminate\Support\Collection ? $items : collect($items);
+        $page = \Illuminate\Pagination\Paginator::resolveCurrentPage($pageName);
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(),
+                'pageName' => $pageName,
+            ]
+        );
     }
 
     public function render()
@@ -1703,18 +1902,89 @@ class Configuration extends Component
 
         // Get contractors for window management tab
         $contractors = [];
+        $windowContractors = []; // Options for the contractor filter dropdown
         if ($this->activeTab === 'windows') {
-            $contractors = $this->windowService->getAllContractorSettings();
+            $allWindowSettings = collect($this->windowService->getAllContractorSettings());
+
+            // Dropdown options from the full (unfiltered) list
+            $windowContractors = $allWindowSettings->map(fn ($c) => [
+                'clab_no' => $c['contractor_clab_no'],
+                'name' => $c['contractor_name'],
+            ])->values();
+
+            // Apply filters
+            $filteredWindows = $allWindowSettings;
+
+            if ($this->windowContractorFilter !== '') {
+                $filteredWindows = $filteredWindows->where('contractor_clab_no', $this->windowContractorFilter);
+            }
+
+            if ($this->windowSearch !== '') {
+                $term = mb_strtolower($this->windowSearch);
+                $filteredWindows = $filteredWindows->filter(function ($c) use ($term) {
+                    return str_contains(mb_strtolower((string) $c['contractor_name']), $term)
+                        || str_contains(mb_strtolower((string) $c['contractor_clab_no']), $term);
+                });
+            }
+
+            // Sort: contractors with an open window float to the top, then by name (ascending).
+            $filteredWindows = $filteredWindows->sort(function ($a, $b) {
+                $aOpen = $a['is_window_open'] ? 1 : 0;
+                $bOpen = $b['is_window_open'] ? 1 : 0;
+
+                if ($aOpen !== $bOpen) {
+                    return $bOpen <=> $aOpen; // open windows first
+                }
+
+                return strcasecmp((string) $a['contractor_name'], (string) $b['contractor_name']);
+            });
+
+            $contractors = $this->paginateCollection($filteredWindows->values(), 15, 'windowsPage');
         }
 
-        // Get contractor configurations if on contractor-settings tab
-        $contractorConfigs = [];
-        $deductionTemplates = [];
+        // Get contractor configurations if on contractor-settings tab.
+        // NOTE: the paginated tables use dedicated variable names ($contractorConfigsPaginated,
+        // $templatesPaginated) because $contractorConfigs and $deductionTemplates are public
+        // Livewire properties — passing a paginator under those names would be shadowed by the
+        // public property (a Collection) in the view, breaking <flux:pagination>.
+        $contractorConfigsPaginated = [];
+        $templatesPaginated = [];
         $allContractors = []; // For worker assignment modal and contractor assignment modal
         if ($this->activeTab === 'contractor-settings') {
-            $contractorConfigs = $this->contractorConfigs;
-            $deductionTemplates = $this->deductionTemplates;
-            // Get all contractor configurations (needed for both modals)
+            // Apply the contractor-specific settings filters before paginating
+            $filteredConfigs = collect($this->contractorConfigs);
+
+            if ($this->configContractorFilter !== '') {
+                $filteredConfigs = $filteredConfigs->where('contractor_clab_no', $this->configContractorFilter);
+            }
+
+            if ($this->configSearch !== '') {
+                $term = mb_strtolower($this->configSearch);
+                $filteredConfigs = $filteredConfigs->filter(function ($config) use ($term) {
+                    return str_contains(mb_strtolower((string) $config->contractor_name), $term)
+                        || str_contains(mb_strtolower((string) $config->contractor_clab_no), $term);
+                });
+            }
+
+            // Sort: contractors with any setting configured (service charge or penalty exemption)
+            // float to the top, then alphabetically by company name (ascending).
+            $filteredConfigs = $filteredConfigs->sort(function ($a, $b) {
+                $aHasSettings = ($a->service_charge_exempt || $a->penalty_exempt) ? 1 : 0;
+                $bHasSettings = ($b->service_charge_exempt || $b->penalty_exempt) ? 1 : 0;
+
+                if ($aHasSettings !== $bHasSettings) {
+                    return $bHasSettings <=> $aHasSettings; // settings-on first
+                }
+
+                return strcasecmp((string) $a->contractor_name, (string) $b->contractor_name);
+            });
+
+            // Paginated view of the contractor-settings table
+            $contractorConfigsPaginated = $this->paginateCollection($filteredConfigs->values(), 15, 'configsPage');
+            // Paginated view of the deduction-templates table
+            // (the full $deductionTemplates collection is still available via the public property for modal lookups)
+            $templatesPaginated = $this->paginateCollection($this->deductionTemplates, 10, 'templatesPage');
+            // Get all contractor configurations (needed for both modals and the filter dropdown)
             $allContractors = $this->configService->getAllContractorConfigurations();
         }
 
@@ -1724,6 +1994,12 @@ class Configuration extends Component
             $workersData = $this->getWorkersData();
         }
 
+        // Paginate uploaded documents for the uploads tab
+        $uploadedDocumentsPaginated = [];
+        if ($this->activeTab === 'uploads') {
+            $uploadedDocumentsPaginated = $this->paginateCollection($this->uploadedDocuments, 10, 'uploadsPage');
+        }
+
         return view('livewire.admin.configuration', array_merge([
             'workers' => $workers,
             'countries' => $countries,
@@ -1731,10 +2007,12 @@ class Configuration extends Component
             'stats' => $this->stats,
             'salaryHistory' => $salaryHistory,
             'contractors' => $contractors,
+            'windowContractors' => $windowContractors,
             'windowStats' => $this->windowStats,
-            'contractorConfigs' => $contractorConfigs,
-            'deductionTemplates' => $deductionTemplates,
+            'contractorConfigsPaginated' => $contractorConfigsPaginated,
+            'templatesPaginated' => $templatesPaginated,
             'allContractors' => $allContractors,
+            'uploadedDocumentsPaginated' => $uploadedDocumentsPaginated,
         ], $workersData))->layout('components.layouts.app', ['title' => __('Configuration')]);
     }
 }

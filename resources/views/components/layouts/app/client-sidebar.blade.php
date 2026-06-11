@@ -41,6 +41,11 @@
                 {{-- <flux:sidebar.item icon="book-open" :href="route('user-manual')" wire:navigate>
                     {{ __('User Manual') }}
                 </flux:sidebar.item> --}}
+                @if($faqAvailable ?? false)
+                    <flux:sidebar.item icon="question-mark-circle" href="{{ route('faq') }}" target="_blank" external>
+                        {{ __('FAQ') }}
+                    </flux:sidebar.item>
+                @endif
                 <flux:sidebar.item icon="settings" :href="route('settings.profile')" wire:navigate>
                     {{ __('Settings') }}
                 </flux:sidebar.item>

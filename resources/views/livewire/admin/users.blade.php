@@ -70,12 +70,16 @@
         @if($showFilters)
         <div class="mb-6" x-data x-transition>
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-                <div class="md:col-span-2">
+                <div class="md:col-span-2" x-data x-on:focusin="$el.querySelector('input')?.removeAttribute('readonly')">
                     <flux:input
+                        type="search"
                         wire:model.live="search"
-                        placeholder="{{ __('Search by username, name or email') }}"
+                        placeholder="{{ __('Search by login ID, name or email') }}"
                         icon="magnifying-glass"
                         size="sm"
+                        autocomplete="off"
+                        name="q"
+                        readonly
                     />
                 </div>
                 <div>

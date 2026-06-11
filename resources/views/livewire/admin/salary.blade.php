@@ -126,10 +126,10 @@
                     </flux:select>
                 </div>
                 <div>
-                    <flux:select wire:model.live="paymentStatusFilter" variant="listbox" placeholder="Filter by Payment" size="sm">
-                        <flux:select.option value="">All Payment Statuses</flux:select.option>
-                        <flux:select.option value="paid">Paid</flux:select.option>
-                        <flux:select.option value="awaiting">Pending Payment</flux:select.option>
+                    <flux:select wire:model.live="payslipFilter" variant="listbox" placeholder="Filter by Pay Slip" size="sm">
+                        <flux:select.option value="">All Pay Slips</flux:select.option>
+                        <flux:select.option value="yes">Uploaded</flux:select.option>
+                        <flux:select.option value="no">Not Uploaded</flux:select.option>
                     </flux:select>
                 </div>
                 <div>
@@ -280,7 +280,7 @@
                 @empty
                     <flux:table.rows>
                         <flux:table.cell variant="strong" colspan="10" class="text-center">
-                            @if($search || $contractor || $statusFilter || $paymentStatusFilter)
+                            @if($search || $contractor || $statusFilter || $payslipFilter)
                                 No submissions found matching your filters.
                             @else
                                 No payroll submissions have been created yet.

@@ -23,7 +23,7 @@ class Salary extends Component
     public $statusFilter = '';
 
     #[Url(except: '')]
-    public $paymentStatusFilter = '';
+    public $payslipFilter = '';
 
     #[Url(except: '')]
     public $search = '';
@@ -123,7 +123,7 @@ class Salary extends Component
             'search' => $this->search,
             'contractor' => $this->contractor ? ($this->contractors[$this->contractor] ?? $this->contractor) : null,
             'status' => $this->statusFilter,
-            'payment_status' => $this->paymentStatusFilter,
+            'payslip' => $this->payslipFilter,
         ];
 
         // Generate filename with current date
@@ -162,7 +162,7 @@ class Salary extends Component
         $this->resetPage();
     }
 
-    public function updatingPaymentStatusFilter()
+    public function updatingPayslipFilter()
     {
         $this->resetPage();
     }
@@ -181,7 +181,7 @@ class Salary extends Component
     {
         $this->contractor = '';
         $this->statusFilter = '';
-        $this->paymentStatusFilter = '';
+        $this->payslipFilter = '';
         $this->search = '';
         $this->yearFilter = (string) now()->year;
         $this->monthFilter = '';
@@ -271,13 +271,11 @@ class Salary extends Component
             $query->where('status', $this->statusFilter);
         }
 
-        // Apply payment status filter
-        if ($this->paymentStatusFilter) {
-            if ($this->paymentStatusFilter === 'paid') {
-                $query->where('status', 'paid');
-            } elseif ($this->paymentStatusFilter === 'awaiting') {
-                $query->whereIn('status', ['approved', 'pending_payment', 'overdue']);
-            }
+        // Apply pay slip filter (whether a payslip file has been uploaded)
+        if ($this->payslipFilter === 'yes') {
+            $query->whereNotNull('payslip_file_path');
+        } elseif ($this->payslipFilter === 'no') {
+            $query->whereNull('payslip_file_path');
         }
 
         // Apply sorting

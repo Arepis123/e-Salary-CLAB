@@ -62,65 +62,78 @@
         </div>
     </div>
 
-    <div class="rounded-lg bg-blue-50 dark:bg-blue-950 p-4 border border-blue-200 dark:border-blue-800 mb-6">
-        <div class="flex gap-3">
-            <flux:icon.information-circle class="size-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div class="text-sm text-blue-900 dark:text-blue-100">
-                <strong>Window Control:</strong>
-                By default, all contractors follow the 1st-15th window rule.
-                Use manual controls below to override this and open/close windows at any time.
-                Opening a window automatically unlocks any locked entries.
-            </div>
+    <!-- Filters -->
+    <div class="grid gap-4 md:grid-cols-3 mb-4">
+        <div>
+            <flux:input
+                wire:model.live.debounce.300ms="windowSearch"
+                placeholder="Search by name or CLAB no..."
+                icon="magnifying-glass"
+                size="sm"
+            />
+        </div>
+        <div>
+            <flux:select wire:model.live="windowContractorFilter" variant="listbox" searchable placeholder="Filter by Contractor" size="sm">
+                <flux:select.option value="">All Contractors</flux:select.option>
+                @foreach($windowContractors as $contractor)
+                    <flux:select.option value="{{ $contractor['clab_no'] }}">
+                        {{ $contractor['name'] }}
+                    </flux:select.option>
+                @endforeach
+            </flux:select>
+        </div>
+        <div>
+            <flux:button wire:click="clearWindowFilters" variant="filled" size="sm">
+                <flux:icon.x-mark class="size-4 inline" />
+                Clear Filters
+            </flux:button>
         </div>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700">
-            <thead class="bg-zinc-50 dark:bg-zinc-800">
-                <tr>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                        Contractor
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                        CLAB Number
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                        Window Status
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                        Last Changed
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                        Changed By
-                    </th>
-                    <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                        Actions
-                    </th>
-                </tr>
-            </thead>
-            <tbody class="bg-white dark:bg-zinc-900 divide-y divide-zinc-200 dark:divide-zinc-800">
+        <flux:table>
+            <flux:table.columns>
+                <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor</span>
+                </flux:table.column>
+                <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</span>
+                </flux:table.column>
+                <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Window Status</span>
+                </flux:table.column>
+                <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Last Changed</span>
+                </flux:table.column>
+                <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Changed By</span>
+                </flux:table.column>
+                <flux:table.column>
+                    <span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span>
+                </flux:table.column>
+            </flux:table.columns>
+
+            <flux:table.rows>
                 @forelse($contractors as $contractor)
-                    <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    <flux:table.row :key="$contractor['contractor_clab_no']">
+                        <flux:table.cell variant="strong">
                             {{ $contractor['contractor_name'] }}
-                        </td>
+                        </flux:table.cell>
 
-                        <td class="px-4 py-4 whitespace-nowrap">
-                            <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">
-                                {{ $contractor['contractor_clab_no'] }}
-                            </code>
-                        </td>
+                        <flux:table.cell variant="strong">
+                            {{ $contractor['contractor_clab_no'] }}
+                        </flux:table.cell>
 
-                        <td class="px-4 py-4 whitespace-nowrap">
+                        <flux:table.cell>
                             <flux:badge
                                 size="sm"
                                 color="{{ $contractor['is_window_open'] ? 'green' : 'red' }}"
                             >
                                 {{ $contractor['is_window_open'] ? 'Open' : 'Closed' }}
                             </flux:badge>
-                        </td>
+                        </flux:table.cell>
 
-                        <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900 dark:text-zinc-100">
+                        <flux:table.cell>
                             @if($contractor['last_changed_at'])
                                 <div class="text-xs">
                                     {{ $contractor['last_changed_at']->format('d M Y') }}<br>
@@ -131,13 +144,13 @@
                             @else
                                 <span class="text-xs text-zinc-500">-</span>
                             @endif
-                        </td>
+                        </flux:table.cell>
 
-                        <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900 dark:text-zinc-100">
+                        <flux:table.cell>
                             {{ $contractor['last_changed_by']->name ?? '-' }}
-                        </td>
+                        </flux:table.cell>
 
-                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                        <flux:table.cell>
                             <div class="flex justify-center gap-2">
                                 @if($contractor['is_window_open'])
                                     <flux:button
@@ -168,24 +181,30 @@
                                     History
                                 </flux:button>
                             </div>
-                        </td>
-                    </tr>
+                        </flux:table.cell>
+                    </flux:table.row>
                 @empty
-                    <tr>
-                        <td colspan="6" class="px-4 py-12 text-center">
-                            <flux:icon.building-office class="mx-auto size-7 text-zinc-400 mb-4" />
-                            <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                                No Contractors Found
-                            </p>
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                                No client users with contractor CLAB numbers found in system.
-                            </p>
-                        </td>
-                    </tr>
+                    <flux:table.row>
+                        <flux:table.cell colspan="6">
+                            <div class="py-12 text-center">
+                                <flux:icon.building-office class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
+                                <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No Contractors Found</p>
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400">
+                                    @if($windowSearch !== '' || $windowContractorFilter !== '')
+                                        No contractors match your filters.
+                                    @else
+                                        No client users with contractor CLAB numbers found in system.
+                                    @endif
+                                </p>
+                            </div>
+                        </flux:table.cell>
+                    </flux:table.row>
                 @endforelse
-            </tbody>
-        </table>
+            </flux:table.rows>
+        </flux:table>
     </div>
+
+    <flux:pagination :paginator="$contractors" class="mt-4" />
 </flux:card>
 
 <!-- Recent Changes -->
