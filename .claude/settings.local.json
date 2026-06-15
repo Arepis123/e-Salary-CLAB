@@ -48,7 +48,6 @@
       "Bash(npm install:*)",
       "Bash(git log:*)",
       "Bash(cd:*)",
-<<<<<<< Updated upstream
       "Bash(grep:*)",
       "Bash(python3:*)",
       "WebFetch(domain:developer.billplz.com)",
@@ -74,10 +73,8 @@
       "PowerShell(foreach \\($h in @\\('110.4.45.227','103.6.196.135'\\)\\) { $r = Test-Connection -ComputerName $h -Count 4 -ErrorAction SilentlyContinue; if \\($r\\) { $avg = \\($r | Measure-Object -Property ResponseTime -Average\\).Average; Write-Output \\(\"{0} -> avg {1} ms\" -f $h, [math]::Round\\($avg,1\\)\\) } else { Write-Output \"$h -> no ICMP reply \\(may still accept DB connections\\)\" } })",
       "Bash(vendor/bin/pint app/Services/OutstandingPayrollService.php app/Services/SalaryProratingService.php app/Console/Commands/AutoSubmitTimesheets.php --test)",
       "Bash(vendor/bin/pint app/Livewire/Admin/Users.php --test)",
-      "Bash(vendor/bin/pint app/Livewire/Admin/Dashboard.php --test)"
-=======
+      "Bash(vendor/bin/pint app/Livewire/Admin/Dashboard.php --test)",
       "PowerShell(php artisan route:list --path=api/payslip 2>&1 | Select-Object -First 20)"
->>>>>>> Stashed changes
     ],
     "deny": [],
     "ask": []

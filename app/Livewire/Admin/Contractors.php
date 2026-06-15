@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Contractor;
 use App\Models\PayrollSubmission;
 use App\Models\User;
 use Flux\Flux;
@@ -13,6 +14,7 @@ use Livewire\WithPagination;
 class Contractors extends Component
 {
     use WithPagination;
+
     public $stats = [];
 
     #[Url(except: '')]
@@ -89,15 +91,13 @@ class Contractors extends Component
 
     protected function loadStats()
     {
-        // Total contractors
-        $totalContractors = User::where('role', 'client')->count();
+        // Total contractors that have workers linked via contract_worker
+        $totalContractors = Contractor::whereHas('contracts')->count();
 
         // Active contractors (submitted in last 3 months)
-        $activeContractors = User::where('role', 'client')
-            ->whereHas('payrollSubmissions', function ($query) {
-                $query->where('created_at', '>=', now()->subMonths(3));
-            })
-            ->count();
+        $activeContractors = PayrollSubmission::where('created_at', '>=', now()->subMonths(3))
+            ->distinct('contractor_clab_no')
+            ->count('contractor_clab_no');
 
         // Total outstanding balance
         $totalOutstanding = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
@@ -118,57 +118,85 @@ class Contractors extends Component
 
     protected function getContractors()
     {
-        $query = User::where('role', 'client');
+        // Pre-compute pending/outstanding stats from the app DB in a single
+        // grouped query, keyed by CLAB no (avoids per-row queries across 5k+ rows).
+        $pendingStats = PayrollSubmission::whereIn('status', ['pending_payment', 'overdue'])
+            ->selectRaw('contractor_clab_no, COUNT(*) as pending_count, COALESCE(SUM(total_with_penalty), 0) as outstanding')
+            ->groupBy('contractor_clab_no')
+            ->get()
+            ->keyBy('contractor_clab_no');
 
-        // Apply search filter
+        // Contact overrides from contractors who have logged in (local users).
+        $users = User::where('role', 'client')->get()->keyBy('contractor_clab_no');
+
+        // Only contractors that have at least one worker linked via contract_worker.
+        $query = Contractor::whereHas('contracts');
+
+        // Apply search filter (mapped to contractor table columns)
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%'.$this->search.'%')
-                    ->orWhere('email', 'like', '%'.$this->search.'%')
-                    ->orWhere('contractor_clab_no', 'like', '%'.$this->search.'%')
-                    ->orWhere('phone', 'like', '%'.$this->search.'%')
-                    ->orWhere('person_in_charge', 'like', '%'.$this->search.'%');
+            $search = $this->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('ctr_comp_name', 'like', '%'.$search.'%')
+                    ->orWhere('ctr_email', 'like', '%'.$search.'%')
+                    ->orWhere('ctr_clab_no', 'like', '%'.$search.'%')
+                    ->orWhere('ctr_contact_mobileno', 'like', '%'.$search.'%')
+                    ->orWhere('ctr_telno', 'like', '%'.$search.'%')
+                    ->orWhere('ctr_contact_name', 'like', '%'.$search.'%');
             });
         }
 
-        // Apply status filter
+        // Apply sorting (map view sort keys -> contractor columns)
+        $sortColumn = match ($this->sortBy) {
+            'contractor_clab_no' => 'ctr_clab_no',
+            'name' => 'ctr_comp_name',
+            'person_in_charge' => 'ctr_contact_name',
+            default => 'ctr_comp_name',
+        };
+        $query->orderBy($sortColumn, $this->sortDirection);
+
+        // Map each contractor into the shape the view expects, merging contact
+        // info (logged-in user preferred, contractors table as fallback) and stats.
+        $contractors = $query->get()->map(function ($contractor) use ($pendingStats, $users) {
+            $clab = $contractor->ctr_clab_no;
+            $user = $users->get($clab);
+            $stat = $pendingStats->get($clab);
+
+            return (object) [
+                'id' => $clab,
+                'contractor_clab_no' => $clab,
+                'name' => $contractor->ctr_comp_name,
+                'email' => $user->email ?? $contractor->ctr_email ?? '',
+                'phone' => $user->phone ?? $contractor->ctr_contact_mobileno ?? $contractor->ctr_telno ?? null,
+                'person_in_charge' => $user->person_in_charge ?? $contractor->ctr_contact_name ?? null,
+                'pending_payments' => $stat->pending_count ?? 0,
+                'total_outstanding' => $stat->outstanding ?? 0,
+            ];
+        });
+
+        // Apply status filter (depends on app-DB payroll data, so filter in PHP)
         if ($this->statusFilter) {
-            if ($this->statusFilter === 'active') {
-                $query->whereHas('payrollSubmissions', function ($q) {
-                    $q->where('created_at', '>=', now()->subMonths(3));
-                });
-            } elseif ($this->statusFilter === 'inactive') {
-                $query->whereDoesntHave('payrollSubmissions', function ($q) {
-                    $q->where('created_at', '>=', now()->subMonths(3));
-                });
+            if ($this->statusFilter === 'active' || $this->statusFilter === 'inactive') {
+                $activeClabs = PayrollSubmission::where('created_at', '>=', now()->subMonths(3))
+                    ->distinct()
+                    ->pluck('contractor_clab_no')
+                    ->flip();
+
+                $contractors = $contractors->filter(function ($c) use ($activeClabs) {
+                    $isActive = $activeClabs->has($c->contractor_clab_no);
+
+                    return $this->statusFilter === 'active' ? $isActive : ! $isActive;
+                })->values();
             } elseif ($this->statusFilter === 'with_pending') {
-                $query->whereHas('payrollSubmissions', function ($q) {
-                    $q->whereIn('status', ['pending_payment', 'overdue']);
-                });
+                $contractors = $contractors->filter(fn ($c) => $c->pending_payments > 0)->values();
             }
         }
 
-        // Apply sorting
-        $query->orderBy($this->sortBy, $this->sortDirection);
-
-        return $query->get();
+        return $contractors;
     }
 
     public function render()
     {
         $allContractors = $this->getContractors();
-
-        // Enhance contractors with statistics
-        $allContractors->transform(function ($contractor) {
-            $contractor->pending_payments = PayrollSubmission::where('contractor_clab_no', $contractor->contractor_clab_no)
-                ->whereIn('status', ['pending_payment', 'overdue'])
-                ->count();
-            $contractor->total_outstanding = PayrollSubmission::where('contractor_clab_no', $contractor->contractor_clab_no)
-                ->whereIn('status', ['pending_payment', 'overdue'])
-                ->sum('total_with_penalty');
-
-            return $contractor;
-        });
 
         $currentPage = $this->getPage();
         $contractors = new LengthAwarePaginator(
