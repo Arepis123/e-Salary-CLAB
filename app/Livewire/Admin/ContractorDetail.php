@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Contractor;
 use App\Models\ContractWorker;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
@@ -13,8 +14,6 @@ use Livewire\Component;
 class ContractorDetail extends Component
 {
     public $contractorClabNo;
-
-    public $contractor;
 
     // Tabs
     public $activeTab = 'workers';
@@ -33,12 +32,36 @@ class ContractorDetail extends Component
     public function mount($clabNo)
     {
         $this->contractorClabNo = $clabNo;
-        $this->contractor = User::where('contractor_clab_no', $clabNo)->firstOrFail();
     }
 
     public function setTab($tab)
     {
         $this->activeTab = $tab;
+    }
+
+    public function getContractorProperty()
+    {
+        // Prefer the local account (has login/verification info)...
+        $user = User::where('contractor_clab_no', $this->contractorClabNo)->first();
+
+        if ($user) {
+            return $user;
+        }
+
+        // ...otherwise fall back to the worker_db contractor record for
+        // contractors that have workers but have never logged in.
+        $contractor = Contractor::where('ctr_clab_no', $this->contractorClabNo)->firstOrFail();
+
+        return (object) [
+            'name' => $contractor->ctr_comp_name,
+            'contractor_clab_no' => $contractor->ctr_clab_no,
+            'email' => $contractor->ctr_email ?? '',
+            'phone' => $contractor->ctr_contact_mobileno ?? $contractor->ctr_telno,
+            'person_in_charge' => $contractor->ctr_contact_name,
+            'created_at' => $contractor->ctr_datereg,
+            'last_login_at' => null,
+            'email_verified_at' => null,
+        ];
     }
 
     public function getWorkersProperty()
@@ -122,6 +145,7 @@ class ContractorDetail extends Component
     public function render()
     {
         return view('livewire.admin.contractor-detail', [
+            'contractor' => $this->contractor,
             'stats' => $this->stats,
             'workers' => $this->workers,
             'payrollHistory' => $this->payrollHistory,

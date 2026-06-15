@@ -56,7 +56,7 @@
                 </div>
                 <div>
                     <label class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Registration Date</label>
-                    <p class="text-sm text-zinc-900 dark:text-zinc-100 mt-1">{{ $contractor->created_at->format('M d, Y') }}</p>
+                    <p class="text-sm text-zinc-900 dark:text-zinc-100 mt-1">{{ $contractor->created_at?->format('M d, Y') ?? '-' }}</p>
                 </div>
                 <div>
                     <label class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Last Login</label>
