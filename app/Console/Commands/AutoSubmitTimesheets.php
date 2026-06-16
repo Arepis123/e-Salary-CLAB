@@ -187,7 +187,7 @@ class AutoSubmitTimesheets extends Command
         // Get active workers for this period
         $targetDate = Carbon::create($year, $month, 1);
         $activeWorkers = $this->contractWorkerService->getContractedWorkers($clabNo)
-            ->filter(function ($worker) use ($clabNo, $targetDate) {
+            ->filter(function ($worker) use ($clabNo, $targetDate, $month, $year) {
                 // Scope to this contractor's contracts only to handle workers with
                 // overlapping contracts under different contractors
                 $contract = $worker->contracts()

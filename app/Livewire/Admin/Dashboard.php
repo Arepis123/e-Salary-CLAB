@@ -2,17 +2,26 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\ContractorConfiguration;
 use App\Models\ContractWorker;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
+use App\Services\ContractorWindowService;
 use Flux\Flux;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
     public $stats = [];
+
+    // Configuration reminder popup: contractors with an open OT window and/or
+    // an active contractor-specific override (service charge / penalty exemption
+    // or enabled deductions). Surfaced so admins don't forget these are active.
+    public $configReminderWindows = [];
+
+    public $configReminderSettings = [];
 
     public $recentPayments = [];
 
@@ -85,6 +94,49 @@ class Dashboard extends Component
     {
         $this->loadStats();
         $this->isLoadingStats = false;
+
+        $this->loadConfigReminders();
+    }
+
+    /**
+     * Build the configuration-reminder data and pop the modal when there are any
+     * open OT windows or active contractor-specific settings. Runs on every
+     * dashboard visit (via wire:init), so the popup appears each time either
+     * area has something active.
+     */
+    protected function loadConfigReminders(): void
+    {
+        // Contractors with an open OT entry window.
+        $this->configReminderWindows = app(ContractorWindowService::class)
+            ->getAllContractorSettings()
+            ->where('is_window_open', true)
+            ->map(fn ($c) => [
+                'name' => $c['contractor_name'],
+                'clab_no' => $c['contractor_clab_no'],
+            ])
+            ->values()
+            ->toArray();
+
+        // Contractors with an active exemption override: service charge or penalty.
+        $this->configReminderSettings = ContractorConfiguration::where(function ($q) {
+            $q->where('service_charge_exempt', true)
+                ->orWhere('penalty_exempt', true);
+        })
+            ->orderBy('contractor_name')
+            ->get()
+            ->map(fn ($config) => [
+                'name' => $config->contractor_name,
+                'clab_no' => $config->contractor_clab_no,
+                'service_charge_exempt' => (bool) $config->service_charge_exempt,
+                'penalty_exempt' => (bool) $config->penalty_exempt,
+            ])
+            ->values()
+            ->toArray();
+
+        // Show the popup when either area has something active.
+        if (! empty($this->configReminderWindows) || ! empty($this->configReminderSettings)) {
+            Flux::modal('config-reminder')->show();
+        }
     }
 
     /**

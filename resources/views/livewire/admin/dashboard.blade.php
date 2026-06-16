@@ -760,4 +760,77 @@
             @endif
         </div>
     </flux:modal>
+
+    <!-- Configuration reminder: pops on dashboard load when any OT entry window is open
+         or any contractor-specific override (service charge / penalty exemption or enabled
+         deductions) is active, so admins are reminded these settings are in effect. -->
+    <flux:modal name="config-reminder" class="w-full max-w-lg">
+        <div class="p-6">
+            <div class="mb-4 flex items-start gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Active Configuration Reminder</h3>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                        The following settings are currently active. Review them on the Configuration page.
+                    </p>
+                </div>
+            </div>
+
+            <div class="max-h-96 space-y-5 overflow-y-auto">
+                @if(count($configReminderWindows) > 0)
+                    <div>
+                        <div class="mb-2 flex items-center gap-2">
+                            <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                                Open OT Entry Windows
+                            </h4>
+                        </div>
+                        <ul class="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                            @foreach($configReminderWindows as $contractor)
+                                <li class="flex items-center justify-between px-3 py-2">
+                                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">- {{ $contractor['name'] }}</span>
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $contractor['clab_no'] }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if(count($configReminderSettings) > 0)
+                    <div>
+                        <div class="mb-2 flex items-center gap-2">
+                            <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                                Contractor-Specific Settings
+                            </h4>
+                        </div>
+                        <ul class="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                            @foreach($configReminderSettings as $contractor)
+                                <li class="px-3 py-2">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">- {{ $contractor['name'] }}</span>
+                                        <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $contractor['clab_no'] }}</span>
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @if($contractor['service_charge_exempt'])
+                                            <flux:badge size="sm" color="purple">Service charge exempt</flux:badge>
+                                        @endif
+                                        @if($contractor['penalty_exempt'])
+                                            <flux:badge size="sm" color="orange">Penalty exempt</flux:badge>
+                                        @endif
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Dismiss</flux:button>
+                </flux:modal.close>
+                <flux:button :href="route('configuration')" wire:navigate variant="primary" icon="cog-6-tooth">
+                    Go to Configuration
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
 </div>

@@ -683,6 +683,23 @@ class Report extends Component
         ]);
     }
 
+    /**
+     * Map of inactive worker IDs grouped by contractor CLAB number.
+     * A worker marked inactive for a contractor is excluded from that
+     * contractor's timesheet rows (both the on-screen report and the export).
+     *
+     * @param  array<int, string>  $clabNos
+     * @return array<string, array<int, string>>
+     */
+    protected function inactiveWorkerIdsByContractor(array $clabNos): array
+    {
+        return \App\Models\InactiveWorker::whereIn('contractor_clab_no', $clabNos)
+            ->get(['worker_id', 'contractor_clab_no'])
+            ->groupBy('contractor_clab_no')
+            ->map(fn ($rows) => $rows->pluck('worker_id')->all())
+            ->toArray();
+    }
+
     protected function loadTimesheetData()
     {
         $selectedMonth = $this->selectedMonth ?? now()->month;
@@ -704,6 +721,9 @@ class Report extends Component
 
         // Get unique contractor CLAB numbers
         $allClabNos = $allContractWorkers->pluck('con_ctr_clab_no')->unique()->toArray();
+
+        // Inactive workers (per contractor) are excluded from the report
+        $inactiveByContractor = $this->inactiveWorkerIdsByContractor($allClabNos);
 
         // Get all payroll submissions for the period (to check who submitted)
         $submissions = PayrollSubmission::where('month', $selectedMonth)
@@ -795,6 +815,11 @@ class Report extends Component
                 }
 
                 $workerId = $worker->wkr_id;
+
+                // Skip workers marked inactive for this contractor
+                if (in_array($workerId, $inactiveByContractor[$clabNo] ?? [])) {
+                    continue;
+                }
 
                 // Get data from PayrollWorker if submitted, otherwise from Worker model
                 $payrollWorker = $payrollWorkers[$workerId] ?? null;
@@ -931,6 +956,9 @@ class Report extends Component
         // Get unique contractor CLAB numbers
         $allClabNos = $allContractWorkers->pluck('con_ctr_clab_no')->unique()->toArray();
 
+        // Inactive workers (per contractor) are excluded from the export
+        $inactiveByContractor = $this->inactiveWorkerIdsByContractor($allClabNos);
+
         // Get all payroll submissions for the period (to check who submitted)
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
@@ -997,6 +1025,12 @@ class Report extends Component
                 }
 
                 $workerId = $worker->wkr_id;
+
+                // Skip workers marked inactive for this contractor
+                if (in_array($workerId, $inactiveByContractor[$clabNo] ?? [])) {
+                    continue;
+                }
+
                 $payrollWorker = $payrollWorkers[$workerId] ?? null;
 
                 // Get OT entry for this worker

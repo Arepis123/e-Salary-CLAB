@@ -139,6 +139,18 @@ class MissingSubmissions extends Component
     {
         $this->selectedContractor = collect($this->missingContractors)->firstWhere('clab_no', $clabNo);
 
+        // Contractors with workers but no registered account cannot receive reminders.
+        if ($this->selectedContractor && empty($this->selectedContractor['has_account'])) {
+            Flux::toast(
+                variant: 'warning',
+                heading: 'No account in system',
+                text: "{$this->selectedContractor['name']} does not have an account in this system, so a reminder cannot be sent."
+            );
+            $this->selectedContractor = null;
+
+            return;
+        }
+
         if ($this->selectedContractor) {
             // Load past reminders for this contractor (selected month/year)
             $this->pastReminders = PayrollReminder::where('contractor_clab_no', $clabNo)
@@ -727,6 +739,17 @@ class MissingSubmissions extends Component
             return;
         }
 
+        // Contractors with workers but no registered account cannot receive reminders.
+        if (empty($this->selectedContractor['has_account'])) {
+            Flux::toast(
+                variant: 'warning',
+                heading: 'No account in system',
+                text: "{$this->selectedContractor['name']} does not have an account in this system, so a reminder cannot be sent."
+            );
+
+            return;
+        }
+
         // Validate email exists
         if (empty($this->selectedContractor['email'])) {
             Flux::toast(variant: 'danger', text: 'Cannot send reminder: No email address found for this contractor.');
@@ -969,6 +992,7 @@ class MissingSubmissions extends Component
 
             $result->push([
                 'clab_no' => $clabNo,
+                'has_account' => (bool) $user,
                 'name' => $user
                     ? ($user->company_name ?? $user->name)
                     : ($contractor ? $contractor->ctr_comp_name : 'Contractor '.$clabNo),
