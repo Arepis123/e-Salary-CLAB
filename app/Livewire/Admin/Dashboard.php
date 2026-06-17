@@ -3,12 +3,12 @@
 namespace App\Livewire\Admin;
 
 use App\Models\ContractorConfiguration;
+use App\Models\ContractorWindowSetting;
 use App\Models\ContractWorker;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
-use App\Services\ContractorWindowService;
 use Flux\Flux;
 use Livewire\Component;
 
@@ -106,13 +106,19 @@ class Dashboard extends Component
      */
     protected function loadConfigReminders(): void
     {
-        // Contractors with an open OT entry window.
-        $this->configReminderWindows = app(ContractorWindowService::class)
-            ->getAllContractorSettings()
-            ->where('is_window_open', true)
-            ->map(fn ($c) => [
-                'name' => $c['contractor_name'],
-                'clab_no' => $c['contractor_clab_no'],
+        // Contractors with an open OT entry window. Filter open windows in SQL and
+        // pull only the contractor name/CLAB — avoids loading every window setting
+        // and lazy-loading the lastChangedBy relation per row.
+        $openWindowClabs = ContractorWindowSetting::where('is_window_open', true)
+            ->pluck('contractor_clab_no');
+
+        $this->configReminderWindows = User::where('role', 'client')
+            ->whereIn('contractor_clab_no', $openWindowClabs)
+            ->orderBy('name')
+            ->get(['contractor_clab_no', 'name'])
+            ->map(fn ($u) => [
+                'name' => $u->name,
+                'clab_no' => $u->contractor_clab_no,
             ])
             ->values()
             ->toArray();
@@ -133,9 +139,11 @@ class Dashboard extends Component
             ->values()
             ->toArray();
 
-        // Show the popup when either area has something active.
+        // Show the carousel popup when either area has something active.
+        // JS (window 'config-reminder-loaded' listener) opens it once the slides
+        // have been rendered into the DOM.
         if (! empty($this->configReminderWindows) || ! empty($this->configReminderSettings)) {
-            Flux::modal('config-reminder')->show();
+            $this->dispatch('config-reminder-loaded');
         }
     }
 

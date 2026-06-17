@@ -103,8 +103,13 @@ class PayrollSubmission extends Model
      */
     public function isOverdue(): bool
     {
+        // No deadline or already paid → never overdue.
+        if (! $this->payment_deadline || $this->status === 'paid') {
+            return false;
+        }
+
         // Check if we're AFTER the end of the deadline day (i.e., next day)
-        return now()->isAfter($this->payment_deadline->endOfDay()) && $this->status !== 'paid';
+        return now()->isAfter($this->payment_deadline->endOfDay());
     }
 
     /**

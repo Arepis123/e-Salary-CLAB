@@ -102,8 +102,15 @@ class Dashboard extends Component
             return $paymentCalculator->calculateTotalPaymentToCLAB($c->worker->wkr_salary ?? 1700);
         });
 
+        // Outstanding = payable now (pending_payment) or already past the payment
+        // deadline. Overdue is detected by date because the status is never
+        // auto-flipped to 'overdue' (no scheduler does that).
         $outstandingBalance = PayrollSubmission::byContractor($clabNo)
-            ->whereIn('status', ['pending_payment', 'overdue'])
+            ->where('status', '!=', 'paid')
+            ->where(function ($q) {
+                $q->where('status', 'pending_payment')
+                    ->orWhereDate('payment_deadline', '<', now()->startOfDay());
+            })
             ->get()
             ->sum(fn ($s) => $s->total_due);
 

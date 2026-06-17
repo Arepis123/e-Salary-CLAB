@@ -1794,8 +1794,7 @@ class Configuration extends Component
             ],
             'inactiveWorkersList' => \App\Models\InactiveWorker::with('deactivatedBy')
                 ->orderBy('deactivated_at', 'desc')
-                ->limit(10)
-                ->get(),
+                ->paginate($this->workersPerPage, ['*'], 'inactivePage'),
         ];
     }
 

@@ -11,6 +11,7 @@ use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
 use App\Services\PayrollService;
+use App\Services\TimesheetDriftService;
 use Flux\Flux;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
@@ -32,6 +33,14 @@ class MissingSubmissions extends Component
     const AUTO_SUBMIT_DAY = 16;
 
     public $missingContractors = [];
+
+    // Contractors whose generated timesheet drifted from live OT data (late changes)
+    public $outOfSyncContractors = [];
+
+    // Re-sync modal state
+    public $showResyncModal = false;
+
+    public $resyncContractor = null;
 
     protected $activeWorkerSubquery = null;
 
@@ -90,6 +99,53 @@ class MissingSubmissions extends Component
 
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
+        $this->loadOutOfSyncContractors();
+    }
+
+    /**
+     * Load contractors whose generated timesheet for the selected period has
+     * drifted from the live OT entry data (OT/transactions changed after the
+     * timesheet was generated).
+     */
+    protected function loadOutOfSyncContractors(): void
+    {
+        $drifted = app(TimesheetDriftService::class)
+            ->getDriftedContractors($this->selectedMonth, $this->selectedYear);
+
+        if ($drifted->isEmpty()) {
+            $this->outOfSyncContractors = collect();
+
+            return;
+        }
+
+        // Enrich with contractor display info (name/contact) for the table.
+        $clabNos = $drifted->pluck('clab_no');
+
+        $users = User::whereIn('contractor_clab_no', $clabNos)
+            ->where('role', 'client')
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        $contractors = Contractor::whereIn('ctr_clab_no', $clabNos)
+            ->get()
+            ->keyBy('ctr_clab_no');
+
+        $this->outOfSyncContractors = $drifted->map(function ($row) use ($users, $contractors) {
+            $user = $users->get($row['clab_no']);
+            $contractor = $contractors->get($row['clab_no']);
+
+            $row['name'] = $user
+                ? ($user->company_name ?? $user->name)
+                : ($contractor ? $contractor->ctr_comp_name : 'Contractor '.$row['clab_no']);
+            $row['email'] = $user
+                ? $user->email
+                : ($contractor ? $contractor->ctr_email : null);
+            $row['phone'] = $user
+                ? $user->phone
+                : ($contractor ? ($contractor->ctr_contact_mobileno ?? $contractor->ctr_telno) : null);
+
+            return $row;
+        })->sortBy('name')->values();
     }
 
     public function toggleHistoricalSummary()
@@ -103,6 +159,7 @@ class MissingSubmissions extends Component
 
         $this->resetPage($this->missingPageName);
         $this->loadMissingContractors();
+        $this->loadOutOfSyncContractors();
 
         $newCount = $this->missingContractors->count();
 
@@ -205,7 +262,7 @@ class MissingSubmissions extends Component
 
             if ($existingSubmission) {
                 $statusNote = $existingSubmission->status === 'approved'
-                    ? "<br><br><strong>Note:</strong> This submission is currently <strong>Approved</strong>. Adding new workers will revert its status to <strong>Under Review</strong> so the Final Amount can be re-confirmed by admin."
+                    ? '<br><br><strong>Note:</strong> This submission is currently <strong>Approved</strong>. Adding new workers will revert its status to <strong>Under Review</strong> so the Final Amount can be re-confirmed by admin.'
                     : '';
                 $this->bulkSubmitMessage = "A submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for <strong>{$periodLabel}</strong> already exists. The newly added workers that are not yet included will be <strong>appended</strong> to the existing submission with basic salary and zero overtime.{$statusNote}<br><br>Are you sure you want to proceed?";
             } else {
@@ -302,8 +359,8 @@ class MissingSubmissions extends Component
                         if ($otEntry && $otEntry->transactions) {
                             foreach ($otEntry->transactions as $txn) {
                                 $payrollWorker->transactions()->create([
-                                    'type'    => $txn->type,
-                                    'amount'  => $txn->amount,
+                                    'type' => $txn->type,
+                                    'amount' => $txn->amount,
                                     'remarks' => $txn->remarks,
                                 ]);
                             }
@@ -395,8 +452,8 @@ class MissingSubmissions extends Component
                     if ($otEntry && $otEntry->transactions) {
                         foreach ($otEntry->transactions as $txn) {
                             $payrollWorker->transactions()->create([
-                                'type'    => $txn->type,
-                                'amount'  => $txn->amount,
+                                'type' => $txn->type,
+                                'amount' => $txn->amount,
                                 'remarks' => $txn->remarks,
                             ]);
                         }
@@ -834,6 +891,7 @@ class MissingSubmissions extends Component
         $this->resetPage($this->historicalPageName);
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
+        $this->loadOutOfSyncContractors();
     }
 
     public function updatedSelectedYear()
@@ -842,6 +900,7 @@ class MissingSubmissions extends Component
         $this->resetPage($this->historicalPageName);
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
+        $this->loadOutOfSyncContractors();
     }
 
     protected function getActiveWorkerIds(): string
@@ -1073,7 +1132,7 @@ class MissingSubmissions extends Component
                 // Get workers with active contracts during this specific period
                 $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
                 $periodEnd = $periodStart->copy()->endOfMonth();
-                
+
                 $periodWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                     ->where('con_start', '<=', $periodEnd->toDateString())
                     ->where('con_end', '>=', $periodStart->toDateString())
@@ -1209,6 +1268,10 @@ class MissingSubmissions extends Component
 
     public function getFilteredContractorsProperty()
     {
+        if ($this->activeTab === 'out_of_sync') {
+            return collect($this->outOfSyncContractors)->values();
+        }
+
         $contractors = collect($this->missingContractors);
 
         if ($this->activeTab === 'not_paid') {
@@ -1216,6 +1279,70 @@ class MissingSubmissions extends Component
         }
 
         return $contractors->filter(fn ($c) => $c['not_submitted'] > 0)->values();
+    }
+
+    /**
+     * Open the re-sync confirmation modal for a drifted contractor.
+     */
+    public function openResyncModal($clabNo): void
+    {
+        $this->resyncContractor = collect($this->outOfSyncContractors)
+            ->firstWhere('clab_no', $clabNo);
+
+        if ($this->resyncContractor) {
+            $this->showResyncModal = true;
+        }
+    }
+
+    public function closeResyncModal(): void
+    {
+        $this->showResyncModal = false;
+        $this->resyncContractor = null;
+    }
+
+    /**
+     * Re-sync the selected contractor's generated timesheet to the live OT data.
+     */
+    public function performResync(): void
+    {
+        if (! $this->resyncContractor) {
+            return;
+        }
+
+        $submission = PayrollSubmission::find($this->resyncContractor['submission_id']);
+
+        if (! $submission) {
+            Flux::toast(variant: 'danger', heading: 'Not found', text: 'The timesheet could not be found. It may have been removed.');
+            $this->closeResyncModal();
+            $this->loadOutOfSyncContractors();
+
+            return;
+        }
+
+        try {
+            $result = app(TimesheetDriftService::class)->resyncSubmission($submission);
+
+            if ($result['synced'] > 0) {
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Timesheet re-synced',
+                    text: $result['synced'].' '.\Illuminate\Support\Str::plural('worker', $result['synced'])
+                        .' updated from the latest OT data. The submission is back in the review queue for final amount confirmation.'
+                );
+            } else {
+                Flux::toast(
+                    variant: 'info',
+                    heading: 'Nothing to sync',
+                    text: 'No differences remained — the timesheet was already up to date.'
+                );
+            }
+        } catch (\Exception $e) {
+            Flux::toast(variant: 'danger', heading: 'Re-sync failed', text: $e->getMessage());
+            \Log::error('Timesheet re-sync failed: '.$e->getMessage());
+        }
+
+        $this->closeResyncModal();
+        $this->loadOutOfSyncContractors();
     }
 
     public function getMissingPaginatedProperty(): LengthAwarePaginator

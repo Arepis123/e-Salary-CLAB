@@ -1,4 +1,26 @@
 <div id="ot-entry-scroll-container" class="flex h-full w-full flex-1 flex-col gap-6 overflow-y-auto" wire:init="initializeData">
+        <!-- Back-to-top button: appears after scrolling down inside this container -->
+        <button
+            type="button"
+            x-data="{ show: false }"
+            x-init="
+                const c = document.getElementById('ot-entry-scroll-container');
+                if (c) {
+                    const onScroll = () => { show = c.scrollTop > 300; };
+                    c.addEventListener('scroll', onScroll, { passive: true });
+                    onScroll();
+                }
+            "
+            x-show="show"
+            style="display: none;"
+            x-transition.opacity
+            @click="document.getElementById('ot-entry-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' })"
+            aria-label="Back to top"
+            class="fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+            <flux:icon.arrow-up class="size-5" />
+        </button>
+
         <!-- Page Header -->
         <div class="flex items-center justify-between">
             <div>

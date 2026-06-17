@@ -322,7 +322,7 @@
                             @forelse($recentWorkers as $worker)
                                 <div class="flex items-center justify-between p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50">
                                     <div class="flex items-center gap-3">
-                                        <flux:avatar size="sm" name="{{ $worker->name }}" />
+                                        <flux:avatar size="sm" name="{{ $worker->name }}" color="auto"/>
                                         <div>
                                             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->name }}</p>
                                             <p class="text-xs text-zinc-600 dark:text-zinc-400">
@@ -378,10 +378,10 @@
                                         <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $payment->month_year }}</span>
                                         @if($payment->status === 'paid')
                                             <flux:badge color="green" size="sm">Paid</flux:badge>
+                                        @elseif($payment->isOverdue())
+                                            <flux:badge color="red" size="sm">Overdue</flux:badge>
                                         @elseif($payment->status === 'pending_payment')
                                             <flux:badge color="yellow" size="sm">Pending</flux:badge>
-                                        @elseif($payment->status === 'overdue')
-                                            <flux:badge color="red" size="sm">Overdue</flux:badge>
                                         @else
                                             <flux:badge color="zinc" size="sm">{{ ucfirst($payment->status) }}</flux:badge>
                                         @endif
@@ -440,10 +440,10 @@
                                             <td class="py-3">
                                                 @if($payment->status === 'paid')
                                                     <flux:badge color="green" size="sm">Paid</flux:badge>
+                                                @elseif($payment->isOverdue())
+                                                    <flux:badge color="red" size="sm">Overdue</flux:badge>
                                                 @elseif($payment->status === 'pending_payment')
                                                     <flux:badge color="yellow" size="sm">Pending Payment</flux:badge>
-                                                @elseif($payment->status === 'overdue')
-                                                    <flux:badge color="red" size="sm">Overdue</flux:badge>
                                                 @else
                                                     <flux:badge color="zinc" size="sm">{{ ucfirst($payment->status) }}</flux:badge>
                                                 @endif
@@ -502,7 +502,7 @@
                         <div class="space-y-3">
                             @php $hasNotifications = false; @endphp
 
-                            @if($paymentStats['this_month_deadline'] && $paymentStats['this_month_status'] !== 'paid' && $paymentStats['this_month_deadline']->isAfter(now()) && $paymentStats['this_month_deadline']->diffInDays(now()) <= 7)
+                            @if($paymentStats['this_month_deadline'] && !in_array($paymentStats['this_month_status'], ['paid', 'approved', 'pending_payment']) && $paymentStats['this_month_deadline']->isAfter(now()) && now()->diffInDays($paymentStats['this_month_deadline'], true) <= 7)
                                 @php $hasNotifications = true; @endphp
                                 <div class="flex gap-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 p-3">
                                     <flux:icon.exclamation-triangle class="size-5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
@@ -566,6 +566,10 @@
                         <div>
                             <p class="text-zinc-600 dark:text-zinc-400">Company Name</p>
                             <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ auth()->user()->name }}</p>
+                        </div>
+                        <div>
+                            <p class="text-zinc-600 dark:text-zinc-400">CLAB No</p>
+                            <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ auth()->user()->contractor_clab_no ?? 'Not set' }}</p>
                         </div>
                         <div>
                             <p class="text-zinc-600 dark:text-zinc-400">Contact Person</p>

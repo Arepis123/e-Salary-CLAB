@@ -162,9 +162,9 @@
     </flux:card>
 
     <!-- Inactive Workers History -->
-    @if(count($inactiveWorkersList) > 0)
+    @if($inactiveWorkersList->total() > 0)
         <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
-            <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Recently Deactivated Workers</h3>
+            <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Deactivated Workers</h3>
 
             <flux:table>
                 <flux:table.columns>
@@ -192,6 +192,9 @@
                     @endforeach
                 </flux:table.rows>
             </flux:table>
+
+            <!-- Pagination -->
+            <flux:pagination :paginator="$inactiveWorkersList" class="mt-4" />
         </flux:card>
     @endif
 </div>

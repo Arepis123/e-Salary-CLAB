@@ -109,6 +109,7 @@
     @php
         $notSubmittedCount = collect($missingContractors)->filter(fn($c) => $c['not_submitted'] > 0)->count();
         $notPaidCount = collect($missingContractors)->filter(fn($c) => $c['submitted_not_paid'] > 0)->count();
+        $outOfSyncCount = collect($outOfSyncContractors)->count();
     @endphp
 
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
@@ -146,6 +147,12 @@
                         <flux:badge color="amber" size="sm" inset="top bottom" class="ml-1">{{ $notPaidCount }}</flux:badge>
                     @endif
                 </flux:tab>
+                <flux:tab name="out_of_sync" icon="arrow-path-rounded-square">
+                    Out of Sync
+                    @if($outOfSyncCount > 0)
+                        <flux:badge color="purple" size="sm" inset="top bottom" class="ml-1">{{ $outOfSyncCount }}</flux:badge>
+                    @endif
+                </flux:tab>
             </flux:tabs>
 
             {{-- Tab 1: Not Submit --}}
@@ -167,7 +174,7 @@
                         </div>
                     </div>
                 </div>
-                @elseif($notSubmittedCount > 0)
+                @elseif($activeTab === 'not_submitted' && $notSubmittedCount > 0)
                 <flux:table>
                     <flux:table.columns>
                         <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
@@ -249,7 +256,7 @@
 
             {{-- Tab 2: Not Paid --}}
             <flux:tab.panel name="not_paid">
-                @if($notPaidCount > 0)
+                @if($activeTab === 'not_paid' && $notPaidCount > 0)
                 <flux:table>
                     <flux:table.columns>
                         <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
@@ -327,6 +334,61 @@
                 </div>
                 @endif
             </flux:tab.panel>
+
+            {{-- Tab 3: Out of Sync (late OT/transaction changes) --}}
+            <flux:tab.panel name="out_of_sync">
+                <flux:callout icon="information-circle" variant="secondary" inline x-data="{ visible: true }" x-show="visible" class="mb-3">
+                    <flux:callout.heading class="flex gap-2 @max-md:flex-col items-start">These contractors changed OT hours or transactions after their timesheet was generated. Re-syncing updates the generated timesheet with the latest data.</flux:callout.heading>
+                    <x-slot name="controls">
+                        <flux:button icon="x-mark" variant="ghost" x-on:click="visible = false" />
+                    </x-slot>
+                </flux:callout>     
+                @if($activeTab === 'out_of_sync' && $outOfSyncCount > 0)
+                <flux:table>
+                    <flux:table.columns>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</span></flux:table.column>
+                        <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor Name</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Timesheet Status</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Workers Changed</span></flux:table.column>
+                        <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
+                    </flux:table.columns>
+                    <flux:table.rows>
+                        @foreach($this->missingPaginated as $index => $contractor)
+                            <flux:table.rows :key="$contractor['clab_no']">
+                                <flux:table.cell align="center">{{ $this->missingPaginated->firstItem() + $index }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
+                                <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <flux:badge :color="$contractor['status'] === 'approved' ? 'green' : 'blue'" size="sm" inset="top bottom">
+                                        {{ ucfirst(str_replace('_', ' ', $contractor['status'])) }}
+                                    </flux:badge>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <flux:badge size="sm" inset="top bottom">
+                                        {{ $contractor['drifted_workers'] }} {{ Str::plural('worker', $contractor['drifted_workers']) }}
+                                    </flux:badge>
+                                </flux:table.cell>
+                                <flux:table.cell align="center">
+                                    <flux:button variant="ghost" size="sm" icon="arrow-path-rounded-square" icon-variant="micro" wire:click="openResyncModal('{{ $contractor['clab_no'] }}')">
+                                        Review & Re-sync
+                                    </flux:button>
+                                </flux:table.cell>
+                            </flux:table.rows>
+                        @endforeach
+                    </flux:table.rows>
+                </flux:table>
+                @else
+                <div class="py-12 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
+                            <flux:icon.check-circle class="size-10 text-green-600 dark:text-green-400" />
+                        </div>
+                        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">All generated timesheets match the latest OT data for this period.</p>
+                    </div>
+                </div>
+                @endif
+            </flux:tab.panel>
         </flux:tab.group>
 
         <!-- Pagination -->
@@ -335,7 +397,7 @@
         @endunless
     </flux:card>
 
-    @if($missingContractors->count() === 0)
+    @if($missingContractors->count() === 0 && $outOfSyncCount === 0)
     <flux:card class="p-12 text-center dark:bg-zinc-900 rounded-lg">
         <div class="flex flex-col items-center gap-4">
             <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
@@ -461,6 +523,74 @@
                     <flux:button wire:click="closeRemindModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>
                     <flux:button wire:click="sendReminder" variant="primary" icon="paper-airplane" class="w-full sm:w-auto">
                         Send Reminder
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
+
+    <!-- Re-sync Modal -->
+    @if($showResyncModal && $resyncContractor)
+        <flux:modal wire:model="showResyncModal" class="w-full max-w-2xl">
+            <div class="space-y-4 p-4 sm:p-6">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                        Review & Re-sync Timesheet
+                    </h2>
+                    <p class="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                        {{ $resyncContractor['name'] }} ({{ $resyncContractor['clab_no'] }}) — {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}
+                    </p>
+                </div>
+
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                    @foreach($resyncContractor['drifts'] as $drift)
+                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                            <div class="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                                {{ $drift['worker_name'] }}
+                                <span class="text-xs text-zinc-500">{{ $drift['worker_passport'] }}</span>
+                            </div>
+                            <div class="mt-2 space-y-1.5 text-xs">
+                                @foreach($drift['changes'] as $field => $change)
+                                    @if($field === 'transactions')
+                                        <div>
+                                            <div class="text-zinc-500 dark:text-zinc-400 mb-1">Transactions</div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div class="rounded bg-red-50 dark:bg-red-900/20 p-2">
+                                                    <div class="text-[10px] uppercase text-red-600 dark:text-red-400 mb-1">In timesheet</div>
+                                                    @forelse($change['before'] as $line)
+                                                        <div class="text-zinc-700 dark:text-zinc-300">{{ $line }}</div>
+                                                    @empty
+                                                        <div class="text-zinc-400">None</div>
+                                                    @endforelse
+                                                </div>
+                                                <div class="rounded bg-green-50 dark:bg-green-900/20 p-2">
+                                                    <div class="text-[10px] uppercase text-green-600 dark:text-green-400 mb-1">Latest (client)</div>
+                                                    @forelse($change['after'] as $line)
+                                                        <div class="text-zinc-700 dark:text-zinc-300">{{ $line }}</div>
+                                                    @empty
+                                                        <div class="text-zinc-400">None</div>
+                                                    @endforelse
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-zinc-500 dark:text-zinc-400 w-28">{{ ucwords(str_replace(['ot_', '_'], ['OT ', ' '], $field)) }}</span>
+                                            <span class="text-red-600 dark:text-red-400 line-through">{{ rtrim(rtrim(number_format($change['before'], 2), '0'), '.') }}h</span>
+                                            <flux:icon.arrow-right class="size-3 text-zinc-400" />
+                                            <span class="text-green-600 dark:text-green-400 font-medium">{{ rtrim(rtrim(number_format($change['after'], 2), '0'), '.') }}h</span>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <flux:button wire:click="closeResyncModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>
+                    <flux:button wire:click="performResync" variant="primary" icon="arrow-path-rounded-square" class="w-full sm:w-auto">
+                        Re-sync Timesheet
                     </flux:button>
                 </div>
             </div>
