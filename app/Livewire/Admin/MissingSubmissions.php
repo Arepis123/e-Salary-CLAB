@@ -18,9 +18,11 @@ use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Response;
+use Livewire\Attributes\Lazy;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+#[Lazy]
 class MissingSubmissions extends Component
 {
     use WithPagination;
@@ -36,6 +38,10 @@ class MissingSubmissions extends Component
 
     // Contractors whose generated timesheet drifted from live OT data (late changes)
     public $outOfSyncContractors = [];
+
+    // Out of Sync drift detection is the heaviest query, so it is loaded on demand
+    // when its tab is first opened rather than eagerly on every page load.
+    public $outOfSyncLoaded = false;
 
     // Re-sync modal state
     public $showResyncModal = false;
@@ -99,7 +105,41 @@ class MissingSubmissions extends Component
 
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
+        // Out of Sync drift is loaded lazily when its tab is opened (see updatedActiveTab).
+    }
+
+    /**
+     * Skeleton shown while the (lazy) component boots and its data loads.
+     */
+    public function placeholder()
+    {
+        return view('livewire.admin.missing-submissions-skeleton');
+    }
+
+    /**
+     * Load the Out of Sync drift list. Public + idempotent so it can be triggered
+     * automatically via wire:init right after the page renders — this keeps the
+     * heavy scan off the initial paint while still populating the tab badge
+     * without the admin having to open the tab first.
+     */
+    public function loadOutOfSync(): void
+    {
+        if ($this->outOfSyncLoaded) {
+            return;
+        }
+
         $this->loadOutOfSyncContractors();
+        $this->outOfSyncLoaded = true;
+    }
+
+    /**
+     * Force a recompute of the Out of Sync list (after a period change, refresh,
+     * or re-sync) so the tab badge stays accurate even when the tab is not open.
+     */
+    protected function refreshOutOfSync(): void
+    {
+        $this->loadOutOfSyncContractors();
+        $this->outOfSyncLoaded = true;
     }
 
     /**
@@ -159,7 +199,7 @@ class MissingSubmissions extends Component
 
         $this->resetPage($this->missingPageName);
         $this->loadMissingContractors();
-        $this->loadOutOfSyncContractors();
+        $this->refreshOutOfSync();
 
         $newCount = $this->missingContractors->count();
 
@@ -891,7 +931,7 @@ class MissingSubmissions extends Component
         $this->resetPage($this->historicalPageName);
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
-        $this->loadOutOfSyncContractors();
+        $this->refreshOutOfSync();
     }
 
     public function updatedSelectedYear()
@@ -900,7 +940,7 @@ class MissingSubmissions extends Component
         $this->resetPage($this->historicalPageName);
         $this->loadMissingContractors();
         $this->loadHistoricalSummary();
-        $this->loadOutOfSyncContractors();
+        $this->refreshOutOfSync();
     }
 
     protected function getActiveWorkerIds(): string
@@ -1241,6 +1281,7 @@ class MissingSubmissions extends Component
     public function updatedActiveTab(): void
     {
         $this->resetPage($this->missingPageName);
+        $this->loadOutOfSync();
     }
 
     /**
@@ -1314,7 +1355,7 @@ class MissingSubmissions extends Component
         if (! $submission) {
             Flux::toast(variant: 'danger', heading: 'Not found', text: 'The timesheet could not be found. It may have been removed.');
             $this->closeResyncModal();
-            $this->loadOutOfSyncContractors();
+            $this->refreshOutOfSync();
 
             return;
         }
@@ -1342,7 +1383,7 @@ class MissingSubmissions extends Component
         }
 
         $this->closeResyncModal();
-        $this->loadOutOfSyncContractors();
+        $this->refreshOutOfSync();
     }
 
     public function getMissingPaginatedProperty(): LengthAwarePaginator

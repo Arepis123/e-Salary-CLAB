@@ -112,6 +112,10 @@
         $outOfSyncCount = collect($outOfSyncContractors)->count();
     @endphp
 
+    {{-- Auto-runs the Out of Sync drift scan in a background request after the page
+         renders, so the tab badge populates without the admin opening the tab. --}}
+    <div wire:init="loadOutOfSync" class="hidden"></div>
+
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
             <div>
@@ -149,7 +153,10 @@
                 </flux:tab>
                 <flux:tab name="out_of_sync" icon="arrow-path-rounded-square">
                     Out of Sync
-                    @if($outOfSyncCount > 0)
+                    @if(! $outOfSyncLoaded)
+                        {{-- Background drift scan still running --}}
+                        <flux:icon.loading class="ml-1 size-3 inline opacity-60" />
+                    @elseif($outOfSyncCount > 0)
                         <flux:badge color="purple" size="sm" inset="top bottom" class="ml-1">{{ $outOfSyncCount }}</flux:badge>
                     @endif
                 </flux:tab>
@@ -342,8 +349,18 @@
                     <x-slot name="controls">
                         <flux:button icon="x-mark" variant="ghost" x-on:click="visible = false" />
                     </x-slot>
-                </flux:callout>     
-                @if($activeTab === 'out_of_sync' && $outOfSyncCount > 0)
+                </flux:callout>
+
+                {{-- Skeleton while a recompute request (refresh / period change) is in flight --}}
+                <div wire:loading.flex wire:target="refresh, selectedMonth, selectedYear">
+                    @include('livewire.admin.partials.out-of-sync-skeleton')
+                </div>
+
+                <div wire:loading.remove wire:target="refresh, selectedMonth, selectedYear">
+                @if(! $outOfSyncLoaded)
+                {{-- First load: background drift scan (wire:init) still running --}}
+                @include('livewire.admin.partials.out-of-sync-skeleton')
+                @elseif($activeTab === 'out_of_sync' && $outOfSyncCount > 0)
                 <flux:table>
                     <flux:table.columns>
                         <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
@@ -378,7 +395,7 @@
                         @endforeach
                     </flux:table.rows>
                 </flux:table>
-                @else
+                @elseif($activeTab === 'out_of_sync' && $outOfSyncLoaded)
                 <div class="py-12 text-center">
                     <div class="flex flex-col items-center gap-3">
                         <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
@@ -388,6 +405,7 @@
                     </div>
                 </div>
                 @endif
+                </div>
             </flux:tab.panel>
         </flux:tab.group>
 
@@ -397,7 +415,7 @@
         @endunless
     </flux:card>
 
-    @if($missingContractors->count() === 0 && $outOfSyncCount === 0)
+    @if($missingContractors->count() === 0)
     <flux:card class="p-12 text-center dark:bg-zinc-900 rounded-lg">
         <div class="flex flex-col items-center gap-4">
             <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-4">

@@ -171,10 +171,38 @@ class TimesheetDriftService
             ->with('workers.transactions')
             ->get();
 
+        if ($submissions->isEmpty()) {
+            return collect();
+        }
+
+        // The OT entry period is the same for every submission on this page, so
+        // load all relevant entries in ONE query (keyed by "clab|worker") instead
+        // of running a separate query per submission.
+        [$otMonth, $otYear] = $this->otEntryPeriod($month, $year);
+
+        $otEntries = MonthlyOTEntry::with('transactions')
+            ->whereIn('contractor_clab_no', $submissions->pluck('contractor_clab_no')->unique()->all())
+            ->where('entry_month', $otMonth)
+            ->where('entry_year', $otYear)
+            ->get()
+            ->keyBy(fn ($entry) => $entry->contractor_clab_no.'|'.$entry->worker_id);
+
         $result = collect();
 
         foreach ($submissions as $submission) {
-            $drifts = $this->getSubmissionDrift($submission);
+            $drifts = [];
+
+            foreach ($submission->workers as $worker) {
+                $entry = $otEntries->get($submission->contractor_clab_no.'|'.$worker->worker_id);
+                if (! $entry) {
+                    continue;
+                }
+
+                $diff = $this->diffWorker($worker, $entry);
+                if ($diff !== null) {
+                    $drifts[] = $diff;
+                }
+            }
 
             if (! empty($drifts)) {
                 $result->push([
