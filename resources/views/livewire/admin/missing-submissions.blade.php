@@ -145,12 +145,6 @@
                         <flux:badge color="red" size="sm" inset="top bottom" class="ml-1">{{ $notSubmittedCount }}</flux:badge>
                     @endif
                 </flux:tab>
-                <flux:tab name="not_paid" icon="banknotes">
-                    Not Paid
-                    @if($notPaidCount > 0)
-                        <flux:badge color="amber" size="sm" inset="top bottom" class="ml-1">{{ $notPaidCount }}</flux:badge>
-                    @endif
-                </flux:tab>
                 <flux:tab name="out_of_sync" icon="arrow-path-rounded-square">
                     Out of Sync
                     @if(! $outOfSyncLoaded)
@@ -158,6 +152,12 @@
                         <flux:icon.loading class="ml-1 size-3 inline opacity-60" />
                     @elseif($outOfSyncCount > 0)
                         <flux:badge color="purple" size="sm" inset="top bottom" class="ml-1">{{ $outOfSyncCount }}</flux:badge>
+                    @endif
+                </flux:tab>
+                <flux:tab name="not_paid" icon="banknotes">
+                    Not Paid
+                    @if($notPaidCount > 0)
+                        <flux:badge color="amber" size="sm" inset="top bottom" class="ml-1">{{ $notPaidCount }}</flux:badge>
                     @endif
                 </flux:tab>
             </flux:tabs>

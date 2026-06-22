@@ -48,13 +48,31 @@ class ContractorConfigurationService
     public function updateConfiguration(
         string $clabNo,
         bool $serviceChargeExempt,
-        bool $penaltyExempt = false
+        bool $penaltyExempt = false,
+        bool $paymentEnabled = true
     ): ContractorConfiguration {
         $config = $this->getContractorConfiguration($clabNo);
 
         $config->update([
             'service_charge_exempt' => $serviceChargeExempt,
             'penalty_exempt' => $penaltyExempt,
+            'payment_enabled' => $paymentEnabled,
+            'updated_by' => auth()->id(),
+        ]);
+
+        return $config->fresh(['deductions']);
+    }
+
+    /**
+     * Enable or disable a contractor's ability to make payments.
+     * Used as a temporary lock while a wrong payroll is being regenerated.
+     */
+    public function setPaymentEnabled(string $clabNo, bool $enabled): ContractorConfiguration
+    {
+        $config = $this->getContractorConfiguration($clabNo);
+
+        $config->update([
+            'payment_enabled' => $enabled,
             'updated_by' => auth()->id(),
         ]);
 
@@ -143,6 +161,17 @@ class ContractorConfigurationService
         $config = $this->getContractorConfiguration($clabNo);
 
         return $config->penalty_exempt ?? false;
+    }
+
+    /**
+     * Check if the contractor is currently allowed to make payments.
+     * Defaults to true when no configuration exists yet.
+     */
+    public function isPaymentEnabled(string $clabNo): bool
+    {
+        $config = $this->getContractorConfiguration($clabNo);
+
+        return $config->payment_enabled ?? true;
     }
 
     /**

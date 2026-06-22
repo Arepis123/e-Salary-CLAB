@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Services\BillplzService;
+use App\Services\ContractorConfigurationService;
 use App\Traits\LogsActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -17,9 +18,12 @@ class PaymentController extends Controller
 
     protected BillplzService $billplzService;
 
-    public function __construct(BillplzService $billplzService)
+    protected ContractorConfigurationService $configService;
+
+    public function __construct(BillplzService $billplzService, ContractorConfigurationService $configService)
     {
         $this->billplzService = $billplzService;
+        $this->configService = $configService;
     }
 
     /**
@@ -39,6 +43,26 @@ class PaymentController extends Controller
         if ($submission->status === 'paid') {
             return redirect()->route('timesheet')
                 ->with('error', 'This payroll has already been paid.');
+        }
+
+        // Block payment if the admin has locked payments for this contractor
+        // (e.g. while a wrong payroll calculation is being regenerated).
+        // Show a Cloudflare-style block page so the hold is unmistakable.
+        if (! $this->configService->isPaymentEnabled($clabNo)) {
+            Log::info('Payment blocked — contractor payments are disabled by admin', [
+                'submission_id' => $submission->id,
+                'contractor_clab_no' => $clabNo,
+                'user_id' => $request->user()->id,
+            ]);
+
+            return response()->view('client.payment-blocked', [
+                'title' => 'Internal server error',
+                'errorCode' => 500,
+                'time' => now()->utc()->format('Y-m-d H:i:s').' UTC',
+                'host' => $request->getHost(),
+                'cloudflareLocation' => 'Kuala Lumpur',
+                'rayId' => strtolower(bin2hex(random_bytes(8))).'-KUL',
+            ], 403);
         }
 
         // Block payment if not approved by admin
@@ -305,7 +329,7 @@ class PaymentController extends Controller
     public function callback(Request $request)
     {
         // Validate signature — Billplz sends x_signature in the POST body, not as an HTTP header
-        $billplzId  = $request->input('id');
+        $billplzId = $request->input('id');
         $xSignature = $request->input('x_signature') ?? $request->header('X-Signature') ?? '';
 
         if (! $this->billplzService->validateSignature($billplzId, $xSignature)) {

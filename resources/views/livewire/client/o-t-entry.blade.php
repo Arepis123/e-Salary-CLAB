@@ -447,7 +447,6 @@
                                     @if($newTransactionCategory === 'deduction')
                                         <flux:select.option value="accommodation">Accommodation</flux:select.option>
                                         <flux:select.option value="advance_payment">Advance Payment</flux:select.option>
-                                        {{-- <flux:select.option value="deduction">Other Deduction</flux:select.option> --}}
                                         <flux:select.option value="npl">No-Pay Leave (NPL)</flux:select.option>
                                     @else
                                         <flux:select.option value="allowance">Allowance</flux:select.option>
@@ -605,7 +604,7 @@
                                     <ul class="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
                                         <li>Download the template file to see the required format</li>
                                         <li>Fill in worker passport, name, OT hours, and transactions</li>
-                                        <li>Deduction types: <strong class="text-zinc-900 dark:text-zinc-100">accommodation</strong>, <strong class="text-zinc-900 dark:text-zinc-100">advance_payment</strong>, <strong class="text-zinc-900 dark:text-zinc-100">deduction</strong>, <strong class="text-zinc-900 dark:text-zinc-100">npl</strong></li>
+                                        <li>Deduction types: <strong class="text-zinc-900 dark:text-zinc-100">accommodation</strong>, <strong class="text-zinc-900 dark:text-zinc-100">advance_payment</strong>, <strong class="text-zinc-900 dark:text-zinc-100">npl</strong></li>
                                         <li>Earning types: <strong class="text-zinc-900 dark:text-zinc-100">allowance</strong>, <strong class="text-zinc-900 dark:text-zinc-100">backpay</strong>, <strong class="text-zinc-900 dark:text-zinc-100">medical_claim</strong></li>
                                         <li>You can have multiple rows for the same worker (for multiple transactions)</li>
                                         <li>Leave OT columns empty if you're only adding transactions</li>

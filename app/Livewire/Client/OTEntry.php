@@ -402,7 +402,7 @@ class OTEntry extends Component
     {
         // Validate the new transaction
         $validated = $this->validate([
-            'newTransactionType' => 'required|in:accommodation,advance_payment,deduction,npl,allowance,backpay,medical_claim',
+            'newTransactionType' => 'required|in:accommodation,advance_payment,npl,allowance,backpay,medical_claim',
             'newTransactionAmount' => 'required|numeric|min:0.01',
             'newTransactionRemarks' => 'required|string|min:3',
         ], [
@@ -533,7 +533,7 @@ class OTEntry extends Component
         $sheet = $spreadsheet->getActiveSheet();
 
         // Row 1: Instructions (will be skipped during import)
-        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, deduction, npl, allowance, backpay, medical_claim. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
+        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, npl, allowance, backpay, medical_claim. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
         $sheet->mergeCells('A1:H1');
         $sheet->getStyle('A1')->getFont()->setItalic(true)->setBold(true);
         $sheet->getStyle('A1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('FFFFCC');
@@ -577,48 +577,38 @@ class OTEntry extends Component
         $sheet->setCellValue('G4', '500.00');
         $sheet->setCellValue('H4', 'Advance payment for medical expenses');
 
-        // Example - Other Deduction
+        // Example - NPL (No-Pay Leave)
         $sheet->setCellValue('A5', 'AB012345');
         $sheet->setCellValue('B5', 'JOHN DOE');
         $sheet->setCellValue('C5', '');
         $sheet->setCellValue('D5', '');
         $sheet->setCellValue('E5', '');
-        $sheet->setCellValue('F5', 'deduction');
-        $sheet->setCellValue('G5', '50.00');
-        $sheet->setCellValue('H5', 'Deduction for damaged equipment');
-
-        // Example - NPL (No-Pay Leave)
-        $sheet->setCellValue('A6', 'AB012345');
-        $sheet->setCellValue('B6', 'JOHN DOE');
-        $sheet->setCellValue('C6', '');
-        $sheet->setCellValue('D6', '');
-        $sheet->setCellValue('E6', '');
-        $sheet->setCellValue('F6', 'npl');
-        $sheet->setCellValue('G6', '2');
-        $sheet->setCellValue('H6', 'No-pay leave for 2 days');
+        $sheet->setCellValue('F5', 'npl');
+        $sheet->setCellValue('G5', '2');
+        $sheet->setCellValue('H5', 'No-pay leave for 2 days');
 
         // Example - Allowance (Earning)
-        $sheet->setCellValue('A7', 'AB012346');
-        $sheet->setCellValue('B7', 'JANE DOE');
-        $sheet->setCellValue('C7', '5');
-        $sheet->setCellValue('D7', '0');
-        $sheet->setCellValue('E7', '8');
-        $sheet->setCellValue('F7', 'allowance');
-        $sheet->setCellValue('G7', '150.00');
-        $sheet->setCellValue('H7', 'Transportation allowance');
+        $sheet->setCellValue('A6', 'AB012346');
+        $sheet->setCellValue('B6', 'JANE DOE');
+        $sheet->setCellValue('C6', '5');
+        $sheet->setCellValue('D6', '0');
+        $sheet->setCellValue('E6', '8');
+        $sheet->setCellValue('F6', '');
+        $sheet->setCellValue('G6', '');
+        $sheet->setCellValue('H6', '');
 
         // Example - Backpay (Earning)
-        $sheet->setCellValue('A8', 'AB012346');
-        $sheet->setCellValue('B8', 'JANE DOE');
-        $sheet->setCellValue('C8', '');
-        $sheet->setCellValue('D8', '');
-        $sheet->setCellValue('E8', '');
-        $sheet->setCellValue('F8', 'backpay');
-        $sheet->setCellValue('G8', '200.00');
-        $sheet->setCellValue('H8', 'Backpay for previous month underpayment');
+        $sheet->setCellValue('A7', 'AB012346');
+        $sheet->setCellValue('B7', 'JANE DOE');
+        $sheet->setCellValue('C7', '');
+        $sheet->setCellValue('D7', '');
+        $sheet->setCellValue('E7', '');
+        $sheet->setCellValue('F7', 'backpay');
+        $sheet->setCellValue('G7', '200.00');
+        $sheet->setCellValue('H7', 'Backpay for previous month underpayment');
 
         // Style example rows with light gray background
-        $sheet->getStyle('A3:H8')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
+        $sheet->getStyle('A3:H7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
 
         // Auto-size columns
         foreach (range('A', 'H') as $col) {
@@ -807,7 +797,7 @@ class OTEntry extends Component
 
                 // Validate transaction type if provided
                 if (! empty($txnType)) {
-                    $validTypes = ['accommodation', 'advance_payment', 'deduction', 'npl', 'allowance', 'backpay', 'medical_claim'];
+                    $validTypes = ['accommodation', 'advance_payment', 'npl', 'allowance', 'backpay', 'medical_claim'];
                     if (! in_array($txnType, $validTypes)) {
                         $this->importErrors[] = "Row {$rowNumber}: Invalid transaction type '{$txnType}'. Must be one of: " . implode(', ', $validTypes);
                         $rowHasError = true;

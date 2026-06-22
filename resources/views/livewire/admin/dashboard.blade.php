@@ -1,4 +1,4 @@
-<div wire:init="loadInitialData" x-on:chart-section-clicked.window="$wire.loadSectionContractors($event.detail.index)">
+<div>
     <div class="flex h-full w-full flex-1 flex-col gap-6">
         <!-- Page Header -->
         <div class="flex items-center justify-between">
@@ -11,198 +11,13 @@
             </div>
         </div>
 
-        <!-- Statistics Cards -->
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <!-- Clients Without Submission -->
-            <a href="{{ route('missing-submissions') }}" wire:navigate>
-                <flux:card class="space-y-2 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg cursor-pointer transition-[transform,box-shadow] duration-300 ease-in-out hover:scale-103 hover:shadow-lg">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Submissions</p>
-                            @if($isLoadingStats)
-                                <flux:skeleton animate="shimmer" class="h-8 w-16 rounded" />
-                            @else
-                                <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['clients_without_submission'] }}</p>
-                            @endif
-                        </div>
-                        <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3 hidden lg:hidden xl:block">
-                            <flux:icon.exclamation-triangle class="size-6 text-orange-600 dark:text-orange-400" />
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs">
-                        @if($isLoadingStats)
-                            <flux:skeleton animate="shimmer" class="h-4 w-32 rounded" />
-                        @else
-                            <span class="text-zinc-600 dark:text-zinc-400">{{ $stats['clients_with_submission_count'] }} of {{ $stats['total_clients'] }} submitted</span>
-                        @endif
-                    </div>
-                </flux:card>
-            </a>
-
-            <!-- Active Workers -->
-            <flux:card class="space-y-2 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg cursor-pointer transition-[transform,box-shadow] duration-300 ease-in-out hover:scale-103 hover:shadow-lg">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Active Workers</p>
-                        @if($isLoadingStats)
-                            <flux:skeleton animate="shimmer" class="h-8 w-16 rounded" />
-                        @else
-                            <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['active_workers'] }}</p>
-                        @endif
-                    </div>
-                    <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3 hidden lg:hidden xl:block">
-                        <flux:icon.users class="size-6 text-green-600 dark:text-green-400" />
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 text-xs">
-                    @if($isLoadingStats)
-                        <flux:skeleton animate="shimmer" class="h-4 w-24 rounded" />
-                    @else
-                        @if($stats['workers_growth'] > 0)
-                            <span class="text-green-600 dark:text-green-400">+{{ $stats['workers_growth'] }} workers</span>
-                        @elseif($stats['workers_growth'] < 0)
-                            <span class="text-red-600 dark:text-red-400">{{ $stats['workers_growth'] }} workers</span>
-                        @else
-                            <span class="text-zinc-500 dark:text-zinc-400">no change</span>
-                        @endif
-                        <span class="text-zinc-600 dark:text-zinc-400">from last month</span>
-                    @endif
-                </div>
-            </flux:card>
-
-            <!-- This Month / Last Month Payments (switches on the 16th) -->
-            <a href="{{ route('payroll') }}" wire:navigate>
-                <flux:card class="space-y-2 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg cursor-pointer transition-[transform,box-shadow] duration-300 ease-in-out hover:scale-103 hover:shadow-lg">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            @if(now()->day >= 16)
-                                <p class="text-sm text-zinc-600 dark:text-zinc-400">This Month Payments</p>
-                            @else
-                                <p class="text-sm text-zinc-600 dark:text-zinc-400">Last Month Payments</p>
-                            @endif
-                            @if($isLoadingStats)
-                                <flux:skeleton animate="shimmer" class="h-8 w-24 rounded" />
-                            @else
-                                @if(now()->day >= 16)
-                                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['this_month_payments']) }}</p>
-                                @else
-                                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['last_month_payments']) }}</p>
-                                @endif
-                            @endif
-                        </div>
-                        <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-3 hidden lg:hidden xl:block">
-                            <flux:icon.wallet class="size-6 text-purple-600 dark:text-purple-400" />
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs">
-                        @if($isLoadingStats)
-                            <flux:skeleton animate="shimmer" class="h-4 w-28 rounded" />
-                        @else
-                            <span class="text-green-600 dark:text-green-400">+{{ $stats['payments_growth'] }}%</span>
-                            <span class="text-zinc-600 dark:text-zinc-400">from last month</span>
-                        @endif
-                    </div>
-                </flux:card>
-            </a>
-
-            <!-- Outstanding Balance -->
-            <flux:card class="space-y-2 p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg cursor-pointer transition-[transform,box-shadow] duration-300 ease-in-out hover:scale-103 hover:shadow-lg">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400">Outstanding Balance</p>
-                        @if($isLoadingStats)
-                            <flux:skeleton animate="shimmer" class="h-8 w-24 rounded" />
-                        @else
-                            <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['outstanding_balance']) }}</p>
-                        @endif
-                    </div>
-                    <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3 hidden lg:hidden xl:block">
-                        <flux:icon.exclamation-circle class="size-6 text-orange-600 dark:text-orange-400" />
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 text-xs">
-                    <span class="text-orange-600 dark:text-orange-400">Unpaid invoices</span>
-                </div>
-            </flux:card>
-        </div>
+        <!-- Statistics Cards (loads independently) -->
+        <livewire:admin.dashboard.stats-cards />
 
         <!-- Recent Activity & Quick Actions -->
-        <div class="grid gap-4 lg:grid-cols-3" wire:init="loadDeferredData">
-            <!-- Recent Payments -->
-            <flux:card class="order-last lg:order-first lg:col-span-2 min-w-0 overflow-hidden p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg">
-                <div class="mb-4 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent Payments</h2>
-                    <flux:button variant="ghost" size="sm" href="{{ route('payroll') }}" wire:navigate>View all</flux:button>
-                </div>
-
-                @if($isLoadingRecentPayments)
-                    <flux:skeleton.group animate="shimmer" class="space-y-3">
-                        @for($i = 0; $i < 5; $i++)
-                            <div class="flex items-center gap-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-                                <flux:skeleton class="h-4 w-32 rounded" />
-                                <flux:skeleton class="h-4 w-20 rounded" />
-                                <flux:skeleton class="h-5 w-16 rounded-full" />
-                            </div>
-                        @endfor
-                    </flux:skeleton.group>
-                @elseif(count($recentPayments) > 0)
-                    <!-- Mobile: card list -->
-                    <div class="sm:hidden space-y-3">
-                        @foreach($recentPayments as $payment)
-                            <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate mr-2">{{ $payment['client'] }}</span>
-                                    <flux:badge color="{{ $payment['status'] === 'completed' ? 'green' : 'yellow' }}" size="sm">
-                                        {{ ucfirst($payment['status']) }}
-                                    </flux:badge>
-                                </div>
-                                <div class="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
-                                    <span class="font-medium">RM {{ number_format($payment['amount']) }}</span>
-                                    <span>{{ $payment['workers'] }} workers · {{ $payment['date'] }}</span>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-
-                    <!-- Desktop: table -->
-                    <div class="hidden sm:block overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Client</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Amount</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Workers</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Date</th>
-                                    <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                                @foreach($recentPayments as $payment)
-                                <tr>
-                                    <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100 max-w-[150px] truncate">{{ $payment['client'] }}</td>
-                                    <td class="py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">RM {{ number_format($payment['amount']) }}</td>
-                                    <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{{ $payment['workers'] }} workers</td>
-                                    <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{{ $payment['date'] }}</td>
-                                    <td class="py-3">
-                                        <flux:badge color="{{ $payment['status'] === 'completed' ? 'green' : 'yellow' }}" size="sm">
-                                            {{ ucfirst($payment['status']) }}
-                                        </flux:badge>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="py-12 text-center">
-                        <flux:icon.banknotes class="mx-auto size-12 text-zinc-300 dark:text-zinc-600 mb-3" />
-                        <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1">No Recent Payments</p>
-                        <p class="text-xs text-zinc-600 dark:text-zinc-400">
-                            Payment records will appear here once contractors complete their payments.
-                        </p>
-                    </div>
-                @endif
-            </flux:card>
+        <div class="grid gap-4 lg:grid-cols-3">
+            <!-- Recent Payments (loads independently) -->
+            <livewire:admin.dashboard.recent-payments />
 
             <!-- Quick Actions & Alerts -->
             <div class="order-first lg:order-last min-w-0 space-y-4">
@@ -234,10 +49,10 @@
                                 <flux:icon.exclamation-triangle class="size-5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
                                 <div>
                                     <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Outstanding Balance</p>
-                                    @if($isLoadingStats)
+                                    @if(is_null($outstandingBalance))
                                         <flux:skeleton animate="shimmer" class="h-4 w-32 rounded mt-1" />
                                     @else
-                                        <p class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($stats['outstanding_balance']) }} in unpaid invoices</p>
+                                        <p class="text-xs text-zinc-600 dark:text-zinc-400">RM {{ number_format($outstandingBalance) }} in unpaid invoices</p>
                                     @endif
                                 </div>
                             </div>
@@ -263,91 +78,15 @@
             </div>
         </div>
 
-        <!-- Charts Row - Side by Side -->
+        <!-- Charts Row - Side by Side (each loads independently) -->
         <div class="grid gap-4 lg:grid-cols-2">
-            <!-- Contractor Submission Status Chart -->
-            <flux:card class="p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg">
-                <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Contractor Submission Status</h2>
-                        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Submission and payment status by period</p>
-                    </div>
-
-                    <!-- Period Selector -->
-                    <div class="flex gap-2 items-center">
-                        <flux:select wire:model.live="selectedMonth" variant="listbox" size="sm">
-                            <flux:select.option value="1">January</flux:select.option>
-                            <flux:select.option value="2">February</flux:select.option>
-                            <flux:select.option value="3">March</flux:select.option>
-                            <flux:select.option value="4">April</flux:select.option>
-                            <flux:select.option value="5">May</flux:select.option>
-                            <flux:select.option value="6">June</flux:select.option>
-                            <flux:select.option value="7">July</flux:select.option>
-                            <flux:select.option value="8">August</flux:select.option>
-                            <flux:select.option value="9">September</flux:select.option>
-                            <flux:select.option value="10">October</flux:select.option>
-                            <flux:select.option value="11">November</flux:select.option>
-                            <flux:select.option value="12">December</flux:select.option>
-                        </flux:select>
-
-                        <flux:select wire:model.live="selectedYear" variant="listbox" size="sm">
-                            @for($year = now()->year; $year >= now()->year - 3; $year--)
-                                <flux:select.option value="{{ $year }}">{{ $year }}</flux:select.option>
-                            @endfor
-                        </flux:select>
-                    </div>
-                </div>
-
-                @if($isLoadingCharts)
-                    <flux:skeleton animate="shimmer" class="h-64 w-full rounded-lg" />
-                @else
-                    <div id="chartDataContainer"
-                        data-chart-labels='@json($contractorStatusChartData["labels"])'
-                        data-chart-data='@json($contractorStatusChartData["data"])'
-                        data-chart-colors='@json($contractorStatusChartData["colors"])'
-                        data-month="{{ $selectedMonth }}"
-                        data-year="{{ $selectedYear }}"
-                        style="display: none;"></div>
-                    <div class="relative h-64">
-                        <canvas id="contractorStatusChart" wire:ignore></canvas>
-                    </div>
-
-                    <!-- Summary info -->
-                    <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        Viewing: {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}
-                        | Paid: {{ $contractorStatusChartData['data'][0] ?? 0 }}
-                        | Pending: {{ $contractorStatusChartData['data'][1] ?? 0 }}
-                        | Not Submitted: {{ $contractorStatusChartData['data'][2] ?? 0 }}
-                    </div>
-                @endif
-            </flux:card>
-
-            <!-- Top Overdue Clients Chart -->
-            <flux:card class="p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg">
-                <div class="mb-4">
-                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Top 5 Overdue Clients</h2>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">Clients who most frequently miss their payment deadline</p>
-                </div>
-                @if($isLoadingCharts)
-                    <flux:skeleton animate="shimmer" class="h-64 w-full rounded-lg" />
-                @elseif(count($topOverdueChartData['labels'] ?? []) > 0)
-                    <!-- Data container for Top Overdue Clients chart -->
-                    <div id="topOverdueChartDataContainer"
-                        data-labels='@json($topOverdueChartData["labels"])'
-                        data-counts='@json($topOverdueChartData["data"])'
-                        style="display: none;"></div>
-                    <div class="relative h-64">
-                        <canvas id="topOverdueChart" wire:ignore></canvas>
-                    </div>
-                @else
-                    <div class="flex h-64 flex-col items-center justify-center gap-2 text-center">
-                        <flux:icon.check-circle class="size-10 text-green-500" />
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">No overdue payrolls. Every client is on time.</p>
-                    </div>
-                @endif
-            </flux:card>
+            <livewire:admin.dashboard.submission-status-chart />
+            <livewire:admin.dashboard.top-overdue-chart />
         </div>
     </div>
+
+    <!-- Configuration reminder popup (loads last, after the data sections) -->
+    <livewire:admin.dashboard.config-reminders />
 
     <script>
         // Store chart instance globally to destroy before re-creating
@@ -520,6 +259,11 @@
             const maxCount = Math.max(0, ...overdueData.counts);
             const suggestedMax = maxCount > 0 ? Math.ceil(maxCount * 1.4) : 1;
 
+            // Flag clients with more than 3 overdue payrolls in red; others stay amber.
+            const OVERDUE_RED_THRESHOLD = 3;
+            const barColors = overdueData.counts.map(c => c > OVERDUE_RED_THRESHOLD ? '#ef4444' : '#f59e0b');
+            const barHoverColors = overdueData.counts.map(c => c > OVERDUE_RED_THRESHOLD ? '#dc2626' : '#d97706');
+
             console.log('Initializing Top Overdue Clients Chart:', overdueData);
 
             window.topOverdueChartInstance = new Chart(ctx, {
@@ -529,10 +273,10 @@
                     datasets: [{
                         label: 'Overdue Payrolls',
                         data: overdueData.counts,
-                        backgroundColor: '#f59e0b',
-                        hoverBackgroundColor: '#d97706',
+                        backgroundColor: barColors,
+                        hoverBackgroundColor: barHoverColors,
                         borderRadius: 6,
-                        borderSkipped: false,
+                        borderSkipped: 'start',
                         maxBarThickness: 30
                     }]
                 },
@@ -708,180 +452,5 @@
             attributes: true,
             attributeFilter: ['class']
         });
-    </script>
-
-    <!-- Section Contractors Modal -->
-    <flux:modal name="section-contractors" class="w-full max-w-2xl">
-        <div class="p-6">
-            <div class="mb-4 flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{{ $sectionTitle }}</h3>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                        {{ \Carbon\Carbon::create($selectedYear, $selectedMonth, 1)->format('F Y') }}
-                        &mdash; {{ count($sectionContractors) }} {{ Str::plural('contractor', count($sectionContractors)) }}
-                    </p>
-                </div>
-            </div>
-
-            @if(count($sectionContractors) > 0)
-                <div class="overflow-x-auto max-h-96 overflow-y-auto">
-                    <table class="w-full text-sm">
-                        <thead class="">
-                            <tr class="">
-                                <th class="pb-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Contractor</th>
-                                <th class="pb-2 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">CLAB No</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
-                            @foreach($sectionContractors as $contractor)
-                                <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                                    <td class="py-2 font-medium text-zinc-900 dark:text-zinc-100">{{ $contractor['name'] }}</td>
-                                    <td class="py-2 text-zinc-500 dark:text-zinc-400">{{ $contractor['clab_no'] ?? '-' }}</td>
-                                    <td class="py-2">
-                                        @php
-                                            $color = match($contractor['status']) {
-                                                'Paid' => 'green',
-                                                'Overdue' => 'red',
-                                                'Pending Payment' => 'yellow',
-                                                'Not Submitted' => 'red',
-                                                default => 'blue',
-                                            };
-                                        @endphp
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @else
-                <div class="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                    No contractors in this category.
-                </div>
-            @endif
-        </div>
-    </flux:modal>
-
-    <!-- Configuration reminder: single-panel dismissable popup (same look & feel as the
-         client dashboard carousel). Opens on dashboard load when any OT entry window is open
-         or any contractor-specific override (service charge / penalty exemption) is active. -->
-    <div id="configReminderModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px] opacity-0 invisible transition-all duration-300">
-        <div id="configReminderPanel" class="relative w-full max-w-lg mx-4 max-h-[90vh] flex flex-col bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300">
-            <button onclick="closeConfigReminder()" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 dark:bg-zinc-800/90 hover:bg-white dark:hover:bg-zinc-800 transition-colors">
-                <flux:icon.x-mark class="size-5 text-zinc-600 dark:text-zinc-400" />
-            </button>
-
-            <!-- Header -->
-            <div class="shrink-0 px-6 pt-6 pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Active Configuration Reminder</h3>
-                <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    The following settings are currently active. Review them on the Configuration page.
-                </p>
-            </div>
-
-            <!-- Body: both sections as accordion items in one panel -->
-            <div class="flex-1 min-h-0 overflow-y-auto p-6">
-                <flux:accordion transition>
-                    @if(count($configReminderWindows) > 0)
-                        <flux:accordion.item expanded>
-                            <flux:accordion.heading>
-                                Open OT Entry Windows
-                            </flux:accordion.heading>
-                            <flux:accordion.content>
-                                <ul class="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                                    @foreach($configReminderWindows as $contractor)
-                                        <li class="flex items-center justify-between px-3 py-2">
-                                            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">- {{ $contractor['name'] }}</span>
-                                            <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $contractor['clab_no'] }}</span>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </flux:accordion.content>
-                        </flux:accordion.item>
-                    @endif
-
-                    @if(count($configReminderSettings) > 0)
-                        <flux:accordion.item expanded>
-                            <flux:accordion.heading>
-                                Contractor-Specific Settings
-                            </flux:accordion.heading>
-                            <flux:accordion.content>
-                                <ul class="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                                    @foreach($configReminderSettings as $contractor)
-                                        <li class="px-3 py-2">
-                                            <div class="flex items-center justify-between">
-                                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">- {{ $contractor['name'] }}</span>
-                                                <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $contractor['clab_no'] }}</span>
-                                            </div>
-                                            <div class="mt-1 flex flex-wrap gap-1">
-                                                @if($contractor['service_charge_exempt'])
-                                                    <flux:badge size="sm" color="purple">Service charge exempt</flux:badge>
-                                                @endif
-                                                @if($contractor['penalty_exempt'])
-                                                    <flux:badge size="sm" color="orange">Penalty exempt</flux:badge>
-                                                @endif
-                                            </div>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </flux:accordion.content>
-                        </flux:accordion.item>
-                    @endif
-                </flux:accordion>
-            </div>
-
-            <!-- Footer -->
-            <div class="shrink-0 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-800 p-4">
-                <flux:button onclick="closeConfigReminder()" variant="filled">Dismiss</flux:button>
-                <flux:button :href="route('configuration')" wire:navigate variant="primary">
-                    Go to Configuration
-                </flux:button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Single-panel configuration reminder (dismissable; same look & feel as the client carousel).
-        function cfgShowConfigReminder() {
-            const modal = document.getElementById('configReminderModal');
-            if (!modal) return;
-            modal.classList.remove('opacity-0', 'invisible');
-            const panel = modal.querySelector('.transform');
-            if (panel) { panel.classList.remove('scale-95'); panel.classList.add('scale-100'); }
-        }
-
-        function closeConfigReminder() {
-            const modal = document.getElementById('configReminderModal');
-            if (!modal) return;
-            modal.classList.add('opacity-0', 'invisible');
-            const panel = modal.querySelector('.transform');
-            if (panel) { panel.classList.remove('scale-100'); panel.classList.add('scale-95'); }
-        }
-
-        // Bind global listeners once (survives wire:navigate; uses delegation so it
-        // keeps working after the modal element is re-rendered).
-        if (!window.__cfgReminderBound) {
-            window.__cfgReminderBound = true;
-
-            // Dismiss when clicking outside the panel (anywhere on the backdrop)
-            document.addEventListener('click', function (e) {
-                const modal = document.getElementById('configReminderModal');
-                if (!modal || modal.classList.contains('invisible')) return;
-                const panel = document.getElementById('configReminderPanel');
-                if (panel && !panel.contains(e.target)) closeConfigReminder();
-            });
-
-            // Dismiss on Escape
-            document.addEventListener('keydown', function (e) {
-                const modal = document.getElementById('configReminderModal');
-                if (modal && !modal.classList.contains('invisible') && e.key === 'Escape') {
-                    closeConfigReminder();
-                }
-            });
-
-            // Opened by the Livewire component once the content is in the DOM.
-            window.addEventListener('config-reminder-loaded', () => {
-                setTimeout(cfgShowConfigReminder, 100);
-            });
-        }
     </script>
 </div>

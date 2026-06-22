@@ -18,6 +18,22 @@ Route::get('csrf-token', function () {
     return response()->json(['token' => csrf_token()]);
 })->middleware('web');
 
+// Preview of the Cloudflare-style "payments disabled" block page (local only).
+// Visit /preview/payment-blocked in the browser to see exactly what a blocked
+// client sees. Not registered in production.
+if (app()->environment('local')) {
+    Route::get('preview/payment-blocked', function (\Illuminate\Http\Request $request) {
+        return response()->view('client.payment-blocked', [
+            'title' => 'Internal server error',
+            'errorCode' => 500,
+            'time' => now()->utc()->format('Y-m-d H:i:s').' UTC',
+            'host' => $request->getHost(),
+            'cloudflareLocation' => 'Kuala Lumpur',
+            'rayId' => strtolower(bin2hex(random_bytes(8))).'-KUL',
+        ], 403);
+    })->name('preview.payment-blocked');
+}
+
 // ============================================================================
 // EXTERNAL API ROUTES (No CSRF, authenticated via X-Payslip-Token header)
 // ============================================================================

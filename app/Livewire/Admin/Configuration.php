@@ -91,7 +91,16 @@ class Configuration extends Component
 
     public $editPenaltyExempt = false;
 
+    public $editPaymentEnabled = true;
+
     public $editEnabledDeductions = []; // Array of deduction template IDs
+
+    // Payment lock confirmation modal
+    public $togglePaymentClab = '';
+
+    public $togglePaymentName = '';
+
+    public $togglePaymentCurrentlyEnabled = true;
 
     // Deduction template management
     public $deductionTemplates = [];
@@ -656,20 +665,22 @@ class Configuration extends Component
         $this->editingContractorName = $config->contractor_name;
         $this->editServiceChargeExempt = $config->service_charge_exempt;
         $this->editPenaltyExempt = $config->penalty_exempt;
+        $this->editPaymentEnabled = $config->payment_enabled;
 
         // Load currently enabled deduction template IDs
         $this->editEnabledDeductions = $config->deductions->pluck('id')->toArray();
 
-        $this->showEditModal = true;
+        Flux::modal('edit-contractor-config')->show();
     }
 
     public function closeContractorEditModal()
     {
-        $this->showEditModal = false;
+        Flux::modal('edit-contractor-config')->close();
         $this->editingContractorClab = '';
         $this->editingContractorName = '';
         $this->editServiceChargeExempt = false;
         $this->editPenaltyExempt = false;
+        $this->editPaymentEnabled = true;
         $this->editEnabledDeductions = [];
     }
 
@@ -681,11 +692,12 @@ class Configuration extends Component
         ]);
 
         try {
-            // Update service charge and penalty exemption
+            // Update service charge and penalty exemption + payment lock
             $this->configService->updateConfiguration(
                 $this->editingContractorClab,
                 $this->editServiceChargeExempt,
-                $this->editPenaltyExempt
+                $this->editPenaltyExempt,
+                $this->editPaymentEnabled
             );
 
             // Update enabled deductions
@@ -707,6 +719,58 @@ class Configuration extends Component
                 variant: 'danger',
                 heading: 'Error',
                 text: 'Failed to update configuration: '.$e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Open the confirmation modal for locking/unlocking a contractor's payments.
+     */
+    public function openPaymentToggleModal(string $clabNo)
+    {
+        $config = $this->configService->getContractorConfiguration($clabNo);
+
+        $this->togglePaymentClab = $config->contractor_clab_no;
+        $this->togglePaymentName = $config->contractor_name;
+        $this->togglePaymentCurrentlyEnabled = $config->payment_enabled;
+
+        Flux::modal('confirm-payment-toggle')->show();
+    }
+
+    public function closePaymentToggleModal()
+    {
+        Flux::modal('confirm-payment-toggle')->close();
+        $this->togglePaymentClab = '';
+        $this->togglePaymentName = '';
+        $this->togglePaymentCurrentlyEnabled = true;
+    }
+
+    /**
+     * Toggle a contractor's payment lock (confirmed from the modal) —
+     * lets admin block/unblock payments fast while a wrong payroll is regenerated.
+     */
+    public function toggleContractorPayment()
+    {
+        try {
+            $clabNo = $this->togglePaymentClab;
+            $config = $this->configService->getContractorConfiguration($clabNo);
+            $config = $this->configService->setPaymentEnabled($clabNo, ! $config->payment_enabled);
+
+            Flux::toast(
+                variant: $config->payment_enabled ? 'success' : 'warning',
+                heading: 'Payment '.($config->payment_enabled ? 'Enabled' : 'Disabled'),
+                text: $config->payment_enabled
+                    ? "{$config->contractor_name} can now make payments again."
+                    : "{$config->contractor_name} is now blocked from making payments."
+            );
+
+            $this->closePaymentToggleModal();
+            $this->loadContractorConfigs();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to update payment status: '.$e->getMessage()
             );
         }
     }
@@ -1624,8 +1688,8 @@ class Configuration extends Component
             $payrollWorker = \App\Models\PayrollWorker::where('worker_id', $this->deactivatingWorkerId)
                 ->whereHas('payrollSubmission', function ($q) {
                     $q->where('month', now()->month)
-                      ->where('year', now()->year)
-                      ->where('status', '!=', 'paid');
+                        ->where('year', now()->year)
+                        ->where('status', '!=', 'paid');
                 })
                 ->with('payrollSubmission')
                 ->first();
@@ -1634,9 +1698,9 @@ class Configuration extends Component
                 $submission = $payrollWorker->payrollSubmission;
                 $monthYear = \Carbon\Carbon::createFromDate($submission->year, $submission->month, 1)->format('F Y');
                 $this->payrollSubmissionToRemove = [
-                    'id'         => $submission->id,
+                    'id' => $submission->id,
                     'month_year' => $monthYear,
-                    'status'     => $submission->status,
+                    'status' => $submission->status,
                 ];
                 $this->showRemoveFromPayrollModal = true;
             } else {
@@ -1965,11 +2029,11 @@ class Configuration extends Component
                 });
             }
 
-            // Sort: contractors with any setting configured (service charge or penalty exemption)
-            // float to the top, then alphabetically by company name (ascending).
+            // Sort: contractors with any active override (service charge / penalty exemption
+            // or a payment lock) float to the top, then alphabetically by company name.
             $filteredConfigs = $filteredConfigs->sort(function ($a, $b) {
-                $aHasSettings = ($a->service_charge_exempt || $a->penalty_exempt) ? 1 : 0;
-                $bHasSettings = ($b->service_charge_exempt || $b->penalty_exempt) ? 1 : 0;
+                $aHasSettings = ($a->service_charge_exempt || $a->penalty_exempt || ! $a->payment_enabled) ? 1 : 0;
+                $bHasSettings = ($b->service_charge_exempt || $b->penalty_exempt || ! $b->payment_enabled) ? 1 : 0;
 
                 if ($aHasSettings !== $bHasSettings) {
                     return $bHasSettings <=> $aHasSettings; // settings-on first

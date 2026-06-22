@@ -145,56 +145,54 @@
                             </flux:table.cell>
 
                             <flux:table.cell>
-                                <div class="flex justify-center gap-2 flex-wrap">
-                                    <flux:button
-                                        size="sm"
-                                        variant="ghost"
-                                        wire:click="openTemplateModal({{ $template->id }})"
-                                        icon="pencil"
-                                        icon-variant="outline"
-                                    >
-                                        Edit
-                                    </flux:button>
-
-                                    @if($template->type === 'worker')
-                                        <flux:button
-                                            size="sm"
-                                            variant="filled"
-                                            wire:click="openWorkerAssignmentModal({{ $template->id }})"
-                                            icon="users"
-                                            icon-variant="outline"
-                                        >
-                                            Manage Workers
+                                <div class="flex justify-center">
+                                    <flux:dropdown align="end">
+                                        <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal">
                                         </flux:button>
-                                    @else
-                                        <flux:button
-                                            size="sm"
-                                            variant="filled"
-                                            wire:click="openContractorAssignmentModal({{ $template->id }})"
-                                            icon="building-office"
-                                            icon-variant="outline"
-                                        >
-                                            Manage Contractors
-                                        </flux:button>
-                                    @endif
 
-                                    <flux:button
-                                        size="sm"
-                                        variant="ghost"
-                                        wire:click="toggleTemplate({{ $template->id }})"
-                                    >
-                                        {{ $template->is_active ? 'Deactivate' : 'Activate' }}
-                                    </flux:button>
-                                    <flux:button
-                                        size="sm"
-                                        variant="danger"
-                                        wire:click="deleteTemplate({{ $template->id }})"
-                                        wire:confirm="Are you sure you want to delete this template? This will remove it from all contractors using it."
-                                        icon="trash"
-                                        icon-variant="outline"
-                                    >
-                                        Delete
-                                    </flux:button>
+                                        <flux:menu>
+                                            <flux:menu.item
+                                                icon="pencil"
+                                                wire:click="openTemplateModal({{ $template->id }})"
+                                            >
+                                                Edit
+                                            </flux:menu.item>
+
+                                            @if($template->type === 'worker')
+                                                <flux:menu.item
+                                                    icon="users"
+                                                    wire:click="openWorkerAssignmentModal({{ $template->id }})"
+                                                >
+                                                    Manage Workers
+                                                </flux:menu.item>
+                                            @else
+                                                <flux:menu.item
+                                                    icon="building-office"
+                                                    wire:click="openContractorAssignmentModal({{ $template->id }})"
+                                                >
+                                                    Manage Contractors
+                                                </flux:menu.item>
+                                            @endif
+
+                                            <flux:menu.item
+                                                icon="{{ $template->is_active ? 'pause-circle' : 'play-circle' }}"
+                                                wire:click="toggleTemplate({{ $template->id }})"
+                                            >
+                                                {{ $template->is_active ? 'Deactivate' : 'Activate' }}
+                                            </flux:menu.item>
+
+                                            <flux:menu.separator />
+
+                                            <flux:menu.item
+                                                variant="danger"
+                                                icon="trash"
+                                                wire:click="deleteTemplate({{ $template->id }})"
+                                                wire:confirm="Are you sure you want to delete this template? This will remove it from all contractors using it."
+                                            >
+                                                Delete
+                                            </flux:menu.item>
+                                        </flux:menu>
+                                    </flux:dropdown>
                                 </div>
                             </flux:table.cell>
                         </flux:table.row>
@@ -265,6 +263,9 @@
                     <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Penalty</span>
                 </flux:table.column>
                 <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Payments</span>
+                </flux:table.column>
+                <flux:table.column>
                     <span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span>
                 </flux:table.column>
             </flux:table.columns>
@@ -306,23 +307,42 @@
                             </flux:badge>
                         </flux:table.cell>
 
+                        <flux:table.cell variant="strong">
+                            <flux:badge color="{{ $config->payment_enabled ? 'green' : 'red' }}" size="sm" :icon="$config->payment_enabled ? 'lock-open' : 'lock-closed'">
+                                {{ $config->payment_enabled ? 'Enabled' : 'Disabled' }}
+                            </flux:badge>
+                        </flux:table.cell>
+
                         <flux:table.cell>
                             <div class="flex justify-center">
-                                <flux:button
-                                    size="sm"
-                                    variant="filled"
-                                    wire:click="openContractorEditModal('{{ $config->contractor_clab_no }}')"
-                                    icon="pencil"
-                                    icon-variant="outline"
-                                >
-                                    Edit
-                                </flux:button>
+                                <flux:dropdown align="end">
+                                    <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
+
+                                    <flux:menu>
+                                        <flux:menu.item
+                                            icon="pencil"
+                                            wire:click="openContractorEditModal('{{ $config->contractor_clab_no }}')"
+                                        >
+                                            Edit
+                                        </flux:menu.item>
+
+                                        <flux:menu.separator />
+
+                                        <flux:menu.item
+                                            :variant="$config->payment_enabled ? 'danger' : 'default'"
+                                            icon="{{ $config->payment_enabled ? 'lock-closed' : 'lock-open' }}"
+                                            wire:click="openPaymentToggleModal('{{ $config->contractor_clab_no }}')"
+                                        >
+                                            {{ $config->payment_enabled ? 'Disable Pay' : 'Enable Pay' }}
+                                        </flux:menu.item>
+                                    </flux:menu>
+                                </flux:dropdown>
                             </div>
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="6">
+                        <flux:table.cell colspan="7">
                             <div class="py-12 text-center">
                                 <flux:icon.users class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
                                 <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No Contractors Found</p>
@@ -345,7 +365,7 @@
 </flux:card>
 
 <!-- Edit Contractor Configuration Modal -->
-<flux:modal name="edit-contractor-config" wire:model="showEditModal" class="md:w-2xl space-y-6">
+<flux:modal name="edit-contractor-config" class="md:w-2xl space-y-6">
     <div>
         <flux:heading size="lg">Edit Contractor Configuration</flux:heading>
         <flux:subheading>{{ $editingContractorName }} ({{ $editingContractorClab }})</flux:subheading>
@@ -412,6 +432,14 @@
             label="Exempt from Late Payment Penalty"
             description="This contractor will not be charged 8% penalty for overdue payments"
         />
+
+        <!-- Payment Lock -->
+        <flux:separator variant="subtle" />
+        <flux:checkbox
+            wire:model="editPaymentEnabled"
+            label="Allow Payments"
+            description="When unchecked, this contractor is blocked from initiating any payment. Use this to temporarily lock payments while a wrong payroll is being regenerated."
+        />
     </div>
 
     <div class="flex justify-end gap-2">
@@ -420,6 +448,38 @@
             <flux:icon.check class="size-4" />
             Save Changes
         </flux:button>
+    </div>
+</flux:modal>
+
+<!-- Confirm Payment Lock/Unlock Modal -->
+<flux:modal name="confirm-payment-toggle" class="md:w-96">
+    <div class="space-y-6">
+        <div>
+            <flux:heading size="lg">
+                {{ $togglePaymentCurrentlyEnabled ? 'Disable Payments?' : 'Enable Payments?' }}
+            </flux:heading>
+            <flux:subheading>{{ $togglePaymentName }} ({{ $togglePaymentClab }})</flux:subheading>
+        </div>
+
+        <flux:text>
+            @if($togglePaymentCurrentlyEnabled)
+                This will block this contractor from making any payments. They will not be able
+                to pay until you re-enable it — useful while a wrong payroll is being regenerated.
+            @else
+                This will allow this contractor to make payments again.
+            @endif
+        </flux:text>
+
+        <div class="flex justify-end gap-2">
+            <flux:button variant="ghost" wire:click="closePaymentToggleModal">Cancel</flux:button>
+            <flux:button
+                variant="{{ $togglePaymentCurrentlyEnabled ? 'danger' : 'primary' }}"
+                icon="{{ $togglePaymentCurrentlyEnabled ? 'lock-closed' : 'lock-open' }}"
+                wire:click="toggleContractorPayment"
+            >
+                {{ $togglePaymentCurrentlyEnabled ? 'Disable Payments' : 'Enable Payments' }}
+            </flux:button>
+        </div>
     </div>
 </flux:modal>
 

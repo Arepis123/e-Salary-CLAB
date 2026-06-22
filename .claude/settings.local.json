@@ -76,7 +76,11 @@
       "Bash(vendor/bin/pint app/Livewire/Admin/Dashboard.php --test)",
       "PowerShell(php artisan route:list --path=api/payslip 2>&1 | Select-Object -First 20)",
       "PowerShell(php -l app/Console/Commands/AutoSubmitTimesheets.php)",
-      "PowerShell(php -l app/Livewire/Admin/MissingSubmissions.php)"
+      "PowerShell(php -l app/Livewire/Admin/MissingSubmissions.php)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Read(//c/tmp/**)",
+      "Bash(rm -rf cferr)",
+      "Bash(gh repo *)"
     ],
     "deny": [],
     "ask": []
