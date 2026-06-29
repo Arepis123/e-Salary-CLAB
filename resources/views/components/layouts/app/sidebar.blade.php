@@ -62,6 +62,19 @@
                                     ->distinct()
                                     ->count('con_ctr_clab_no');
                             }
+
+                            // Out of Sync drift (timesheets that diverged from live OT data) is
+                            // meaningful at any time a submission exists, so it's counted regardless
+                            // of the 16th. The drift scan is the heaviest query on this page, so the
+                            // sidebar (which renders on every navigation) reads a short-lived cache
+                            // instead of rescanning each time; the page itself always recomputes live.
+                            $missingCount += \Illuminate\Support\Facades\Cache::remember(
+                                'sidebar_out_of_sync_count_'.now()->format('Y_m'),
+                                now()->addSeconds(60),
+                                fn () => app(\App\Services\TimesheetDriftService::class)
+                                    ->getDriftedContractors(now()->month, now()->year)
+                                    ->count()
+                            );
                         @endphp
                         <flux:sidebar.group expandable icon="wallet" heading="Payroll" class="grid">
                             <flux:sidebar.item :href="route('payroll')" :current="request()->routeIs('payroll')" wire:navigate>All submissions</flux:sidebar.item>

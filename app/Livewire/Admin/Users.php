@@ -136,9 +136,59 @@ class Users extends Component
         $this->dispatch('changePasswordUser', $id);
     }
 
+    public function toggleStatus($id)
+    {
+        $user = User::find($id);
+
+        if (! $user) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'User not found.'
+            );
+
+            return;
+        }
+
+        // Prevent disabling self (would lock yourself out)
+        if ($user->id === auth()->id()) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Cannot Disable',
+                text: 'You cannot disable your own account.'
+            );
+
+            return;
+        }
+
+        // Prevent toggling client users from this screen
+        if ($user->role === 'client') {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Unauthorized',
+                text: 'Cannot change status of client users.'
+            );
+
+            return;
+        }
+
+        $user->is_active = ! $user->is_active;
+        $user->save();
+
+        Flux::toast(
+            variant: 'success',
+            heading: $user->is_active ? 'User Enabled' : 'User Disabled',
+            text: $user->is_active
+                ? 'User can now log in to the system.'
+                : 'User has been disabled and can no longer log in.'
+        );
+    }
+
     public function delete($id)
     {
         $this->userIdToDelete = $id;
+        // Clear any previously typed confirmation so the button starts disabled
+        $this->dispatch('reset-delete-confirmation');
         Flux::modal('delete-user')->show();
     }
 

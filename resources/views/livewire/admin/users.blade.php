@@ -107,6 +107,7 @@
                 <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" wire:click="sortByColumn('name')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ __('Name') }}</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'email'" :direction="$sortDirection" wire:click="sortByColumn('email')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ __('Email') }}</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'role'" :direction="$sortDirection" wire:click="sortByColumn('role')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ __('Role') }}</span></flux:table.column>
+                <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ __('Status') }}</span></flux:table.column>
                 <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">{{ __('Actions') }}</span></flux:table.column>
             </flux:table.columns>
 
@@ -139,6 +140,12 @@
                         </flux:table.cell>
 
                         <flux:table.cell>
+                            <flux:badge :color="$user->is_active ? 'green' : 'red'" size="sm" inset="top bottom">
+                                {{ $user->is_active ? __('Active') : __('Disabled') }}
+                            </flux:badge>
+                        </flux:table.cell>
+
+                        <flux:table.cell>
                             <flux:dropdown>
                                 <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" inset="top bottom" />
                                 <flux:menu>
@@ -146,6 +153,11 @@
                                     <flux:menu.item icon="key" wire:click="changePassword({{ $user->id }})">{{ __('Change Password') }}</flux:menu.item>
                                     @if($user->id !== auth()->id())
                                         <flux:menu.separator />
+                                        @if($user->is_active)
+                                            <flux:menu.item icon="no-symbol" variant="danger" wire:click="toggleStatus({{ $user->id }})">{{ __('Disable User') }}</flux:menu.item>
+                                        @else
+                                            <flux:menu.item icon="check-circle" wire:click="toggleStatus({{ $user->id }})">{{ __('Enable User') }}</flux:menu.item>
+                                        @endif
                                         <flux:menu.item icon="trash" variant="danger" wire:click="delete({{ $user->id }})">{{ __('Delete') }}</flux:menu.item>
                                     @endif
                                 </flux:menu>
@@ -154,7 +166,7 @@
                     </flux:table.rows>
                 @empty
                     <flux:table.rows>
-                        <flux:table.cell variant="strong" colspan="6" class="text-center">
+                        <flux:table.cell variant="strong" colspan="7" class="text-center">
                             {{ __('No users found.') }}
                         </flux:table.cell>
                     </flux:table.rows>
@@ -173,7 +185,12 @@
 <livewire:admin.user-change-password/>
 
 {{-- Delete Confirmation Modal --}}
-<flux:modal name="delete-user" class="min-w-[22rem]">
+<flux:modal
+    name="delete-user"
+    class="min-w-[22rem]"
+    x-data="{ confirmText: '' }"
+    x-on:reset-delete-confirmation.window="confirmText = ''"
+>
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg">{{ __('Delete user?') }}</flux:heading>
@@ -182,12 +199,31 @@
                     <p>{{ __('This action cannot be reversed.') }}</p>
                 </flux:text>
             </div>
+
+            <div>
+                <flux:text class="mb-2">
+                    {{ __('To confirm, type') }} <strong class="text-zinc-900 dark:text-zinc-100">Delete</strong> {{ __('in the box below.') }}
+                </flux:text>
+                <flux:input
+                    x-model="confirmText"
+                    type="text"
+                    placeholder="{{ __('Delete') }}"
+                    autocomplete="off"
+                    x-on:keydown.enter.prevent="confirmText === 'Delete' && $wire.destroy()"
+                />
+            </div>
+
             <div class="flex gap-2">
                 <flux:spacer />
                 <flux:modal.close>
                     <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
                 </flux:modal.close>
-                <flux:button type="submit" variant="danger" wire:click="destroy()">{{ __('Delete user') }}</flux:button>
+                <flux:button
+                    type="submit"
+                    variant="danger"
+                    wire:click="destroy()"
+                    x-bind:disabled="confirmText !== 'Delete'"
+                >{{ __('Delete user') }}</flux:button>
             </div>
         </div>
     </flux:modal>

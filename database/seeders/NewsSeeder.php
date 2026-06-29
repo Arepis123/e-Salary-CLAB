@@ -16,7 +16,6 @@ class NewsSeeder extends Seeder
             'title' => 'Welcome to e-Salary CLAB!',
             'description' => 'Thank you for using our payroll management system. We\'re here to help you manage your worker salaries efficiently and accurately.',
             'type' => 'welcome',
-            'icon' => 'hand-raised',
             'gradient_from' => 'blue-500',
             'gradient_to' => 'purple-600',
             'order' => 1,

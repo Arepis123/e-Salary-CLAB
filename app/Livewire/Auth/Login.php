@@ -47,6 +47,17 @@ class Login extends Component
             ]);
         }
 
+        // Block disabled accounts from accessing the system
+        if (! Auth::user()->isActive()) {
+            Auth::logout();
+
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'username' => __('Your account has been disabled. Please contact the administrator.'),
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
         Session::regenerate();
 

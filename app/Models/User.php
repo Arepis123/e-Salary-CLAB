@@ -36,6 +36,7 @@ class User extends Authenticatable
         'person_in_charge',
         'password',
         'role',
+        'is_active',
         'email_verified_at',
         'tutorial_completed',
     ];
@@ -60,6 +61,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
             'tutorial_completed' => 'array',
         ];
     }
@@ -134,6 +136,14 @@ class User extends Authenticatable
     public function isClient(): bool
     {
         return $this->role === 'client';
+    }
+
+    /**
+     * Check if the user account is active (allowed to log in)
+     */
+    public function isActive(): bool
+    {
+        return (bool) $this->is_active;
     }
 
     /**
