@@ -42,10 +42,14 @@ class TopOverdueChart extends Component
                     $q2->whereNotIn('status', ['paid', 'draft'])
                         ->whereDate('payment_deadline', '<', now()->startOfDay());
                 })
-                    // Or paid, but settled after the deadline (late payment)
+                    // Or paid, but settled after the deadline (late payment).
+                    // The deadline is end-of-day (see PayrollSubmission::isOverdue),
+                    // so paying any time on the deadline day itself is still on time.
+                    // Compare by calendar day: late only if paid on a LATER day.
                     ->orWhere(function ($q2) {
                         $q2->where('status', 'paid')
-                            ->whereColumn('paid_at', '>', 'payment_deadline');
+                            ->whereNotNull('paid_at')
+                            ->whereRaw('DATE(paid_at) > DATE(payment_deadline)');
                     });
             })
             ->get();
