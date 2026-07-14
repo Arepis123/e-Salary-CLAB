@@ -64,16 +64,34 @@ class SubmissionStatusChart extends Component
         $this->loadContractorStatusChartData();
     }
 
+    /**
+     * Contractors expected to have a payroll for the given period.
+     *
+     * A contractor is only "expected" if it had at least one worker whose
+     * contract overlaps the selected month (con_start <= period end AND
+     * con_end >= period start). Using the current `active()` scope instead
+     * would wrongly count companies that registered/started after a past
+     * period as "Not Submitted" for payrolls that never should have existed.
+     */
+    protected function expectedClabNosForPeriod(int $month, int $year): array
+    {
+        $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
+        $periodEnd = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+
+        return ContractWorker::where('con_end', '>=', $periodStart)
+            ->where('con_start', '<=', $periodEnd)
+            ->distinct('con_ctr_clab_no')
+            ->pluck('con_ctr_clab_no')
+            ->toArray();
+    }
+
     protected function loadContractorStatusChartData(): void
     {
         $month = $this->selectedMonth;
         $year = $this->selectedYear;
 
-        // Get contractors that have at least one active worker
-        $activeClabNos = ContractWorker::active()
-            ->distinct('con_ctr_clab_no')
-            ->pluck('con_ctr_clab_no')
-            ->toArray();
+        // Contractors that had a worker under contract during this period.
+        $activeClabNos = $this->expectedClabNosForPeriod($month, $year);
 
         $allContractors = User::where('role', 'client')
             ->whereIn('contractor_clab_no', $activeClabNos)
@@ -165,10 +183,7 @@ class SubmissionStatusChart extends Component
                 ->unique()
                 ->toArray();
 
-            $activeClabNos = ContractWorker::active()
-                ->distinct('con_ctr_clab_no')
-                ->pluck('con_ctr_clab_no')
-                ->toArray();
+            $activeClabNos = $this->expectedClabNosForPeriod($month, $year);
 
             $notSubmitted = User::where('role', 'client')
                 ->whereIn('contractor_clab_no', $activeClabNos)
