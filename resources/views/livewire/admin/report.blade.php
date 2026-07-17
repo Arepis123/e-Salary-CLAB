@@ -698,19 +698,19 @@
                             </div>
                             <div class="flex flex-wrap gap-3 text-sm">
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">Workers:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">Workers:</span>
                                     <span class="font-semibold">{{ $contractor['total_workers'] }}</span>
                                 </span>
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">Total Paid:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">Total Paid:</span>
                                     <span class="font-semibold text-green-600 dark:text-green-400">RM {{ number_format($contractor['total_paid'], 2) }}</span>
                                 </span>
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">OR No:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">OR No:</span>
                                     <span class="font-semibold">{{ $contractor['tax_invoice_number'] ?? '-' }}</span>
                                 </span>
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">Paid:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">Paid:</span>
                                     <span class="font-semibold">{{ $contractor['paid_at'] ? \Carbon\Carbon::parse($contractor['paid_at'])->format('d M Y') : '-' }}</span>
                                 </span>
                             </div>
@@ -817,11 +817,11 @@
                             </div>
                             <div class="flex flex-wrap gap-3 text-sm">
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">Workers:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">Workers:</span>
                                     <span class="font-semibold">{{ $contractor['total_workers'] }}</span>
                                 </span>
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">Total Due:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">Total Due:</span>
                                     <span class="font-semibold text-orange-600 dark:text-orange-400">RM {{ number_format($contractor['total_due'], 2) }}</span>
                                 </span>
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
@@ -831,7 +831,7 @@
                                 </span>
                                 @if($contractor['payment_deadline'])
                                 <span class="bg-white dark:bg-zinc-800 px-2 py-1 rounded">
-                                    <span class="text-zinc-500">Deadline:</span>
+                                    <span class="text-zinc-500 dark:text-zinc-400">Deadline:</span>
                                     <span class="font-semibold {{ \Carbon\Carbon::parse($contractor['payment_deadline'])->isPast() ? 'text-red-600' : '' }}">
                                         {{ \Carbon\Carbon::parse($contractor['payment_deadline'])->format('d M Y') }}
                                     </span>
