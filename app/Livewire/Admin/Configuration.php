@@ -75,6 +75,8 @@ class Configuration extends Component
 
     public $windowContractorFilter = '';
 
+    public $windowStatusFilter = ''; // '', 'open', or 'closed'
+
     // Contractor configuration properties
     public $contractorConfigs = [];
 
@@ -540,10 +542,16 @@ class Configuration extends Component
         $this->resetPage('windowsPage');
     }
 
+    public function updatedWindowStatusFilter()
+    {
+        $this->resetPage('windowsPage');
+    }
+
     public function clearWindowFilters()
     {
         $this->windowSearch = '';
         $this->windowContractorFilter = '';
+        $this->windowStatusFilter = '';
         $this->resetPage('windowsPage');
     }
 
@@ -1988,6 +1996,11 @@ class Configuration extends Component
                     return str_contains(mb_strtolower((string) $c['contractor_name']), $term)
                         || str_contains(mb_strtolower((string) $c['contractor_clab_no']), $term);
                 });
+            }
+
+            if ($this->windowStatusFilter !== '') {
+                $wantOpen = $this->windowStatusFilter === 'open';
+                $filteredWindows = $filteredWindows->filter(fn ($c) => (bool) $c['is_window_open'] === $wantOpen);
             }
 
             // Sort: contractors with an open window float to the top, then by name (ascending).

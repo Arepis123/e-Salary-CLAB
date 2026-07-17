@@ -86,7 +86,8 @@
       "PowerShell(php artisan tinker --execute=\"$u = new App\\\\Models\\\\User\\(['username'=>'jdoe','name'=>'John Doe','email'=>'jdoe@example.com','role'=>'admin']\\); $html = \\(new App\\\\Mail\\\\WelcomeNewUser\\($u, 'Secret123'\\)\\)->render\\(\\); echo str_contains\\($html, 'Secret123'\\) && str_contains\\($html, 'jdoe'\\) ? 'RENDER OK' : 'RENDER MISSING DATA';\")",
       "PowerShell(php artisan tinker \"C:\\\\Users\\\\HAFIZ\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--xampp-htdocs-e-payroll\\\\ce442179-82ee-475b-89b3-3ca44176369c\\\\scratchpad\\\\render_test.php\")",
       "PowerShell(php artisan view:clear; php artisan view:cache 2>&1 | Select-Object -Last 5)",
-      "PowerShell(php artisan view:clear 2>&1 | Select-Object -Last 2)"
+      "PowerShell(php artisan view:clear 2>&1 | Select-Object -Last 2)",
+      "PowerShell(php artisan view:cache)"
     ],
     "deny": [],
     "ask": []

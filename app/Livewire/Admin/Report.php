@@ -804,7 +804,9 @@ class Report extends Component
             if (! isset($workerPeriodCounts[$clabNo])) {
                 $workerPeriodCounts[$clabNo] = $workerDeductionService->getWorkersPayrollPeriodCounts(
                     $contractorWorkerIds,
-                    $clabNo
+                    $clabNo,
+                    $selectedMonth,
+                    $selectedYear
                 );
             }
 
@@ -1014,7 +1016,9 @@ class Report extends Component
             if (! isset($workerPeriodCounts[$clabNo])) {
                 $workerPeriodCounts[$clabNo] = $workerDeductionService->getWorkersPayrollPeriodCounts(
                     $contractorWorkerIds,
-                    $clabNo
+                    $clabNo,
+                    $selectedMonth,
+                    $selectedYear
                 );
             }
 

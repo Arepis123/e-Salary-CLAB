@@ -44,7 +44,7 @@
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-4">
             <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Manage Worker Status</h3>
-        </div>
+        </div>asdfsd
 
         <div class="grid gap-4 md:grid-cols-4 mb-4">
             <div>

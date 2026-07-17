@@ -63,7 +63,7 @@
     </div>
 
     <!-- Filters -->
-    <div class="grid gap-4 md:grid-cols-3 mb-4">
+    <div class="grid gap-4 md:grid-cols-4 mb-4">
         <div>
             <flux:input
                 wire:model.live.debounce.300ms="windowSearch"
@@ -80,6 +80,13 @@
                         {{ $contractor['name'] }}
                     </flux:select.option>
                 @endforeach
+            </flux:select>
+        </div>
+        <div>
+            <flux:select wire:model.live="windowStatusFilter" variant="listbox" placeholder="Filter by Window Status" size="sm">
+                <flux:select.option value="">All Statuses</flux:select.option>
+                <flux:select.option value="open">Open</flux:select.option>
+                <flux:select.option value="closed">Closed</flux:select.option>
             </flux:select>
         </div>
         <div>
@@ -190,7 +197,7 @@
                                 <flux:icon.building-office class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
                                 <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No Contractors Found</p>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                                    @if($windowSearch !== '' || $windowContractorFilter !== '')
+                                    @if($windowSearch !== '' || $windowContractorFilter !== '' || $windowStatusFilter !== '')
                                         No contractors match your filters.
                                     @else
                                         No client users with contractor CLAB numbers found in system.

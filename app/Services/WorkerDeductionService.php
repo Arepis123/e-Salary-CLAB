@@ -28,16 +28,32 @@ class WorkerDeductionService
     /**
      * Calculate payroll period counts for multiple workers
      * Returns array: ['worker_id' => period_count]
+     *
+     * When $upToMonth/$upToYear are provided, only submissions up to and
+     * including that period are counted. This makes reports reflect the
+     * worker's period number AS OF the selected month rather than the
+     * all-time (current) count.
      */
-    public function getWorkersPayrollPeriodCounts(array $workerIds, string $clabNo): array
+    public function getWorkersPayrollPeriodCounts(array $workerIds, string $clabNo, ?int $upToMonth = null, ?int $upToYear = null): array
     {
         $counts = [];
 
         // Optimize with single query
         $results = PayrollWorker::select('worker_id', DB::raw('COUNT(*) as period_count'))
-            ->whereHas('payrollSubmission', function ($query) use ($clabNo) {
+            ->whereHas('payrollSubmission', function ($query) use ($clabNo, $upToMonth, $upToYear) {
                 $query->where('contractor_clab_no', $clabNo)
                     ->whereIn('status', ['submitted', 'approved', 'paid']);
+
+                // Bound the count to the selected period (inclusive) when given
+                if ($upToMonth !== null && $upToYear !== null) {
+                    $query->where(function ($q) use ($upToMonth, $upToYear) {
+                        $q->where('year', '<', $upToYear)
+                            ->orWhere(function ($q2) use ($upToMonth, $upToYear) {
+                                $q2->where('year', $upToYear)
+                                    ->where('month', '<=', $upToMonth);
+                            });
+                    });
+                }
             })
             ->whereIn('worker_id', $workerIds)
             ->groupBy('worker_id')
