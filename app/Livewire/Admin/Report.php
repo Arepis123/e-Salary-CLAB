@@ -56,6 +56,12 @@ class Report extends Component
 
     public $unpaidPayrollData = [];
 
+    public $phoneDeductionData = [];
+
+    // Phone Deduction report: when true, show the full history across all
+    // periods instead of a single selected month.
+    public $phoneAllPeriods = false;
+
     public function updatedSelectAll($value)
     {
         if ($value) {
@@ -75,6 +81,14 @@ class Report extends Component
         // Reset report when report type changes
         $this->reportGenerated = false;
         $this->initializeEmptyData();
+
+        // The "All Periods" option only exists for the phone deduction report.
+        // Leaving it selected for another report would give an invalid period,
+        // so fall back to the last real month.
+        if ($this->reportType !== 'phone_deduction' && $this->period === 'all') {
+            $this->phoneAllPeriods = false;
+            $this->period = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth)->format('Y-m');
+        }
     }
 
     public function mount()
@@ -113,6 +127,7 @@ class Report extends Component
         $this->otTransactionData = [];
         $this->paidPayrollData = [];
         $this->unpaidPayrollData = [];
+        $this->phoneDeductionData = [];
     }
 
     protected function generateAvailableMonths()
@@ -147,6 +162,19 @@ class Report extends Component
 
     public function filterByMonthYear($monthYear)
     {
+        // "All Periods" (phone deduction report only): show the full history.
+        if ($monthYear === 'all') {
+            $this->phoneAllPeriods = true;
+
+            if ($this->reportGenerated && $this->reportType === 'phone_deduction') {
+                $this->loadPhoneDeductionData();
+            }
+
+            return;
+        }
+
+        $this->phoneAllPeriods = false;
+
         [$year, $month] = explode('-', $monthYear);
         $this->selectedYear = (int) $year;
         $this->selectedMonth = (int) $month;
@@ -154,6 +182,10 @@ class Report extends Component
         if ($this->reportGenerated) {
             $this->loadClientPayments();
             $this->loadTopWorkers();
+
+            if ($this->reportType === 'phone_deduction') {
+                $this->loadPhoneDeductionData();
+            }
         }
     }
 
@@ -442,6 +474,9 @@ class Report extends Component
                 break;
             case 'unpaid_payroll':
                 $this->loadUnpaidPayrollData();
+                break;
+            case 'phone_deduction':
+                $this->loadPhoneDeductionData();
                 break;
             default: // All Reports
                 $this->loadStats();
@@ -934,6 +969,225 @@ class Report extends Component
         });
 
         $this->timesheetData = $timesheetData;
+    }
+
+    /**
+     * Phone Topup deduction report for workers under contractors that have the
+     * (contractor-level) phone deduction enabled.
+     *
+     * Two modes:
+     *  - Single month (default): a roster of every eligible worker with their
+     *    payroll period for the selected month and whether it is charged that
+     *    month (period matches a target period).
+     *  - All periods ($phoneAllPeriods): the full history — one row per month
+     *    where the deduction was actually charged across the worker's payroll
+     *    record.
+     */
+    protected function loadPhoneDeductionData()
+    {
+        $selectedMonth = $this->selectedMonth ?? now()->month;
+        $selectedYear = $this->selectedYear ?? now()->year;
+        $allPeriods = $this->phoneAllPeriods;
+
+        // Active phone deduction template(s) — the contractor-level "Phone Topup"
+        $phoneTemplates = \App\Models\DeductionTemplate::active()
+            ->where('name', 'like', '%phone%')
+            ->get();
+
+        if ($phoneTemplates->isEmpty()) {
+            $this->phoneDeductionData = [];
+
+            return;
+        }
+
+        // Active contract workers (optionally client-filtered)
+        $clabs = $this->filteredClabNos();
+        $allContractWorkers = \App\Models\ContractWorker::active()
+            ->when($clabs, fn ($q) => $q->whereIn('con_ctr_clab_no', $clabs))
+            ->with(['worker', 'contractor'])
+            ->orderBy('con_ctr_clab_no')
+            ->get();
+
+        if ($allContractWorkers->isEmpty()) {
+            $this->phoneDeductionData = [];
+
+            return;
+        }
+
+        $allClabNos = $allContractWorkers->pluck('con_ctr_clab_no')->unique()->toArray();
+
+        // Inactive workers (per contractor) are excluded
+        $inactiveByContractor = $this->inactiveWorkerIdsByContractor($allClabNos);
+
+        // Contractor info (name) keyed by CLAB
+        $contractors = \App\Models\User::whereIn('contractor_clab_no', $allClabNos)
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        // Contractor-level deduction assignments (which contractors enabled the phone template)
+        $contractorConfigs = \App\Models\ContractorConfiguration::whereIn('contractor_clab_no', $allClabNos)
+            ->with('deductions')
+            ->get()
+            ->keyBy('contractor_clab_no');
+
+        $workerDeductionService = app(\App\Services\WorkerDeductionService::class);
+
+        $rows = [];
+        $workersByContractor = $allContractWorkers->groupBy('con_ctr_clab_no');
+
+        foreach ($workersByContractor as $clabNo => $contractWorkers) {
+            $contractorConfig = $contractorConfigs[$clabNo] ?? null;
+            $contractorDeductionIds = $contractorConfig
+                ? $contractorConfig->deductions->pluck('id')->toArray()
+                : [];
+
+            // Phone templates this contractor actually has enabled
+            $enabledPhoneTemplates = $phoneTemplates->whereIn('id', $contractorDeductionIds);
+            if ($enabledPhoneTemplates->isEmpty()) {
+                continue; // contractor has no phone deduction
+            }
+
+            $contractor = $contractors[$clabNo] ?? null;
+            $contractorWorkerIds = $contractWorkers->pluck('con_wkr_id')->toArray();
+
+            // Period data for this contractor's workers:
+            //  - all periods: the full ordered payroll-month history per worker
+            //  - single month: the period number for the selected month
+            $monthsByWorker = $allPeriods
+                ? $workerDeductionService->getWorkerPayrollMonths($contractorWorkerIds, $clabNo)
+                : [];
+            $periods = $allPeriods
+                ? []
+                : $workerDeductionService->getPeriodNumbersForMonth($contractorWorkerIds, $clabNo, $selectedYear, $selectedMonth);
+
+            foreach ($contractWorkers as $contractWorker) {
+                $worker = $contractWorker->worker;
+                if (! $worker) {
+                    continue;
+                }
+
+                $workerId = $worker->wkr_id;
+
+                if (in_array($workerId, $inactiveByContractor[$clabNo] ?? [])) {
+                    continue;
+                }
+
+                foreach ($enabledPhoneTemplates as $template) {
+                    $baseRow = [
+                        'worker_id' => $workerId,
+                        'worker_name' => $worker->wkr_name,
+                        'passport' => $worker->wkr_passno ?? '',
+                        'contractor_name' => $contractor->name ?? 'Unknown',
+                        'contractor_clab_no' => $clabNo,
+                        'deduction_name' => $template->name,
+                        'amount' => (float) $template->amount,
+                        'target_periods' => $template->apply_periods ?? [],
+                    ];
+
+                    if ($allPeriods) {
+                        // One row per month where this deduction was actually charged.
+                        foreach (($monthsByWorker[$workerId] ?? []) as $index => $ym) {
+                            $period = $index + 1;
+                            $monthOk = empty($template->apply_months) || $template->shouldApplyInMonth($ym['month']);
+
+                            if ($monthOk && $template->shouldApplyInPeriod($period)) {
+                                $rows[] = $baseRow + [
+                                    'period' => $period,
+                                    'period_year' => $ym['year'],
+                                    'period_month' => $ym['month'],
+                                    'charged' => true,
+                                ];
+                            }
+                        }
+                    } else {
+                        $currentPeriod = $periods[$workerId] ?? 1;
+                        $monthOk = empty($template->apply_months) || $template->shouldApplyInMonth($selectedMonth);
+                        $charged = $monthOk && $template->shouldApplyInPeriod($currentPeriod);
+
+                        $rows[] = $baseRow + [
+                            'period' => $currentPeriod,
+                            'period_year' => $selectedYear,
+                            'period_month' => $selectedMonth,
+                            'charged' => $charged,
+                        ];
+                    }
+                }
+            }
+        }
+
+        // Sort: charged first (single-month view), then contractor, worker, month
+        usort($rows, function ($a, $b) {
+            if ($a['charged'] !== $b['charged']) {
+                return ($b['charged'] ? 1 : 0) <=> ($a['charged'] ? 1 : 0);
+            }
+            $contractorCompare = strcmp($a['contractor_name'], $b['contractor_name']);
+            if ($contractorCompare !== 0) {
+                return $contractorCompare;
+            }
+            $nameCompare = strcmp($a['worker_name'], $b['worker_name']);
+            if ($nameCompare !== 0) {
+                return $nameCompare;
+            }
+
+            return ($a['period_year'] * 100 + $a['period_month']) <=> ($b['period_year'] * 100 + $b['period_month']);
+        });
+
+        $this->phoneDeductionData = $rows;
+    }
+
+    public function exportPhoneDeductionReport()
+    {
+        if (empty($this->phoneDeductionData)) {
+            Flux::toast(variant: 'error', text: 'No data to export. Please generate the Phone Deduction Report first.');
+
+            return;
+        }
+
+        $filename = 'phone_deduction_'.\Carbon\Carbon::create($this->selectedYear, $this->selectedMonth)->format('Y_m').'.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ];
+
+        $callback = function () {
+            $file = fopen('php://output', 'w');
+
+            // BOM for Excel UTF-8 support
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($file, [
+                'Worker ID',
+                'Name',
+                'Passport',
+                'Contractor',
+                'Month',
+                'Deduction',
+                'Amount (RM)',
+                'Payroll Period',
+                'Target Periods',
+                'Charged',
+            ]);
+
+            foreach ($this->phoneDeductionData as $row) {
+                fputcsv($file, [
+                    $row['worker_id'],
+                    $row['worker_name'],
+                    $row['passport'],
+                    $row['contractor_name'],
+                    \Carbon\Carbon::create($row['period_year'], $row['period_month'])->format('M Y'),
+                    $row['deduction_name'],
+                    number_format($row['amount'], 2, '.', ''),
+                    $row['period'],
+                    implode(', ', $row['target_periods']),
+                    $row['charged'] ? 'Yes' : 'No',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     public function exportTimesheetReport()

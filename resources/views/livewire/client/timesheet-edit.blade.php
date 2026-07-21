@@ -98,7 +98,7 @@
                             <td class="py-3 text-center">
                                 <div class="flex items-center justify-center gap-1">
                                     <span class="text-sm {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                        {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? number_format($worker['ot_normal_hours'], 1) . ' hrs' : '-' }}
+                                        {{ ($worker['ot_normal_hours'] ?? 0) > 0 ? number_format($worker['ot_normal_hours'], 2) . ' hrs' : '-' }}
                                     </span>
                                     @if($worker['ot_from_monthly_entry'] ?? false)
                                         <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry" />
@@ -110,7 +110,7 @@
                             <td class="py-3 text-center">
                                 <div class="flex items-center justify-center gap-1">
                                     <span class="text-sm {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                        {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? number_format($worker['ot_rest_hours'], 1) . ' hrs' : '-' }}
+                                        {{ ($worker['ot_rest_hours'] ?? 0) > 0 ? number_format($worker['ot_rest_hours'], 2) . ' hrs' : '-' }}
                                     </span>
                                     @if($worker['ot_from_monthly_entry'] ?? false)
                                         <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry" />
@@ -122,7 +122,7 @@
                             <td class="py-3 text-center">
                                 <div class="flex items-center justify-center gap-1">
                                     <span class="text-sm {{ ($worker['ot_public_hours'] ?? 0) > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-600' }}">
-                                        {{ ($worker['ot_public_hours'] ?? 0) > 0 ? number_format($worker['ot_public_hours'], 1) . ' hrs' : '-' }}
+                                        {{ ($worker['ot_public_hours'] ?? 0) > 0 ? number_format($worker['ot_public_hours'], 2) . ' hrs' : '-' }}
                                     </span>
                                     @if($worker['ot_from_monthly_entry'] ?? false)
                                         <flux:icon.lock-closed class="size-3 text-blue-600 dark:text-blue-400" title="Locked from OT Entry" />

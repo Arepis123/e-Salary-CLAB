@@ -150,21 +150,21 @@
                                     </td>
                                     <td class="py-3 text-center text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                         @if(($worker->ot_normal_hours ?? 0) > 0)
-                                            {{ number_format($worker->ot_normal_hours, 1) }}h
+                                            {{ number_format($worker->ot_normal_hours, 2) }}h
                                         @else
                                             <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                         @endif
                                     </td>
                                     <td class="py-3 text-center text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                         @if(($worker->ot_rest_hours ?? 0) > 0)
-                                            {{ number_format($worker->ot_rest_hours, 1) }}h
+                                            {{ number_format($worker->ot_rest_hours, 2) }}h
                                         @else
                                             <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                         @endif
                                     </td>
                                     <td class="py-3 text-center text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                         @if(($worker->ot_public_hours ?? 0) > 0)
-                                            {{ number_format($worker->ot_public_hours, 1) }}h
+                                            {{ number_format($worker->ot_public_hours, 2) }}h
                                         @else
                                             <span class="text-zinc-400 dark:text-zinc-500">-</span>
                                         @endif

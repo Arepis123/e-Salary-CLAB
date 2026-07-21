@@ -95,6 +95,39 @@ class WorkerDeductionService
     }
 
     /**
+     * Ordered list of committed payroll months per worker under a contractor.
+     * Returns ['worker_id' => [ ['year' => int, 'month' => int], ... ]] in
+     * chronological order. The 0-based array index + 1 equals that month's
+     * payroll period number, consistent with getPeriodNumberForMonth().
+     */
+    public function getWorkerPayrollMonths(array $workerIds, string $clabNo): array
+    {
+        $map = [];
+
+        if (empty($workerIds)) {
+            return $map;
+        }
+
+        $rows = DB::table('payroll_workers')
+            ->join('payroll_submissions', 'payroll_submissions.id', '=', 'payroll_workers.payroll_submission_id')
+            ->where('payroll_submissions.contractor_clab_no', $clabNo)
+            ->whereIn('payroll_submissions.status', self::PERIOD_STATUSES)
+            ->whereIn('payroll_workers.worker_id', $workerIds)
+            ->select('payroll_workers.worker_id', 'payroll_submissions.year', 'payroll_submissions.month')
+            ->distinct()
+            ->orderBy('payroll_workers.worker_id')
+            ->orderBy('payroll_submissions.year')
+            ->orderBy('payroll_submissions.month')
+            ->get();
+
+        foreach ($rows as $r) {
+            $map[$r->worker_id][] = ['year' => (int) $r->year, 'month' => (int) $r->month];
+        }
+
+        return $map;
+    }
+
+    /**
      * Calculate current payroll period count for a worker under a contractor
      * Counts submitted/approved/paid payroll submissions where worker appeared
      */

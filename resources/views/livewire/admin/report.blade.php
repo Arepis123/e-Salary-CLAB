@@ -37,6 +37,7 @@
                         <flux:select.option value="client">Client Summary</flux:select.option>
                         {{-- <flux:select.option value="ot_transaction">OT & Transaction</flux:select.option> --}}
                         <flux:select.option value="timesheet">Timesheet Report</flux:select.option>
+                        <flux:select.option value="phone_deduction">Phone Deduction Report</flux:select.option>
                         <flux:select.option value="tax">Official Receipt Report</flux:select.option>
                         <flux:select.option value="paid_payroll">Paid Payroll Report</flux:select.option>
                         <flux:select.option value="unpaid_payroll">Unpaid Payroll Report</flux:select.option>
@@ -46,6 +47,9 @@
                 <flux:field>
                     <flux:label>Period</flux:label>
                     <flux:select wire:model.live="period" variant="listbox" wire:change="filterByMonthYear($event.target.value)" placeholder="Select period">
+                        @if($reportType === 'phone_deduction')
+                            <flux:select.option value="all">All Periods (full history)</flux:select.option>
+                        @endif
                         @foreach($availableMonths as $month)
                             <flux:select.option value="{{ $month['value'] }}">{{ $month['label'] }}</flux:select.option>
                         @endforeach
@@ -386,21 +390,21 @@
                                         <td class="py-3 text-sm text-zinc-600 dark:text-zinc-400">{{ $entry['entry_period'] }}</td>
                                         <td class="py-3 text-sm text-blue-600 dark:text-blue-400">
                                             @if($entry['ot_normal'] > 0)
-                                                {{ number_format($entry['ot_normal'], 1) }}h
+                                                {{ number_format($entry['ot_normal'], 2) }}h
                                             @else
                                                 -
                                             @endif
                                         </td>
                                         <td class="py-3 text-sm text-purple-600 dark:text-purple-400">
                                             @if($entry['ot_rest'] > 0)
-                                                {{ number_format($entry['ot_rest'], 1) }}h
+                                                {{ number_format($entry['ot_rest'], 2) }}h
                                             @else
                                                 -
                                             @endif
                                         </td>
                                         <td class="py-3 text-sm text-orange-600 dark:text-orange-400">
                                             @if($entry['ot_public'] > 0)
-                                                {{ number_format($entry['ot_public'], 1) }}h
+                                                {{ number_format($entry['ot_public'], 2) }}h
                                             @else
                                                 -
                                             @endif
@@ -470,9 +474,9 @@
                             Total: {{ count($otTransactionData) }} {{ Str::plural('entry', count($otTransactionData)) }}
                         </div>
                         <div class="flex flex-wrap gap-4">
-                            <span>Total Normal OT: {{ number_format(collect($otTransactionData)->sum('ot_normal'), 1) }}h</span>
-                            <span>Total Rest OT: {{ number_format(collect($otTransactionData)->sum('ot_rest'), 1) }}h</span>
-                            <span>Total Public OT: {{ number_format(collect($otTransactionData)->sum('ot_public'), 1) }}h</span>
+                            <span>Total Normal OT: {{ number_format(collect($otTransactionData)->sum('ot_normal'), 2) }}h</span>
+                            <span>Total Rest OT: {{ number_format(collect($otTransactionData)->sum('ot_rest'), 2) }}h</span>
+                            <span>Total Public OT: {{ number_format(collect($otTransactionData)->sum('ot_public'), 2) }}h</span>
                             <span class="text-green-600 dark:text-green-400">Allowances: RM {{ number_format(collect($otTransactionData)->sum('allowance'), 2) }}</span>
                             <span class="text-green-600 dark:text-green-400">Backpay: RM {{ number_format(collect($otTransactionData)->sum('backpay'), 2) }}</span>
                             <span class="text-amber-600 dark:text-amber-400">Advances: RM {{ number_format(collect($otTransactionData)->sum('advance_salary'), 2) }}</span>
@@ -586,10 +590,10 @@
                                             @endif
                                         </td>
                                         {{-- Overtime (hrs) --}}
-                                        <td class="{{ $cellBorder }} {{ $num }} text-blue-600 dark:text-blue-400">@if($entry['ot_normal'] > 0){{ number_format($entry['ot_normal'], 1) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
-                                        <td class="{{ $num }} text-purple-600 dark:text-purple-400">@if($entry['ot_rest'] > 0){{ number_format($entry['ot_rest'], 1) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
-                                        <td class="{{ $num }} text-orange-600 dark:text-orange-400">@if($entry['ot_public'] > 0){{ number_format($entry['ot_public'], 1) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
-                                        <td class="{{ $num }} font-medium text-zinc-900 dark:text-zinc-100">@if($entry['ot_total'] > 0){{ number_format($entry['ot_total'], 1) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="{{ $cellBorder }} {{ $num }} text-blue-600 dark:text-blue-400">@if($entry['ot_normal'] > 0){{ number_format($entry['ot_normal'], 2) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="{{ $num }} text-purple-600 dark:text-purple-400">@if($entry['ot_rest'] > 0){{ number_format($entry['ot_rest'], 2) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="{{ $num }} text-orange-600 dark:text-orange-400">@if($entry['ot_public'] > 0){{ number_format($entry['ot_public'], 2) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="{{ $num }} font-medium text-zinc-900 dark:text-zinc-100">@if($entry['ot_total'] > 0){{ number_format($entry['ot_total'], 2) }}<span class="text-xs text-zinc-400">h</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         {{-- Transactions (RM) --}}
                                         <td class="{{ $cellBorder }} {{ $num }} text-emerald-600 dark:text-emerald-400">@if($entry['allowance'] > 0){{ number_format($entry['allowance'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-emerald-600 dark:text-emerald-400">@if($entry['backpay'] > 0){{ number_format($entry['backpay'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
@@ -618,10 +622,10 @@
                                     <td class="sticky left-0 z-10 border-r border-zinc-200 bg-zinc-100 px-4 py-3 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">TOTAL</td>
                                     <td class="px-4 py-3"></td>
                                     <td class="px-4 py-3"></td>
-                                    <td class="{{ $groupBorder }} {{ $num }} text-blue-600 dark:text-blue-400">{{ number_format($sum('ot_normal'), 1) }}<span class="text-xs text-zinc-400">h</span></td>
-                                    <td class="{{ $num }} text-purple-600 dark:text-purple-400">{{ number_format($sum('ot_rest'), 1) }}<span class="text-xs text-zinc-400">h</span></td>
-                                    <td class="{{ $num }} text-orange-600 dark:text-orange-400">{{ number_format($sum('ot_public'), 1) }}<span class="text-xs text-zinc-400">h</span></td>
-                                    <td class="{{ $num }} text-zinc-900 dark:text-zinc-100">{{ number_format($sum('ot_total'), 1) }}<span class="text-xs text-zinc-400">h</span></td>
+                                    <td class="{{ $groupBorder }} {{ $num }} text-blue-600 dark:text-blue-400">{{ number_format($sum('ot_normal'), 2) }}<span class="text-xs text-zinc-400">h</span></td>
+                                    <td class="{{ $num }} text-purple-600 dark:text-purple-400">{{ number_format($sum('ot_rest'), 2) }}<span class="text-xs text-zinc-400">h</span></td>
+                                    <td class="{{ $num }} text-orange-600 dark:text-orange-400">{{ number_format($sum('ot_public'), 2) }}<span class="text-xs text-zinc-400">h</span></td>
+                                    <td class="{{ $num }} text-zinc-900 dark:text-zinc-100">{{ number_format($sum('ot_total'), 2) }}<span class="text-xs text-zinc-400">h</span></td>
                                     <td class="{{ $groupBorder }} {{ $num }} text-emerald-600 dark:text-emerald-400">{{ number_format($sum('allowance'), 2) }}</td>
                                     <td class="{{ $num }} text-emerald-600 dark:text-emerald-400">{{ number_format($sum('backpay'), 2) }}</td>
                                     <td class="{{ $num }} text-amber-600 dark:text-amber-400">{{ number_format($sum('advance_salary'), 2) }}</td>
@@ -645,6 +649,119 @@
                         <flux:icon.document-text class="mx-auto size-12 text-zinc-400 dark:text-zinc-600 mb-4" />
                         <p class="text-zinc-600 dark:text-zinc-400">No timesheet data available for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</p>
                         <p class="text-sm text-zinc-500 dark:text-zinc-500 mt-1">Make sure clients have submitted their OT entries for this period.</p>
+                    </div>
+                @endif
+            </flux:card>
+            @endif
+
+            @if($reportType === 'phone_deduction')
+            <!-- Export Button for Phone Deduction Report -->
+            <div class="flex justify-end">
+                <flux:button variant="primary" size="sm" wire:click="exportPhoneDeductionReport">
+                    <flux:icon.arrow-down-tray class="size-4 inline" />
+                    Export Phone Deduction (CSV)
+                </flux:button>
+            </div>
+
+            <!-- Phone Deduction Report Data -->
+            <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+                <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Phone Deduction Report - {{ $phoneAllPeriods ? 'All Periods' : \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}</h2>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">
+                            @if($phoneAllPeriods)
+                                Every month the Phone Topup deduction has been charged, across all payroll periods
+                            @else
+                                Workers under contractors with the Phone Topup deduction enabled, and their payroll period for this month
+                            @endif
+                        </p>
+                    </div>
+                </div>
+
+                @if(count($phoneDeductionData) > 0)
+                    @php
+                        $chargedRows = collect($phoneDeductionData)->where('charged', true);
+                        $chargedCount = $chargedRows->count();
+                        $chargedAmount = $chargedRows->sum('amount');
+                        $distinctWorkers = collect($phoneDeductionData)->pluck('worker_id')->unique()->count();
+                    @endphp
+
+                    <!-- Summary -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-4">
+                            <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $phoneAllPeriods ? 'Total Charges' : 'Workers with Deduction' }}</div>
+                            <div class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ count($phoneDeductionData) }}</div>
+                        </div>
+                        <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                            <div class="text-sm text-red-600 dark:text-red-400">{{ $phoneAllPeriods ? 'Workers Charged' : 'Charged This Month' }}</div>
+                            <div class="text-2xl font-bold text-red-700 dark:text-red-300">{{ $phoneAllPeriods ? $distinctWorkers : $chargedCount }}</div>
+                        </div>
+                        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                            <div class="text-sm text-purple-600 dark:text-purple-400">Total Charged Amount</div>
+                            <div class="text-2xl font-bold text-purple-700 dark:text-purple-300">RM {{ number_format($chargedAmount, 2) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="max-h-[70vh] overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                        <table class="min-w-full border-collapse text-sm">
+                            <thead>
+                                <tr class="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/60">
+                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Name</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Passport</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Contractor</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Month</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Payroll Period</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Target Periods</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Amount</th>
+                                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Charged?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($phoneDeductionData as $row)
+                                    <tr class="odd:bg-white even:bg-zinc-50 hover:bg-zinc-100 dark:odd:bg-zinc-900 dark:even:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors">
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <div class="font-medium text-zinc-900 dark:text-zinc-100">{{ $row['worker_name'] }}</div>
+                                            <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ $row['worker_id'] }}</div>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{{ $row['passport'] ?: '-' }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{{ $row['contractor_name'] }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{{ \Carbon\Carbon::create($row['period_year'], $row['period_month'])->format('M Y') }}</td>
+                                        <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap text-zinc-900 dark:text-zinc-100">{{ $row['period'] }}</td>
+                                        <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap text-zinc-500 dark:text-zinc-400">{{ implode(', ', $row['target_periods']) }}</td>
+                                        <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap {{ $row['charged'] ? 'font-medium text-red-600 dark:text-red-400' : 'text-zinc-300 dark:text-zinc-600' }}">
+                                            RM {{ number_format($row['amount'], 2) }}
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            @if($row['charged'])
+                                                <flux:badge color="red" size="sm">Charged</flux:badge>
+                                            @else
+                                                <flux:badge color="zinc" size="sm">Not yet</flux:badge>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                        @if($phoneAllPeriods)
+                            Total: {{ count($phoneDeductionData) }} {{ Str::plural('charge', count($phoneDeductionData)) }} across all periods &middot; {{ $distinctWorkers }} {{ Str::plural('worker', $distinctWorkers) }}
+                        @else
+                            Total: {{ count($phoneDeductionData) }} {{ Str::plural('worker', count($phoneDeductionData)) }} &middot; {{ $chargedCount }} charged in {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}
+                        @endif
+                    </p>
+                @else
+                    <div class="text-center py-12">
+                        <flux:icon.device-phone-mobile class="mx-auto size-12 text-zinc-400 dark:text-zinc-600 mb-4" />
+                        <p class="text-zinc-600 dark:text-zinc-400">
+                            @if($phoneAllPeriods)
+                                No phone deduction charges found across all periods.
+                            @else
+                                No phone deduction data available for {{ \Carbon\Carbon::create($selectedYear, $selectedMonth)->format('F Y') }}
+                            @endif
+                        </p>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-500 mt-1">Make sure a contractor has the Phone Topup deduction enabled and has active workers.</p>
                     </div>
                 @endif
             </flux:card>

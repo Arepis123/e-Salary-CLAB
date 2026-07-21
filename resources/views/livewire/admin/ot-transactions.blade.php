@@ -14,9 +14,9 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Total OT Hours</p>
-                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ number_format(($stats['total_weekday_ot_hours'] ?? 0) + ($stats['total_rest_ot_hours'] ?? 0) + ($stats['total_public_ot_hours'] ?? 0), 1) }} hrs</p>
+                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ number_format(($stats['total_weekday_ot_hours'] ?? 0) + ($stats['total_rest_ot_hours'] ?? 0) + ($stats['total_public_ot_hours'] ?? 0), 2) }} hrs</p>
                     <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 space-y-0.5">
-                        <div>W: {{ number_format($stats['total_weekday_ot_hours'] ?? 0, 1) }}h | R: {{ number_format($stats['total_rest_ot_hours'] ?? 0, 1) }}h | P: {{ number_format($stats['total_public_ot_hours'] ?? 0, 1) }}h</div>
+                        <div>W: {{ number_format($stats['total_weekday_ot_hours'] ?? 0, 2) }}h | R: {{ number_format($stats['total_rest_ot_hours'] ?? 0, 2) }}h | P: {{ number_format($stats['total_public_ot_hours'] ?? 0, 2) }}h</div>
                     </div>
                 </div>
                 <flux:icon.clock class="size-8 text-blue-600 dark:text-blue-400" />
@@ -175,13 +175,13 @@
                             @if($hasOt)
                                 <div class="text-xs space-y-0.5">
                                     @if($submission->total_ot_normal > 0)
-                                        <div><span class="text-blue-600 dark:text-blue-400">W:</span> {{ number_format($submission->total_ot_normal, 1) }}h</div>
+                                        <div><span class="text-blue-600 dark:text-blue-400">W:</span> {{ number_format($submission->total_ot_normal, 2) }}h</div>
                                     @endif
                                     @if($submission->total_ot_rest > 0)
-                                        <div><span class="text-purple-600 dark:text-purple-400">R:</span> {{ number_format($submission->total_ot_rest, 1) }}h</div>
+                                        <div><span class="text-purple-600 dark:text-purple-400">R:</span> {{ number_format($submission->total_ot_rest, 2) }}h</div>
                                     @endif
                                     @if($submission->total_ot_public > 0)
-                                        <div><span class="text-orange-600 dark:text-orange-400">P:</span> {{ number_format($submission->total_ot_public, 1) }}h</div>
+                                        <div><span class="text-orange-600 dark:text-orange-400">P:</span> {{ number_format($submission->total_ot_public, 2) }}h</div>
                                     @endif
                                 </div>
                             @else
@@ -299,27 +299,27 @@
                                             <td class="px-3 py-2 text-zinc-600 dark:text-zinc-400">{{ $entry->worker_passport ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center">
                                                 @if($entry->ot_normal_hours > 0)
-                                                    <span class="text-blue-600 dark:text-blue-400">{{ number_format($entry->ot_normal_hours, 1) }}h</span>
+                                                    <span class="text-blue-600 dark:text-blue-400">{{ number_format($entry->ot_normal_hours, 2) }}h</span>
                                                 @else
                                                     <span class="text-zinc-400">-</span>
                                                 @endif
                                             </td>
                                             <td class="px-3 py-2 text-center">
                                                 @if($entry->ot_rest_hours > 0)
-                                                    <span class="text-purple-600 dark:text-purple-400">{{ number_format($entry->ot_rest_hours, 1) }}h</span>
+                                                    <span class="text-purple-600 dark:text-purple-400">{{ number_format($entry->ot_rest_hours, 2) }}h</span>
                                                 @else
                                                     <span class="text-zinc-400">-</span>
                                                 @endif
                                             </td>
                                             <td class="px-3 py-2 text-center">
                                                 @if($entry->ot_public_hours > 0)
-                                                    <span class="text-orange-600 dark:text-orange-400">{{ number_format($entry->ot_public_hours, 1) }}h</span>
+                                                    <span class="text-orange-600 dark:text-orange-400">{{ number_format($entry->ot_public_hours, 2) }}h</span>
                                                 @else
                                                     <span class="text-zinc-400">-</span>
                                                 @endif
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-zinc-900 dark:text-zinc-100">
-                                                {{ number_format($entry->ot_normal_hours + $entry->ot_rest_hours + $entry->ot_public_hours, 1) }}h
+                                                {{ number_format($entry->ot_normal_hours + $entry->ot_rest_hours + $entry->ot_public_hours, 2) }}h
                                             </td>
                                         </tr>
                                     @endforeach
@@ -327,10 +327,10 @@
                                 <tfoot class="bg-zinc-100 dark:bg-zinc-800/50">
                                     <tr class="font-semibold">
                                         <td class="px-3 py-2 text-zinc-900 dark:text-zinc-100" colspan="2">Total</td>
-                                        <td class="px-3 py-2 text-center text-blue-600 dark:text-blue-400">{{ number_format($entriesWithOt->sum('ot_normal_hours'), 1) }}h</td>
-                                        <td class="px-3 py-2 text-center text-purple-600 dark:text-purple-400">{{ number_format($entriesWithOt->sum('ot_rest_hours'), 1) }}h</td>
-                                        <td class="px-3 py-2 text-center text-orange-600 dark:text-orange-400">{{ number_format($entriesWithOt->sum('ot_public_hours'), 1) }}h</td>
-                                        <td class="px-3 py-2 text-center text-zinc-900 dark:text-zinc-100">{{ number_format($entriesWithOt->sum('ot_normal_hours') + $entriesWithOt->sum('ot_rest_hours') + $entriesWithOt->sum('ot_public_hours'), 1) }}h</td>
+                                        <td class="px-3 py-2 text-center text-blue-600 dark:text-blue-400">{{ number_format($entriesWithOt->sum('ot_normal_hours'), 2) }}h</td>
+                                        <td class="px-3 py-2 text-center text-purple-600 dark:text-purple-400">{{ number_format($entriesWithOt->sum('ot_rest_hours'), 2) }}h</td>
+                                        <td class="px-3 py-2 text-center text-orange-600 dark:text-orange-400">{{ number_format($entriesWithOt->sum('ot_public_hours'), 2) }}h</td>
+                                        <td class="px-3 py-2 text-center text-zinc-900 dark:text-zinc-100">{{ number_format($entriesWithOt->sum('ot_normal_hours') + $entriesWithOt->sum('ot_rest_hours') + $entriesWithOt->sum('ot_public_hours'), 2) }}h</td>
                                     </tr>
                                 </tfoot>
                             </table>
