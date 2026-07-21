@@ -12,6 +12,89 @@ use Illuminate\Support\Facades\DB;
 class WorkerDeductionService
 {
     /**
+     * Payroll submission statuses that represent a committed payroll occupying
+     * a payroll period. Mirrors the "a payroll already exists for this period"
+     * definition used by AutoSubmitTimesheets. Excludes 'draft' (not yet
+     * committed) and 'cancelled' (voided) so that period numbering is
+     * independent of payment progress.
+     */
+    public const PERIOD_STATUSES = ['submitted', 'approved', 'pending_payment', 'paid', 'overdue'];
+
+    /**
+     * Deterministic payroll period number that a payroll for the given month
+     * occupies for a worker under a contractor.
+     *
+     * Period = (number of the worker's committed payrolls in STRICTLY EARLIER
+     * months) + 1. Counting only earlier months makes the result identical
+     * whether or not the target month's own submission exists yet (apply-time
+     * vs preview-time), and is independent of payment status — so a late/unpaid
+     * month (pending_payment/overdue) can no longer drop out of the count and
+     * cause two months to resolve to the same period. Months with no payroll
+     * for the worker simply don't advance the counter (periods compress onto
+     * the next real payroll).
+     */
+    public function getPeriodNumberForMonth(string $workerId, string $clabNo, int $year, int $month): int
+    {
+        $earlierMonths = DB::table('payroll_workers')
+            ->join('payroll_submissions', 'payroll_submissions.id', '=', 'payroll_workers.payroll_submission_id')
+            ->where('payroll_workers.worker_id', $workerId)
+            ->where('payroll_submissions.contractor_clab_no', $clabNo)
+            ->whereIn('payroll_submissions.status', self::PERIOD_STATUSES)
+            ->where(function ($q) use ($year, $month) {
+                $q->where('payroll_submissions.year', '<', $year)
+                    ->orWhere(function ($q2) use ($year, $month) {
+                        $q2->where('payroll_submissions.year', $year)
+                            ->where('payroll_submissions.month', '<', $month);
+                    });
+            })
+            ->distinct()
+            ->count(DB::raw('payroll_submissions.year * 100 + payroll_submissions.month'));
+
+        return $earlierMonths + 1;
+    }
+
+    /**
+     * Batch version of getPeriodNumberForMonth() for many workers at once.
+     * Returns ['worker_id' => period_number]; workers with no earlier payroll
+     * default to period 1.
+     */
+    public function getPeriodNumbersForMonth(array $workerIds, string $clabNo, int $year, int $month): array
+    {
+        $periods = [];
+
+        if (! empty($workerIds)) {
+            $rows = DB::table('payroll_workers')
+                ->join('payroll_submissions', 'payroll_submissions.id', '=', 'payroll_workers.payroll_submission_id')
+                ->where('payroll_submissions.contractor_clab_no', $clabNo)
+                ->whereIn('payroll_submissions.status', self::PERIOD_STATUSES)
+                ->whereIn('payroll_workers.worker_id', $workerIds)
+                ->where(function ($q) use ($year, $month) {
+                    $q->where('payroll_submissions.year', '<', $year)
+                        ->orWhere(function ($q2) use ($year, $month) {
+                            $q2->where('payroll_submissions.year', $year)
+                                ->where('payroll_submissions.month', '<', $month);
+                        });
+                })
+                ->groupBy('payroll_workers.worker_id')
+                ->selectRaw('payroll_workers.worker_id as worker_id, COUNT(DISTINCT payroll_submissions.year * 100 + payroll_submissions.month) as earlier_count')
+                ->get();
+
+            foreach ($rows as $row) {
+                $periods[$row->worker_id] = ((int) $row->earlier_count) + 1;
+            }
+        }
+
+        // Workers with no earlier payroll are in their first period.
+        foreach ($workerIds as $workerId) {
+            if (! isset($periods[$workerId])) {
+                $periods[$workerId] = 1;
+            }
+        }
+
+        return $periods;
+    }
+
+    /**
      * Calculate current payroll period count for a worker under a contractor
      * Counts submitted/approved/paid payroll submissions where worker appeared
      */

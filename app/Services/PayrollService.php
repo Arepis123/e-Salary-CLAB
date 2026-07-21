@@ -322,10 +322,14 @@ class PayrollService
 
         // Process each worker
         foreach ($submission->workers as $worker) {
-            // Calculate current payroll period for this worker
-            $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount(
+            // Calculate current payroll period for this worker.
+            // Month-anchored so an unpaid/late prior month can't collide with
+            // this month and double-apply a period-targeted deduction.
+            $currentPeriod = $workerDeductionService->getPeriodNumberForMonth(
                 $worker->worker_id,
-                $submission->contractor_clab_no
+                $submission->contractor_clab_no,
+                $submission->year,
+                $submission->month
             );
 
             // 1. Apply CONTRACTOR-LEVEL deductions (check period for each worker)

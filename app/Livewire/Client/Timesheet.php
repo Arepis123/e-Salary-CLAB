@@ -1081,11 +1081,11 @@ class Timesheet extends Component
                 $pendingCount = 0;
 
                 if (! empty($deduction->apply_periods)) {
-                    // Has period restrictions - check each worker individually
-                    // Add +1 because getWorkerPayrollPeriodCount returns completed payrolls,
-                    // but we need the CURRENT (upcoming) period number
+                    // Has period restrictions - check each worker individually.
+                    // Month-anchored period so the preview matches what will
+                    // actually be applied for this month (see PayrollService).
                     foreach ($workerIds as $workerId) {
-                        $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo) + 1;
+                        $currentPeriod = $workerDeductionService->getPeriodNumberForMonth($workerId, $clabNo, $year, $month);
                         $willApplyForWorker = $willApplyThisMonth && $deduction->shouldApplyInPeriod($currentPeriod);
 
                         $workerData[$workerId] = [
@@ -1143,11 +1143,11 @@ class Timesheet extends Component
             $activeCount = 0;
             $pendingCount = 0;
 
-            // Check each assigned worker's status
-            // Add +1 because getWorkerPayrollPeriodCount returns completed payrolls,
-            // but we need the CURRENT (upcoming) period number
+            // Check each assigned worker's status.
+            // Month-anchored period so the preview matches what will actually
+            // be applied for this month (see PayrollService).
             foreach ($assignedWorkerIds as $workerId) {
-                $currentPeriod = $workerDeductionService->getWorkerPayrollPeriodCount($workerId, $clabNo) + 1;
+                $currentPeriod = $workerDeductionService->getPeriodNumberForMonth($workerId, $clabNo, $year, $month);
 
                 $willApply = $template->shouldApplyInMonth($month) &&
                              $template->shouldApplyInPeriod($currentPeriod);

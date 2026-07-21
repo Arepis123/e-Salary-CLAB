@@ -802,11 +802,11 @@ class Report extends Component
             // Get period counts for this contractor's workers
             $contractorWorkerIds = $contractWorkers->pluck('con_wkr_id')->toArray();
             if (! isset($workerPeriodCounts[$clabNo])) {
-                $workerPeriodCounts[$clabNo] = $workerDeductionService->getWorkersPayrollPeriodCounts(
+                $workerPeriodCounts[$clabNo] = $workerDeductionService->getPeriodNumbersForMonth(
                     $contractorWorkerIds,
                     $clabNo,
-                    $selectedMonth,
-                    $selectedYear
+                    $selectedYear,
+                    $selectedMonth
                 );
             }
 
@@ -1014,11 +1014,11 @@ class Report extends Component
             // Get period counts for this contractor's workers
             $contractorWorkerIds = $contractWorkers->pluck('con_wkr_id')->toArray();
             if (! isset($workerPeriodCounts[$clabNo])) {
-                $workerPeriodCounts[$clabNo] = $workerDeductionService->getWorkersPayrollPeriodCounts(
+                $workerPeriodCounts[$clabNo] = $workerDeductionService->getPeriodNumbersForMonth(
                     $contractorWorkerIds,
                     $clabNo,
-                    $selectedMonth,
-                    $selectedYear
+                    $selectedYear,
+                    $selectedMonth
                 );
             }
 
