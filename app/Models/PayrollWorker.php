@@ -129,16 +129,43 @@ class PayrollWorker extends Model
     }
 
     /**
-     * Get total NPL (No-Pay Leave) amount from all transactions
-     * NPL is stored as days in 'amount' field and calculated as: (Basic Salary / 26) × Days
+     * Get total NPL (No-Pay Leave) amount from all transactions.
+     *
+     * Transactions carrying a per-month breakdown are charged at each month's
+     * own daily rate (salary / actual days in that month). Transactions without
+     * one predate that rule and keep the legacy flat "salary / 26" divisor, so
+     * historical payroll totals are never restated.
      */
     public function getTotalNplAttribute(): float
     {
-        $nplDays = $this->transactions()
+        $nplTransactions = $this->transactions()
             ->where('type', 'npl')
-            ->sum('amount') ?? 0;
+            ->with('nplDetails')
+            ->get();
 
-        return round(($this->basic_salary / 26) * $nplDays, 2);
+        $monthlySalary = (float) $this->basic_salary;
+
+        return round(
+            $nplTransactions->sum(fn ($transaction) => $transaction->nplAmount($monthlySalary)),
+            2
+        );
+    }
+
+    /**
+     * Flattened per-month NPL breakdown across every NPL transaction, for
+     * payslips and reports. Legacy transactions yield no rows.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\NplMonthDetail>
+     */
+    public function getNplBreakdownAttribute()
+    {
+        return $this->transactions()
+            ->where('type', 'npl')
+            ->with('nplDetails')
+            ->get()
+            ->flatMap->nplDetails
+            ->sortBy('month_key')
+            ->values();
     }
 
     /**

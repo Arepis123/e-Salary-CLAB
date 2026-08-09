@@ -440,6 +440,12 @@
                                         <td class="py-3 text-sm text-red-600 dark:text-red-400">
                                             @if($entry['npl'] > 0)
                                                 {{ number_format($entry['npl'], 1) }}d
+                                                @if(($entry['npl_amount'] ?? 0) > 0)
+                                                    <span class="block text-xs">RM {{ number_format($entry['npl_amount'], 2) }}</span>
+                                                @endif
+                                                @if(! empty($entry['npl_months']))
+                                                    <span class="block text-xs text-zinc-500 dark:text-zinc-400">{{ implode(', ', $entry['npl_months']) }}</span>
+                                                @endif
                                             @else
                                                 -
                                             @endif
@@ -481,7 +487,7 @@
                             <span class="text-green-600 dark:text-green-400">Backpay: RM {{ number_format(collect($otTransactionData)->sum('backpay'), 2) }}</span>
                             <span class="text-amber-600 dark:text-amber-400">Advances: RM {{ number_format(collect($otTransactionData)->sum('advance_salary'), 2) }}</span>
                             <span class="text-red-600 dark:text-red-400">Deductions: RM {{ number_format(collect($otTransactionData)->sum('deduction'), 2) }}</span>
-                            <span class="text-red-600 dark:text-red-400">NPL: RM {{ number_format(collect($otTransactionData)->sum('npl'), 2) }}</span>
+                            <span class="text-red-600 dark:text-red-400">NPL: {{ number_format(collect($otTransactionData)->sum('npl'), 1) }}d / RM {{ number_format(collect($otTransactionData)->sum('npl_amount'), 2) }}</span>
                             <span class="text-yellow-600 dark:text-yellow-400">Accommodation: RM {{ number_format(collect($otTransactionData)->sum('accommodation'), 2) }}</span>
                             <span class="text-teal-600 dark:text-teal-400">Medical Claim: RM {{ number_format(collect($otTransactionData)->sum('medical_claim'), 2) }}</span>
                         </div>
@@ -599,7 +605,7 @@
                                         <td class="{{ $num }} text-emerald-600 dark:text-emerald-400">@if($entry['backpay'] > 0){{ number_format($entry['backpay'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-amber-600 dark:text-amber-400">@if($entry['advance_salary'] > 0){{ number_format($entry['advance_salary'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-red-600 dark:text-red-400">@if($entry['client_deduction'] > 0){{ number_format($entry['client_deduction'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
-                                        <td class="{{ $num }} text-red-600 dark:text-red-400">@if($entry['npl'] > 0){{ number_format($entry['npl'], 1) }}<span class="text-xs text-zinc-400">d</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="{{ $num }} text-red-600 dark:text-red-400">@if($entry['npl'] > 0){{ number_format($entry['npl'], 1) }}<span class="text-xs text-zinc-400">d</span>@if(($entry['npl_amount'] ?? 0) > 0)<span class="block text-xs">RM {{ number_format($entry['npl_amount'], 2) }}</span>@endif @if(! empty($entry['npl_months']))<span class="block text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ implode(', ', $entry['npl_months']) }}</span>@endif @else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-yellow-600 dark:text-yellow-400">@if($entry['accommodation'] > 0){{ number_format($entry['accommodation'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-teal-600 dark:text-teal-400">@if($entry['medical_claim'] > 0){{ number_format($entry['medical_claim'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         {{-- Deductions (RM) - dynamic templates --}}
@@ -630,7 +636,7 @@
                                     <td class="{{ $num }} text-emerald-600 dark:text-emerald-400">{{ number_format($sum('backpay'), 2) }}</td>
                                     <td class="{{ $num }} text-amber-600 dark:text-amber-400">{{ number_format($sum('advance_salary'), 2) }}</td>
                                     <td class="{{ $num }} text-red-600 dark:text-red-400">{{ number_format($sum('client_deduction'), 2) }}</td>
-                                    <td class="{{ $num }} text-red-600 dark:text-red-400">{{ number_format($sum('npl'), 1) }}<span class="text-xs text-zinc-400">d</span></td>
+                                    <td class="{{ $num }} text-red-600 dark:text-red-400">{{ number_format($sum('npl'), 1) }}<span class="text-xs text-zinc-400">d</span><span class="block text-xs">RM {{ number_format($sum('npl_amount'), 2) }}</span></td>
                                     <td class="{{ $num }} text-yellow-600 dark:text-yellow-400">{{ number_format($sum('accommodation'), 2) }}</td>
                                     <td class="{{ $num }} text-teal-600 dark:text-teal-400">{{ number_format($sum('medical_claim'), 2) }}</td>
                                     @foreach($allTemplateNames as $templateName)

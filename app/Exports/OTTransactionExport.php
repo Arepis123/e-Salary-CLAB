@@ -51,7 +51,11 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'Backpay',
             'Advance Salary',
             'Deduction',
-            'NPL',
+            // NPL is reported per the month the leave was taken, matching the
+            // NPL Month / NPL Days columns used on import.
+            'NPL Month',
+            'NPL Days',
+            'NPL Amount (RM)',
             'Accommodation',
             'Medical Claim',
             'Status',
@@ -67,8 +71,11 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
         $advanceSalary = 0;
         $deduction = 0;
         $npl = 0;
+        $nplAmount = 0;
+        $nplMonths = [];
         $accommodation = 0;
         $medicalClaim = 0;
+        $entrySalary = (float) ($entry->worker_salary ?? 0);
 
         if ($entry->transactions) {
             foreach ($entry->transactions as $transaction) {
@@ -82,6 +89,10 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
                     $deduction += $transaction->amount;
                 } elseif ($transaction->type === 'npl') {
                     $npl += $transaction->amount;
+                    $nplAmount += $transaction->nplAmount($entrySalary);
+                    foreach ($transaction->nplDetails as $detail) {
+                        $nplMonths[] = $detail->month_label;
+                    }
                 } elseif ($transaction->type === 'accommodation') {
                     $accommodation += $transaction->amount;
                 } elseif ($transaction->type === 'medical_claim') {
@@ -109,7 +120,9 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             $backpay > 0 ? $backpay : '',
             $advanceSalary > 0 ? $advanceSalary : '',
             $deduction > 0 ? $deduction : '',
+            ! empty($nplMonths) ? implode(', ', array_unique($nplMonths)) : '',
             $npl > 0 ? $npl : '',
+            $nplAmount > 0 ? round($nplAmount, 2) : '',
             $accommodation > 0 ? $accommodation : '',
             $medicalClaim > 0 ? $medicalClaim : '',
             ucfirst($entry->status),
@@ -143,11 +156,13 @@ class OTTransactionExport implements FromCollection, WithColumnWidths, WithHeadi
             'N' => 15, // Backpay
             'O' => 15, // Advance Salary
             'P' => 15, // Deduction
-            'Q' => 15, // NPL
-            'R' => 15, // Accommodation
-            'S' => 15, // Medical Claim
-            'T' => 12, // Status
-            'U' => 18, // Submitted At
+            'Q' => 24, // NPL Month
+            'R' => 12, // NPL Days
+            'S' => 18, // NPL Amount (RM)
+            'T' => 15, // Accommodation
+            'U' => 15, // Medical Claim
+            'V' => 12, // Status
+            'W' => 18, // Submitted At
         ];
     }
 }

@@ -78,11 +78,16 @@ class PayrollService
             // Save transactions BEFORE calculating salary
             if (isset($workerData['transactions']) && is_array($workerData['transactions'])) {
                 foreach ($workerData['transactions'] as $transaction) {
-                    $payrollWorker->transactions()->create([
+                    $payrollTransaction = $payrollWorker->transactions()->create([
                         'type' => $transaction['type'],
                         'amount' => $transaction['amount'],
                         'remarks' => $transaction['remarks'],
                     ]);
+
+                    // Carry the per-month NPL breakdown across so the payroll
+                    // record can be valued and explained on its own.
+                    app(NplCalculatorService::class)
+                        ->syncDetails($payrollTransaction, $transaction['npl_details'] ?? []);
                 }
             }
 
@@ -166,11 +171,16 @@ class PayrollService
             // Save transactions BEFORE calculating salary
             if (isset($workerData['transactions']) && is_array($workerData['transactions'])) {
                 foreach ($workerData['transactions'] as $transaction) {
-                    $payrollWorker->transactions()->create([
+                    $payrollTransaction = $payrollWorker->transactions()->create([
                         'type' => $transaction['type'],
                         'amount' => $transaction['amount'],
                         'remarks' => $transaction['remarks'],
                     ]);
+
+                    // Carry the per-month NPL breakdown across so the payroll
+                    // record can be valued and explained on its own.
+                    app(NplCalculatorService::class)
+                        ->syncDetails($payrollTransaction, $transaction['npl_details'] ?? []);
                 }
             }
 

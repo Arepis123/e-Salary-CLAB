@@ -261,7 +261,7 @@ class AutoSubmitTimesheets extends Command
             $otEntryYear--;
         }
 
-        $monthlyOTEntries = MonthlyOTEntry::with('transactions')
+        $monthlyOTEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('contractor_clab_no', $clabNo)
             ->where('entry_month', $otEntryMonth)
             ->where('entry_year', $otEntryYear)
@@ -313,6 +313,18 @@ class AutoSubmitTimesheets extends Command
                         'type' => $txn->type,
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
+                        // Carry the per-month NPL breakdown into payroll.
+                        'npl_details' => $txn->type === 'npl'
+                            ? $txn->nplDetails->map(fn ($detail) => [
+                                'npl_year' => $detail->npl_year,
+                                'npl_month' => $detail->npl_month,
+                                'days_in_month' => $detail->days_in_month,
+                                'npl_days' => (float) $detail->npl_days,
+                                'monthly_salary' => (float) $detail->monthly_salary,
+                                'daily_rate' => (float) $detail->daily_rate,
+                                'amount' => (float) $detail->amount,
+                            ])->toArray()
+                            : [],
                     ];
                 })->toArray();
             }

@@ -486,6 +486,18 @@
                                                     +RM {{ number_format($txn->amount, 2) }} (Allowance)
                                                 @elseif($txn->type === 'npl')
                                                     {{ $txn->amount }} {{ $txn->amount == 1 ? 'day' : 'days' }} (NPL)
+                                                    @if($txn->nplDetails->isNotEmpty())
+                                                        <div class="pl-2 mt-0.5 space-y-0.5">
+                                                            @foreach($txn->nplDetails as $detail)
+                                                                <div class="text-zinc-500 dark:text-zinc-400">
+                                                                    {{ $detail->month_label }} ({{ $detail->days_in_month }} days) &mdash;
+                                                                    {{ rtrim(rtrim(number_format($detail->npl_days, 1), '0'), '.') }} days &times;
+                                                                    RM{{ number_format($detail->daily_rate, 2) }} =
+                                                                    <span class="font-medium text-red-600 dark:text-red-400">RM{{ number_format($detail->amount, 2) }}</span>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
                                                 @elseif($txn->type === 'advance_payment')
                                                     -RM {{ number_format($txn->amount, 2) }} (Advance)
                                                 @else

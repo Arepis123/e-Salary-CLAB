@@ -296,7 +296,7 @@ class Timesheet extends Component
         $isAfterOTWindow = $today->day > 15;
 
         // Check if there are submitted OT entries for this period
-        $monthlyOTEntries = MonthlyOTEntry::with('transactions')
+        $monthlyOTEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('contractor_clab_no', $clabNo)
             ->where('entry_month', $otEntryMonth)
             ->where('entry_year', $otEntryYear)
@@ -372,6 +372,19 @@ class Timesheet extends Component
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
                         'locked' => true, // Flag to make read-only
+                        // Carry the per-month NPL breakdown into payroll.
+                        'npl_details' => $txn->type === 'npl'
+                            ? $txn->nplDetails->map(fn ($detail) => [
+                                'npl_year' => $detail->npl_year,
+                                'npl_month' => $detail->npl_month,
+                                'month_label' => $detail->month_label,
+                                'days_in_month' => $detail->days_in_month,
+                                'npl_days' => (float) $detail->npl_days,
+                                'monthly_salary' => (float) $detail->monthly_salary,
+                                'daily_rate' => (float) $detail->daily_rate,
+                                'amount' => (float) $detail->amount,
+                            ])->toArray()
+                            : [],
                     ];
                 })->toArray();
             }

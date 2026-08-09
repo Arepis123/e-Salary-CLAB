@@ -458,10 +458,148 @@
                             </div>
 
                             @if($newTransactionType === 'npl')
-                                <!-- NPL Days Input -->
-                                <div>
-                                    <flux:input wire:model.live="newTransactionAmount" type="number" step="0.5" min="0" label="No-Pay Leave Days" placeholder="0.0" />
+                                <!--
+                                    NPL is charged against the month the leave was taken,
+                                    at that month's own daily rate, so several months can
+                                    be selected in one transaction.
+                                -->
+                                @php
+                                    $nplMonths = $this->nplSelectableMonths;
+                                    $nplPreview = $this->nplPreview;
+                                @endphp
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <!-- Month multi-select -->
+                                    <div>
+                                        <flux:label>NPL Month <span class="text-red-600">*</span></flux:label>
+
+                                        @if(count($nplSelectedMonths) > 0)
+                                            <div class="flex flex-wrap gap-1 mt-1 mb-2">
+                                                @foreach($nplMonths as $month)
+                                                    @if(in_array($month['key'], $nplSelectedMonths))
+                                                        <flux:badge color="blue" size="sm">{{ $month['label'] }}</flux:badge>
+                                                    @endif
+                                                @endforeach
+                                            </div>
+                                        @endif
+
+                                        <div class="mt-1 border border-zinc-200 dark:border-zinc-700 rounded-lg divide-y divide-zinc-100 dark:divide-zinc-800 max-h-48 overflow-y-auto">
+                                            @foreach($nplMonths as $month)
+                                                <label class="flex items-center gap-2 px-3 py-2 text-sm {{ $month['already_used'] ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800' }}">
+                                                    <input
+                                                        type="checkbox"
+                                                        wire:model.live="nplSelectedMonths"
+                                                        value="{{ $month['key'] }}"
+                                                        @disabled($month['already_used'])
+                                                        class="rounded border-zinc-300 dark:border-zinc-600"
+                                                    />
+                                                    <span class="text-zinc-900 dark:text-zinc-100">
+                                                        {{ $month['label'] }}
+                                                        <span class="text-zinc-500 dark:text-zinc-400">({{ $month['days_in_month'] }} days)</span>
+                                                    </span>
+                                                    @if($month['already_used'])
+                                                        <flux:badge color="zinc" size="sm" class="ml-auto">Already recorded</flux:badge>
+                                                    @endif
+                                                </label>
+                                            @endforeach
+                                        </div>
+
+                                        <div class="flex gap-3 mt-2">
+                                            <button type="button" wire:click="selectAllNplMonths" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Select All</button>
+                                            <button type="button" wire:click="clearNplMonths" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Clear All</button>
+                                        </div>
+
+                                        @error('nplSelectedMonths') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    <!-- Days per selected month -->
+                                    <div>
+                                        <flux:label>No-Pay Leave Days <span class="text-red-600">*</span></flux:label>
+
+                                        @if(count($nplSelectedMonths) === 0)
+                                            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Select one or more NPL months first.</p>
+                                        @else
+                                            <div class="space-y-2 mt-1">
+                                                @foreach($nplMonths as $month)
+                                                    @if(in_array($month['key'], $nplSelectedMonths))
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-sm text-zinc-700 dark:text-zinc-300 flex-1">
+                                                                {{ $month['label'] }}
+                                                            </span>
+                                                            <input
+                                                                type="number"
+                                                                step="0.5"
+                                                                min="0"
+                                                                max="{{ $month['days_in_month'] }}"
+                                                                wire:model.live="nplDaysByMonth.{{ $month['key'] }}"
+                                                                class="w-20 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-2 py-1 text-sm text-zinc-900 dark:text-zinc-100"
+                                                            />
+                                                            <span class="text-sm text-zinc-500">days</span>
+                                                        </div>
+                                                        @error('nplDaysByMonth.'.$month['key'])
+                                                            <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span>
+                                                        @enderror
+                                                    @endif
+                                                @endforeach
+                                            </div>
+
+                                            <flux:callout variant="success" class="mt-3" icon="check-circle">
+                                                <flux:callout.text class="text-xs">
+                                                    Deduction is calculated automatically from the real number of days in each selected month.
+                                                </flux:callout.text>
+                                            </flux:callout>
+                                        @endif
+                                    </div>
                                 </div>
+
+                                <!-- Monthly salary (read-only, from payroll) -->
+                                <div>
+                                    <flux:label>Monthly Salary (RM)</flux:label>
+                                    <div class="mt-1 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-100">
+                                        {{ number_format($nplMonthlySalary, 2) }}
+                                    </div>                                   
+                                </div>
+
+                                <!-- Live calculation summary -->
+                                @if(count($nplPreview['rows']) > 0)
+                                    <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                                        <div class="px-3 py-2 bg-zinc-100 dark:bg-zinc-800">
+                                            <h4 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">System Calculation</h4>
+                                        </div>
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-xs">
+                                                <thead class="bg-zinc-50 dark:bg-zinc-900">
+                                                    <tr class="text-left text-zinc-600 dark:text-zinc-400">
+                                                        <th class="px-3 py-2 font-medium">NPL Month</th>
+                                                        <th class="px-3 py-2 font-medium text-center">Days in Month</th>
+                                                        <th class="px-3 py-2 font-medium text-center">NPL Days</th>
+                                                        <th class="px-3 py-2 font-medium">Daily Rate (RM)</th>
+                                                        <th class="px-3 py-2 font-medium text-right">NPL Deduction (RM)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                                    @foreach($nplPreview['rows'] as $row)
+                                                        <tr class="text-zinc-900 dark:text-zinc-100">
+                                                            <td class="px-3 py-2">{{ $row['month_label'] }}</td>
+                                                            <td class="px-3 py-2 text-center">{{ $row['days_in_month'] }}</td>
+                                                            <td class="px-3 py-2 text-center">{{ rtrim(rtrim(number_format($row['npl_days'], 1), '0'), '.') }}</td>
+                                                            <td class="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                                                                RM{{ number_format($row['monthly_salary'], 2) }} ÷ {{ $row['days_in_month'] }} = RM{{ number_format($row['daily_rate'], 2) }}
+                                                            </td>
+                                                            <td class="px-3 py-2 text-right font-semibold">RM{{ number_format($row['amount'], 2) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                                <tfoot class="bg-zinc-50 dark:bg-zinc-900">
+                                                    <tr>
+                                                        <td colspan="4" class="px-3 py-2 text-right font-semibold text-zinc-900 dark:text-zinc-100">Total NPL Deduction (RM)</td>
+                                                        <td class="px-3 py-2 text-right font-bold text-zinc-900 dark:text-zinc-100">RM{{ number_format($nplPreview['total_amount'], 2) }}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                @endif
                             @else
                                 <!-- Amount Input -->
                                 <div>
@@ -498,8 +636,12 @@
                                                 @if($transaction['type'] === 'allowance')
                                                     <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($transaction['amount'], 2) }}</span>
                                                 @elseif($transaction['type'] === 'npl')
+                                                    @php $nplTotal = collect($transaction['npl_details'] ?? [])->sum('amount'); @endphp
                                                     <span class="font-semibold text-zinc-900 dark:text-zinc-100">
                                                         {{ $transaction['amount'] }} {{ $transaction['amount'] == 1 ? 'day' : 'days' }}
+                                                        @if(count($transaction['npl_details'] ?? []) > 0)
+                                                            <span class="text-zinc-500 dark:text-zinc-400">— RM {{ number_format($nplTotal, 2) }}</span>
+                                                        @endif
                                                     </span>
                                                 @else
                                                     <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($transaction['amount'], 2) }}</span>
@@ -519,6 +661,18 @@
                                                     <flux:badge color="lime" size="sm">Medical Claim</flux:badge>
                                                 @endif
                                             </div>
+                                            @if($transaction['type'] === 'npl' && count($transaction['npl_details'] ?? []) > 0)
+                                                <div class="mt-1 space-y-0.5">
+                                                    @foreach($transaction['npl_details'] as $detail)
+                                                        <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                                                            {{ $detail['month_label'] }} ({{ $detail['days_in_month'] }} days) &mdash;
+                                                            {{ rtrim(rtrim(number_format($detail['npl_days'], 1), '0'), '.') }} days &times;
+                                                            RM{{ number_format($detail['daily_rate'], 2) }} =
+                                                            <span class="font-medium text-zinc-700 dark:text-zinc-300">RM{{ number_format($detail['amount'], 2) }}</span>
+                                                        </p>
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                             <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{{ $transaction['remarks'] }}</p>
                                         </div>
                                         <flux:button wire:click="removeTransaction({{ $index }})" variant="ghost" size="sm" class="text-red-600 dark:text-red-400">
@@ -722,7 +876,14 @@
                                                                         <flux:badge color="lime" size="sm">Medical Claim</flux:badge>
                                                                     @endif
                                                                     <span class="text-xs text-zinc-600 dark:text-zinc-400">
-                                                                        {{ $item['transaction_type'] === 'npl' ? $item['transaction_amount'] . ' days' : 'RM ' . number_format($item['transaction_amount'], 2) }}
+                                                                        @if($item['transaction_type'] === 'npl')
+                                                                            {{ $item['transaction_amount'] }} days
+                                                                            @if(! empty($item['npl_year']))
+                                                                                <span class="text-zinc-500">in {{ \Carbon\Carbon::create($item['npl_year'], $item['npl_month'], 1)->format('M Y') }}</span>
+                                                                            @endif
+                                                                        @else
+                                                                            RM {{ number_format($item['transaction_amount'], 2) }}
+                                                                        @endif
                                                                     </span>
                                                                 </div>
                                                                 <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">{{ $item['transaction_remarks'] }}</p>

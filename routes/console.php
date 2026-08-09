@@ -21,11 +21,15 @@ Schedule::command('reminders:payment')->dailyAt('09:00');
 // Note: Penalties are now applied immediately when client submits late
 Schedule::command('penalties:apply-overdue')->dailyAt('00:01');
 
-// Auto-submit OT entries on the 16th of every month at 12:01 AM (MYT/UTC+8)
-// Server runs on UTC: 16th 00:01 MYT = 15th 16:01 UTC
-Schedule::command('payroll:auto-submit-ot')->monthlyOn(15, '16:01');
+// Auto-submit OT entries on the 16th of every month at 12:01 AM MYT.
+// Times below are MYT: the scheduler resolves them against config('app.timezone')
+// (Asia/Kuala_Lumpur), NOT the server clock, so no UTC offset is applied here.
+Schedule::command('payroll:auto-submit-ot')
+    ->monthlyOn(16, '00:01')
+    ->timezone('Asia/Kuala_Lumpur');
 
-// Auto-submit timesheets on the 16th of every month at 12:03 AM (MYT/UTC+8)
-// Server runs on UTC: 16th 00:03 MYT = 15th 16:03 UTC
+// Auto-submit timesheets on the 16th of every month at 12:03 AM MYT.
 // Runs after auto-submit-ot so OT data is already submitted when payroll is built
-Schedule::command('payroll:auto-submit')->monthlyOn(15, '16:03');
+Schedule::command('payroll:auto-submit')
+    ->monthlyOn(16, '00:03')
+    ->timezone('Asia/Kuala_Lumpur');

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasNplMonthDetails;
 use Illuminate\Database\Eloquent\Model;
 
 class PayrollWorkerTransaction extends Model
 {
+    use HasNplMonthDetails;
+
     protected $fillable = [
         'payroll_worker_id',
         'type',

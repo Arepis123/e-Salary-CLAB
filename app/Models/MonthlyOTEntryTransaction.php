@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasNplMonthDetails;
 use Illuminate\Database\Eloquent\Model;
 
 class MonthlyOTEntryTransaction extends Model
 {
+    use HasNplMonthDetails;
+
     protected $table = 'monthly_ot_entry_transactions';
 
     protected $fillable = [

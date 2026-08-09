@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Client;
 
+use App\Services\NplCalculatorService;
 use App\Services\OTEntryService;
 use App\Services\OutstandingPayrollService;
 use App\Traits\LogsActivity;
@@ -45,6 +46,18 @@ class OTEntry extends Component
 
     public $newTransactionRemarks = '';
 
+    // NPL (No-Pay Leave) multi-month entry.
+    // NPL is charged against the month the leave was taken, at that month's own
+    // daily rate, so one transaction can span several months.
+
+    /** @var array<int, string> selected month keys, "YYYY-MM" */
+    public array $nplSelectedMonths = [];
+
+    /** @var array<string, string> month key => NPL days entered */
+    public array $nplDaysByMonth = [];
+
+    public float $nplMonthlySalary = 0.0;
+
     // Import management
     public $showImportModal = false;
 
@@ -62,7 +75,7 @@ class OTEntry extends Component
 
     public bool $isLoading = true;
 
-    // Sequential payroll blocking — OT entry is hidden until outstanding (unpaid)
+    // Sequential payroll blocking â€” OT entry is hidden until outstanding (unpaid)
     // payroll is settled, mirroring the Timesheet page.
     public bool $isBlocked = false;
 
@@ -72,14 +85,17 @@ class OTEntry extends Component
 
     protected $otEntryService;
 
-    public function boot(OTEntryService $otEntryService)
+    protected NplCalculatorService $nplCalculator;
+
+    public function boot(OTEntryService $otEntryService, NplCalculatorService $nplCalculator)
     {
         $this->otEntryService = $otEntryService;
+        $this->nplCalculator = $nplCalculator;
     }
 
     public function mount()
     {
-        // Initialize safe defaults — initializeData() runs via wire:init
+        // Initialize safe defaults â€” initializeData() runs via wire:init
         $this->period = [
             'entry_month_name' => now()->subMonth()->format('F Y'),
             'submission_month_name' => now()->format('F Y'),
@@ -140,6 +156,15 @@ class OTEntry extends Component
         $clabNo = auth()->user()->contractor_clab_no;
         $entriesCollection = $this->otEntryService->getOrCreateEntriesForContractor($clabNo);
 
+        // The service returns a plain Support collection when it merges freshly
+        // created entries, so only eager-load when Eloquent can do it. Without
+        // this the NPL details still resolve, just one query at a time.
+        if ($entriesCollection instanceof \Illuminate\Database\Eloquent\Collection) {
+            $entriesCollection->load('transactions.nplDetails');
+        } else {
+            $entriesCollection->each->load('transactions.nplDetails');
+        }
+
         // Convert to array for Livewire with transactions
         $this->entries = $entriesCollection->map(function ($entry) {
             return [
@@ -158,6 +183,20 @@ class OTEntry extends Component
                         'type' => $txn->type,
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
+                        // Per-month NPL breakdown; empty for every other type and
+                        // for legacy NPL rows saved before the per-month rule.
+                        'npl_details' => $txn->type === 'npl'
+                            ? $txn->nplDetails->map(fn ($detail) => [
+                                'npl_year' => $detail->npl_year,
+                                'npl_month' => $detail->npl_month,
+                                'month_label' => $detail->month_label,
+                                'days_in_month' => $detail->days_in_month,
+                                'npl_days' => (float) $detail->npl_days,
+                                'monthly_salary' => (float) $detail->monthly_salary,
+                                'daily_rate' => (float) $detail->daily_rate,
+                                'amount' => (float) $detail->amount,
+                            ])->toArray()
+                            : [],
                     ];
                 })->toArray(),
             ];
@@ -208,16 +247,18 @@ class OTEntry extends Component
 
                 // Save transactions
                 if (isset($entry['transactions']) && is_array($entry['transactions'])) {
-                    // Delete existing transactions
-                    $savedEntry->transactions()->delete();
+                    // Delete existing transactions (and their NPL breakdowns)
+                    $this->nplCalculator->deleteTransactionsWithDetails($savedEntry->transactions());
 
                     // Create new transactions
                     foreach ($entry['transactions'] as $txn) {
-                        $savedEntry->transactions()->create([
+                        $savedTxn = $savedEntry->transactions()->create([
                             'type' => $txn['type'],
                             'amount' => $txn['amount'],
                             'remarks' => $txn['remarks'],
                         ]);
+
+                        $this->nplCalculator->syncDetails($savedTxn, $txn['npl_details'] ?? []);
                     }
                 }
             }
@@ -350,13 +391,15 @@ class OTEntry extends Component
             ]);
 
             // Always sync transactions (handles deletions, including removing all)
-            $savedEntry->transactions()->delete();
+            $this->nplCalculator->deleteTransactionsWithDetails($savedEntry->transactions());
             foreach ($entry['transactions'] ?? [] as $txn) {
-                $savedEntry->transactions()->create([
+                $savedTxn = $savedEntry->transactions()->create([
                     'type' => $txn['type'],
                     'amount' => $txn['amount'],
                     'remarks' => $txn['remarks'],
                 ]);
+
+                $this->nplCalculator->syncDetails($savedTxn, $txn['npl_details'] ?? []);
             }
 
             $this->autoSaveStatus = 'saved';
@@ -395,11 +438,155 @@ class OTEntry extends Component
         $this->newTransactionType = 'advance_payment';
         $this->newTransactionAmount = '';
         $this->newTransactionRemarks = '';
-        $this->resetValidation(['newTransactionAmount', 'newTransactionRemarks']);
+        $this->resetNplForm();
+        $this->resetValidation(['newTransactionAmount', 'newTransactionRemarks', 'nplSelectedMonths', 'nplDaysByMonth']);
+    }
+
+    /**
+     * Clear the NPL month picker and reload the worker's monthly salary.
+     */
+    protected function resetNplForm(): void
+    {
+        $this->nplSelectedMonths = [];
+        $this->nplDaysByMonth = [];
+        $this->nplMonthlySalary = $this->currentWorkerIndex !== null
+            ? $this->nplCalculator->resolveMonthlySalary(
+                (int) ($this->entries[$this->currentWorkerIndex]['worker_id'] ?? 0),
+                auth()->user()->contractor_clab_no
+            )
+            : NplCalculatorService::DEFAULT_MONTHLY_SALARY;
+    }
+
+    /**
+     * Months selectable for NPL: the OT entry month plus the previous six.
+     *
+     * Months already charged by an existing NPL transaction for this worker are
+     * flagged so they can be disabled â€” the same month must not be deducted twice.
+     */
+    public function getNplSelectableMonthsProperty(): array
+    {
+        $anchor = $this->nplEntryAnchorMonth();
+        $used = $this->nplMonthsAlreadyUsed();
+
+        return collect($this->nplCalculator->selectableMonths($anchor))
+            ->map(function ($month) use ($used) {
+                $month['already_used'] = in_array($month['key'], $used, true);
+
+                return $month;
+            })
+            ->all();
+    }
+
+    /**
+     * Live per-month calculation shown before the transaction is added.
+     */
+    public function getNplPreviewProperty(): array
+    {
+        return $this->nplCalculator->calculate(
+            $this->nplMonthlySalary,
+            $this->nplDaysForSelectedMonths()
+        );
+    }
+
+    /**
+     * Select every month that is not already charged.
+     */
+    public function selectAllNplMonths(): void
+    {
+        $this->nplSelectedMonths = collect($this->nplSelectableMonths)
+            ->reject(fn ($month) => $month['already_used'])
+            ->pluck('key')
+            ->all();
+
+        $this->updatedNplSelectedMonths();
+    }
+
+    public function clearNplMonths(): void
+    {
+        $this->nplSelectedMonths = [];
+        $this->nplDaysByMonth = [];
+    }
+
+    /**
+     * Default a newly ticked month to 1 day and drop days for unticked months.
+     */
+    public function updatedNplSelectedMonths(): void
+    {
+        foreach ($this->nplSelectedMonths as $key) {
+            if (! isset($this->nplDaysByMonth[$key]) || $this->nplDaysByMonth[$key] === '') {
+                $this->nplDaysByMonth[$key] = '1';
+            }
+        }
+
+        $this->nplDaysByMonth = array_intersect_key(
+            $this->nplDaysByMonth,
+            array_flip($this->nplSelectedMonths)
+        );
+    }
+
+    /**
+     * The month OT is being entered for; NPL may be charged to it or the six
+     * months before it.
+     */
+    protected function nplEntryAnchorMonth(): \Carbon\Carbon
+    {
+        $entryMonth = $this->period['entry_month_name'] ?? null;
+
+        try {
+            return $entryMonth
+                ? \Carbon\Carbon::parse('1 '.$entryMonth)->startOfMonth()
+                : now()->startOfMonth();
+        } catch (\Exception $e) {
+            return now()->startOfMonth();
+        }
+    }
+
+    /**
+     * Month keys already charged by this worker's existing NPL transactions.
+     *
+     * @return array<int, string>
+     */
+    protected function nplMonthsAlreadyUsed(): array
+    {
+        if ($this->currentWorkerIndex === null) {
+            return [];
+        }
+
+        return collect($this->entries[$this->currentWorkerIndex]['transactions'] ?? [])
+            ->where('type', 'npl')
+            ->flatMap(fn ($txn) => collect($txn['npl_details'] ?? [])
+                ->map(fn ($detail) => sprintf('%04d-%02d', $detail['npl_year'], $detail['npl_month'])))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Days entered against each currently selected month.
+     *
+     * @return array<string, float>
+     */
+    protected function nplDaysForSelectedMonths(): array
+    {
+        $days = [];
+
+        foreach ($this->nplSelectedMonths as $key) {
+            $days[$key] = (float) ($this->nplDaysByMonth[$key] ?? 0);
+        }
+
+        return $days;
     }
 
     public function addTransaction()
     {
+        // NPL is entered as days per month rather than a single ringgit amount,
+        // so it validates and builds differently from every other type.
+        if ($this->newTransactionType === 'npl') {
+            $this->addNplTransaction();
+
+            return;
+        }
+
         // Validate the new transaction
         $validated = $this->validate([
             'newTransactionType' => 'required|in:accommodation,advance_payment,npl,allowance,backpay,medical_claim',
@@ -421,7 +608,8 @@ class OTEntry extends Component
 
             if ($existingAccommodation + floatval($validated['newTransactionAmount']) > 100) {
                 $remaining = max(0, 100 - $existingAccommodation);
-                $this->addError('newTransactionAmount', "Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM " . number_format($remaining, 2));
+                $this->addError('newTransactionAmount', 'Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM '.number_format($remaining, 2));
+
                 return;
             }
         }
@@ -466,6 +654,105 @@ class OTEntry extends Component
         }
 
         // Reset the form
+        $this->resetNewTransaction();
+    }
+
+    /**
+     * Add a multi-month No-Pay Leave transaction.
+     *
+     * Each selected month is charged at its own daily rate (monthly salary /
+     * actual days in that month) and the per-month breakdown is kept alongside
+     * the transaction so payslips and reports can show the working.
+     */
+    protected function addNplTransaction(): void
+    {
+        $this->resetValidation();
+
+        $this->validate([
+            'nplSelectedMonths' => 'required|array|min:1',
+            'newTransactionRemarks' => 'required|string|min:3',
+        ], [
+            'nplSelectedMonths.required' => 'Select at least one NPL month',
+            'nplSelectedMonths.min' => 'Select at least one NPL month',
+            'newTransactionRemarks.required' => 'Remarks are required',
+            'newTransactionRemarks.min' => 'Remarks must be at least 3 characters',
+        ]);
+
+        // Every selected month needs a positive day count.
+        foreach ($this->nplSelectedMonths as $key) {
+            $days = (float) ($this->nplDaysByMonth[$key] ?? 0);
+            $daysInMonth = $this->nplCalculator->daysInMonth(...$this->nplCalculator->parseMonthKey($key));
+
+            if ($days <= 0) {
+                $this->addError('nplDaysByMonth.'.$key, 'Enter NPL days greater than 0');
+
+                return;
+            }
+
+            if ($days > $daysInMonth) {
+                $this->addError('nplDaysByMonth.'.$key, "Cannot exceed {$daysInMonth} days for this month");
+
+                return;
+            }
+        }
+
+        // A month must not be charged twice for the same worker.
+        $alreadyUsed = array_intersect($this->nplSelectedMonths, $this->nplMonthsAlreadyUsed());
+
+        if (! empty($alreadyUsed)) {
+            $labels = collect($this->nplSelectableMonths)
+                ->whereIn('key', $alreadyUsed)
+                ->pluck('label')
+                ->implode(', ');
+
+            $this->addError('nplSelectedMonths', "NPL already recorded for {$labels}. Remove the existing transaction first.");
+
+            return;
+        }
+
+        $preview = $this->nplPreview;
+
+        if (empty($preview['rows'])) {
+            $this->addError('nplSelectedMonths', 'Nothing to deduct â€” enter NPL days.');
+
+            return;
+        }
+
+        $newTransaction = [
+            'type' => 'npl',
+            // `amount` stays the total day count, matching how NPL has always
+            // been stored; the ringgit value comes from the breakdown.
+            'amount' => $preview['total_days'],
+            'remarks' => $this->newTransactionRemarks,
+            'npl_details' => $preview['rows'],
+        ];
+
+        if ($this->currentWorkerIndex !== null) {
+            $currentTransactions = $this->entries[$this->currentWorkerIndex]['transactions'] ?? [];
+            $currentTransactions[] = $newTransaction;
+
+            $entries = $this->entries;
+            $entries[$this->currentWorkerIndex]['transactions'] = $currentTransactions;
+            $this->entries = $entries;
+
+            $this->transactions = $currentTransactions;
+
+            $this->autoSaveDraft($this->currentWorkerIndex);
+
+            $workerName = $this->entries[$this->currentWorkerIndex]['worker_name'] ?? 'Unknown';
+            $this->logOTActivity(
+                action: 'transaction_added',
+                description: "Added npl transaction for {$workerName}",
+                properties: [
+                    'worker_name' => $workerName,
+                    'transaction_type' => 'npl',
+                    'total_days' => $preview['total_days'],
+                    'total_amount' => $preview['total_amount'],
+                    'months' => array_column($preview['rows'], 'month_label'),
+                ]
+            );
+        }
+
         $this->resetNewTransaction();
     }
 
@@ -527,95 +814,160 @@ class OTEntry extends Component
     }
 
     // Import methods
+
+    /**
+     * Column layout of the import template.
+     *
+     * One row per worker, with a column per transaction type grouped under
+     * "Earning" and "Deduction" banners.
+     *
+     * @var array<string, array{label:string, group:string, width:float}>
+     */
+    protected const TEMPLATE_COLUMNS = [
+        'A' => ['label' => 'Worker Passport', 'group' => 'identity', 'width' => 18.7],
+        'B' => ['label' => 'Worker Name', 'group' => 'identity', 'width' => 30],
+        'C' => ['label' => 'OT Normal Hours', 'group' => 'identity', 'width' => 18.7],
+        'D' => ['label' => 'OT Rest Hours', 'group' => 'identity', 'width' => 16.4],
+        'E' => ['label' => 'OT Public Hours', 'group' => 'identity', 'width' => 18.7],
+        'F' => ['label' => 'Allowance Transaction Amount (RM)', 'group' => 'earning', 'width' => 20],
+        'G' => ['label' => 'Backpay Transaction Amount (RM)', 'group' => 'earning', 'width' => 22.2],
+        'H' => ['label' => 'Medical Claim Transaction Amount (RM)', 'group' => 'earning', 'width' => 23.4],
+        'I' => ['label' => 'Accommodation Transaction Amount (RM)', 'group' => 'deduction', 'width' => 23.4],
+        'J' => ['label' => 'Advance Payment Transaction Amount (RM)', 'group' => 'deduction', 'width' => 23.4],
+        'K' => ['label' => 'NPL Month', 'group' => 'deduction', 'width' => 11.7],
+        'L' => ['label' => 'NPL Days', 'group' => 'deduction', 'width' => 10.6],
+        'M' => ['label' => 'Remarks', 'group' => 'identity', 'width' => 30],
+    ];
+
+    /**
+     * Header fill colour per column group.
+     */
+    protected const TEMPLATE_GROUP_FILLS = [
+        'identity' => 'D9E1F2',
+        'earning' => 'EBF1DE',
+        'deduction' => 'F2DBDB',
+    ];
+
+    /**
+     * Transaction-amount columns, keyed by the transaction type they create.
+     */
+    protected const TEMPLATE_AMOUNT_COLUMNS = [
+        'F' => 'allowance',
+        'G' => 'backpay',
+        'H' => 'medical_claim',
+        'I' => 'accommodation',
+        'J' => 'advance_payment',
+    ];
+
+    /**
+     * Build the import template, pre-filled with this contractor's workers.
+     *
+     * Row 1 carries the merged group banners, row 2 the column headers, and
+     * row 3 onwards one row per worker with passport and name already filled
+     * in — the client only has to enter hours and amounts.
+     */
     public function downloadTemplate()
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('OT Entry');
 
-        // Row 1: Instructions (will be skipped during import)
-        $sheet->setCellValue('A1', 'INSTRUCTIONS: Fill passport, name, OT hours. For transactions, use types: accommodation, advance_payment, npl, allowance, backpay, medical_claim. Leave OT columns empty if adding only transactions. You can have multiple rows for the same worker. DELETE THIS ROW AND EXAMPLE ROWS BEFORE IMPORTING.');
-        $sheet->mergeCells('A1:H1');
-        $sheet->getStyle('A1')->getFont()->setItalic(true)->setBold(true);
-        $sheet->getStyle('A1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('FFFFCC');
-        $sheet->getRowDimension(1)->setRowHeight(30);
+        // --- Row 1: merged group banners -------------------------------------
+        $sheet->setCellValue('F1', 'Earning');
+        $sheet->mergeCells('F1:H1');
+        $sheet->setCellValue('I1', 'Deduction');
+        $sheet->mergeCells('I1:L1');
 
-        // Row 2: Headers
-        $headers = [
-            'A2' => 'Worker Passport',
-            'B2' => 'Worker Name',
-            'C2' => 'OT Normal Hours',
-            'D2' => 'OT Rest Hours',
-            'E2' => 'OT Public Hours',
-            'F2' => 'Transaction Type',
-            'G2' => 'Transaction Amount',
-            'H2' => 'Transaction Remarks',
-        ];
-
-        foreach ($headers as $cell => $value) {
-            $sheet->setCellValue($cell, $value);
-            $sheet->getStyle($cell)->getFont()->setBold(true);
-            $sheet->getStyle($cell)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('D9E1F2');
+        // Identity/OT/Remarks columns span both header rows.
+        foreach (['A', 'B', 'C', 'D', 'E', 'M'] as $col) {
+            $sheet->setCellValue($col.'1', self::TEMPLATE_COLUMNS[$col]['label']);
+            $sheet->mergeCells($col.'1:'.$col.'2');
         }
 
-        // Row 3+: Example data - Accommodation
-        $sheet->setCellValue('A3', 'AB012345');
-        $sheet->setCellValue('B3', 'JOHN DOE');
-        $sheet->setCellValue('C3', '10');
-        $sheet->setCellValue('D3', '8');
-        $sheet->setCellValue('E3', '0');
-        $sheet->setCellValue('F3', 'accommodation');
-        $sheet->setCellValue('G3', '200.00');
-        $sheet->setCellValue('H3', 'Monthly accommodation deduction');
+        // --- Row 2: per-column headers under the banners ----------------------
+        foreach (self::TEMPLATE_COLUMNS as $col => $meta) {
+            if (in_array($col, ['A', 'B', 'C', 'D', 'E', 'M'], true)) {
+                continue;
+            }
 
-        // Example - Advance Payment
-        $sheet->setCellValue('A4', 'AB012345');
-        $sheet->setCellValue('B4', 'JOHN DOE');
-        $sheet->setCellValue('C4', '');
-        $sheet->setCellValue('D4', '');
-        $sheet->setCellValue('E4', '');
-        $sheet->setCellValue('F4', 'advance_payment');
-        $sheet->setCellValue('G4', '500.00');
-        $sheet->setCellValue('H4', 'Advance payment for medical expenses');
-
-        // Example - NPL (No-Pay Leave)
-        $sheet->setCellValue('A5', 'AB012345');
-        $sheet->setCellValue('B5', 'JOHN DOE');
-        $sheet->setCellValue('C5', '');
-        $sheet->setCellValue('D5', '');
-        $sheet->setCellValue('E5', '');
-        $sheet->setCellValue('F5', 'npl');
-        $sheet->setCellValue('G5', '2');
-        $sheet->setCellValue('H5', 'No-pay leave for 2 days');
-
-        // Example - Allowance (Earning)
-        $sheet->setCellValue('A6', 'AB012346');
-        $sheet->setCellValue('B6', 'JANE DOE');
-        $sheet->setCellValue('C6', '5');
-        $sheet->setCellValue('D6', '0');
-        $sheet->setCellValue('E6', '8');
-        $sheet->setCellValue('F6', '');
-        $sheet->setCellValue('G6', '');
-        $sheet->setCellValue('H6', '');
-
-        // Example - Backpay (Earning)
-        $sheet->setCellValue('A7', 'AB012346');
-        $sheet->setCellValue('B7', 'JANE DOE');
-        $sheet->setCellValue('C7', '');
-        $sheet->setCellValue('D7', '');
-        $sheet->setCellValue('E7', '');
-        $sheet->setCellValue('F7', 'backpay');
-        $sheet->setCellValue('G7', '200.00');
-        $sheet->setCellValue('H7', 'Backpay for previous month underpayment');
-
-        // Style example rows with light gray background
-        $sheet->getStyle('A3:H7')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('F0F0F0');
-
-        // Auto-size columns
-        foreach (range('A', 'H') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
+            $sheet->setCellValue($col.'2', $meta['label']);
         }
 
-        // Create file
+        // --- Header styling ---------------------------------------------------
+        foreach (self::TEMPLATE_COLUMNS as $col => $meta) {
+            $fill = self::TEMPLATE_GROUP_FILLS[$meta['group']];
+
+            $sheet->getStyle($col.'1:'.$col.'2')->applyFromArray([
+                'font' => ['bold' => true],
+                'alignment' => [
+                    'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                    'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                    'wrapText' => true,
+                ],
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => $fill],
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        'color' => ['rgb' => 'B7B7B7'],
+                    ],
+                ],
+            ]);
+
+            $sheet->getColumnDimension($col)->setWidth($meta['width']);
+        }
+
+        $sheet->getRowDimension(1)->setRowHeight(20);
+        $sheet->getRowDimension(2)->setRowHeight(46);
+
+        // --- Rows 3+: one pre-filled row per worker ---------------------------
+        $row = 3;
+
+        foreach ($this->entries as $entry) {
+            $sheet->setCellValueExplicit(
+                'A'.$row,
+                (string) ($entry['worker_passport'] ?? ''),
+                \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+            );
+            $sheet->setCellValue('B'.$row, $entry['worker_name'] ?? '');
+
+            // Passport and name are pre-filled for reference; greying them out
+            // signals that they are not meant to be edited.
+            $sheet->getStyle('A'.$row.':B'.$row)->applyFromArray([
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'F5F5F5'],
+                ],
+            ]);
+
+            $row++;
+        }
+
+        $lastRow = max($row - 1, 3);
+
+        // Keep NPL Month as text so Excel does not rewrite "Jul-2025" as a date.
+        // Scoped to the worker rows so the sheet's used range stays accurate.
+        $sheet->getStyle('K3:K'.$lastRow)
+            ->getNumberFormat()
+            ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+
+        // Light grid over the fillable area so the groups stay readable.
+        if ($row > 3) {
+            $sheet->getStyle('A3:M'.$lastRow)->applyFromArray([
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        'color' => ['rgb' => 'D9D9D9'],
+                    ],
+                ],
+            ]);
+        }
+
+        // Headers stay visible while scrolling a long worker list.
+        $sheet->freezePane('C3');
+
         $writer = new Xlsx($spreadsheet);
         $fileName = 'OT_Import_Template_'.date('Y-m-d').'.xlsx';
         $tempFile = tempnam(sys_get_temp_dir(), $fileName);
@@ -659,26 +1011,40 @@ class OTEntry extends Component
             $this->importErrors = [];
             $clabNo = auth()->user()->contractor_clab_no;
 
+            // The current template puts every transaction type on one row per
+            // worker. Templates downloaded before that used one row per
+            // transaction, so both layouts are accepted.
+            $groupedHeaderIndex = $this->detectGroupedTemplate($rows);
+
+            if ($groupedHeaderIndex !== null) {
+                $this->parseGroupedImportRows($rows, $groupedHeaderIndex);
+            }
+
+            $legacyRows = $groupedHeaderIndex === null ? $rows : [];
+
             // Process rows and intelligently skip instructions/headers
             $dataStartIndex = 0;
-            foreach ($rows as $index => $row) {
+            foreach ($legacyRows as $index => $row) {
                 $firstCell = strtoupper(trim($row[0] ?? ''));
 
                 // Skip instruction rows (starts with "INSTRUCTION")
                 if (str_starts_with($firstCell, 'INSTRUCTION')) {
                     $dataStartIndex = $index + 1;
+
                     continue;
                 }
 
                 // Skip header rows (contains typical header values)
                 if (in_array($firstCell, ['WORKER PASSPORT', 'PASSPORT', 'WORKER_PASSPORT', 'NO', 'NO.'])) {
                     $dataStartIndex = $index + 1;
+
                     continue;
                 }
 
                 // Skip example rows (check for example passport patterns like AB012345, AB012346)
                 if (in_array($firstCell, ['AB012345', 'AB012346'])) {
                     $dataStartIndex = $index + 1;
+
                     continue;
                 }
 
@@ -704,10 +1070,10 @@ class OTEntry extends Component
                 // A passport typically has no spaces and matches alphanumeric patterns (e.g. A12345678)
                 $colA = trim($row[0] ?? '');
                 $colB = trim($row[1] ?? '');
-                $colALooksLikePassport = strlen($colA) > 0 && !str_contains($colA, ' ');
-                $colBLooksLikePassport = strlen($colB) > 0 && !str_contains($colB, ' ');
-                if (!$colALooksLikePassport && $colBLooksLikePassport) {
-                    // File has Name | Passport order — swap them
+                $colALooksLikePassport = strlen($colA) > 0 && ! str_contains($colA, ' ');
+                $colBLooksLikePassport = strlen($colB) > 0 && ! str_contains($colB, ' ');
+                if (! $colALooksLikePassport && $colBLooksLikePassport) {
+                    // File has Name | Passport order â€” swap them
                     $passport = $colB;
                     $name = $colA;
                 } else {
@@ -720,6 +1086,12 @@ class OTEntry extends Component
                 $txnType = strtolower(trim($row[5] ?? ''));
                 $txnAmount = $this->sanitizeNumericValue($row[6] ?? '');
                 $txnRemarks = trim($row[7] ?? '');
+
+                // NPL columns: month the leave was taken, and how many days.
+                $rawNplMonth = is_string($row[8] ?? null) ? trim($row[8]) : ($row[8] ?? '');
+                $rawNplDays = trim((string) ($row[9] ?? ''));
+                $nplDays = $this->sanitizeNumericValue($row[9] ?? '');
+                [$nplYear, $nplMonth] = $this->nplCalculator->parseNplMonthInput($rawNplMonth);
 
                 $rowHasError = false;
 
@@ -799,11 +1171,21 @@ class OTEntry extends Component
                 if (! empty($txnType)) {
                     $validTypes = ['accommodation', 'advance_payment', 'npl', 'allowance', 'backpay', 'medical_claim'];
                     if (! in_array($txnType, $validTypes)) {
-                        $this->importErrors[] = "Row {$rowNumber}: Invalid transaction type '{$txnType}'. Must be one of: " . implode(', ', $validTypes);
+                        $this->importErrors[] = "Row {$rowNumber}: Invalid transaction type '{$txnType}'. Must be one of: ".implode(', ', $validTypes);
                         $rowHasError = true;
                     }
 
-                    if (empty($rawTxnAmount)) {
+                    if ($txnType === 'npl') {
+                        // NPL uses the NPL Month / NPL Days columns instead of an amount.
+                        $rowHasError = $this->validateImportedNplRow(
+                            $rowNumber,
+                            $rawNplMonth,
+                            $rawNplDays,
+                            $nplYear,
+                            $nplMonth,
+                            $nplDays
+                        ) || $rowHasError;
+                    } elseif (empty($rawTxnAmount)) {
                         $this->importErrors[] = "Row {$rowNumber}: Transaction amount is required when transaction type is provided";
                         $rowHasError = true;
                     } elseif ($txnAmount === null) {
@@ -812,13 +1194,10 @@ class OTEntry extends Component
                     } elseif ($txnAmount <= 0) {
                         $this->importErrors[] = "Row {$rowNumber}: Transaction amount must be greater than 0 (got {$txnAmount})";
                         $rowHasError = true;
-                    } elseif ($txnType === 'npl' && $txnAmount > 31) {
-                        $this->importErrors[] = "Row {$rowNumber}: NPL days cannot exceed 31 days (got {$txnAmount})";
-                        $rowHasError = true;
                     } elseif ($txnType === 'accommodation' && $txnAmount > 100) {
-                        $this->importErrors[] = "Row {$rowNumber}: Accommodation cannot exceed RM 100.00 per month (got RM " . number_format($txnAmount, 2) . ")";
+                        $this->importErrors[] = "Row {$rowNumber}: Accommodation cannot exceed RM 100.00 per month (got RM ".number_format($txnAmount, 2).')';
                         $rowHasError = true;
-                    } elseif ($txnType !== 'npl' && $txnAmount > 100000) {
+                    } elseif ($txnAmount > 100000) {
                         $this->importErrors[] = "Row {$rowNumber}: Transaction amount seems too high (RM {$txnAmount}). Maximum allowed is RM 100,000";
                         $rowHasError = true;
                     }
@@ -853,11 +1232,19 @@ class OTEntry extends Component
                     'ot_rest' => $otRest,
                     'ot_public' => $otPublic,
                     'transaction_type' => $txnType ?: null,
-                    'transaction_amount' => $txnAmount,
+                    // For NPL the "amount" is the day count, matching how NPL
+                    // has always been stored.
+                    'transaction_amount' => $txnType === 'npl' ? $nplDays : $txnAmount,
                     'transaction_remarks' => $txnRemarks ?: null,
+                    'npl_year' => $txnType === 'npl' ? $nplYear : null,
+                    'npl_month' => $txnType === 'npl' ? $nplMonth : null,
+                    'npl_days' => $txnType === 'npl' ? $nplDays : null,
                     'row_number' => $rowNumber,
                 ];
             }
+
+            // One NPL month may only be charged once per worker.
+            $this->validateImportedNplDuplicates();
 
             // Validate aggregate accommodation limit (RM100) per worker across all import rows + existing
             $accommodationByWorker = [];
@@ -885,7 +1272,7 @@ class OTEntry extends Component
 
                 $grandTotal = $existingAccommodation + $info['total'];
                 if ($grandTotal > 100) {
-                    $this->importErrors[] = "Worker '{$info['name']}' ({$passport}): Total accommodation RM " . number_format($grandTotal, 2) . " exceeds RM 100.00 per month limit" . ($existingAccommodation > 0 ? " (existing: RM " . number_format($existingAccommodation, 2) . " + import: RM " . number_format($info['total'], 2) . ")" : "");
+                    $this->importErrors[] = "Worker '{$info['name']}' ({$passport}): Total accommodation RM ".number_format($grandTotal, 2).' exceeds RM 100.00 per month limit'.($existingAccommodation > 0 ? ' (existing: RM '.number_format($existingAccommodation, 2).' + import: RM '.number_format($info['total'], 2).')' : '');
                 }
             }
 
@@ -907,7 +1294,7 @@ class OTEntry extends Component
                 // Show specific error details in the toast so user knows exactly what's wrong
                 $errorSummary = count($this->importErrors) === 1
                     ? $this->importErrors[0]
-                    : count($this->importErrors) . " errors found:\n" . implode("\n", array_slice($this->importErrors, 0, 3)) . (count($this->importErrors) > 3 ? "\n...and " . (count($this->importErrors) - 3) . " more. See details below." : "");
+                    : count($this->importErrors)." errors found:\n".implode("\n", array_slice($this->importErrors, 0, 3)).(count($this->importErrors) > 3 ? "\n...and ".(count($this->importErrors) - 3).' more. See details below.' : '');
 
                 Flux::toast(
                     variant: 'warning',
@@ -923,6 +1310,399 @@ class OTEntry extends Component
                 text: 'Failed to process file: '.$e->getMessage()
             );
         }
+    }
+
+    /**
+     * Detect the grouped (one row per worker) template layout.
+     *
+     * @return int|null index of the row holding the per-column headers, or null
+     *                  when the file uses the older one-row-per-transaction layout
+     */
+    protected function detectGroupedTemplate(array $rows): ?int
+    {
+        foreach (array_slice($rows, 0, 6, true) as $index => $row) {
+            $cells = array_map(
+                fn ($cell) => strtolower(trim((string) $cell)),
+                array_slice((array) $row, 0, 13)
+            );
+
+            // The legacy layout is unmistakable: it has a Transaction Type column.
+            if (in_array('transaction type', $cells, true)) {
+                return null;
+            }
+
+            foreach ($cells as $cell) {
+                if (str_contains($cell, 'allowance transaction amount')) {
+                    return $index;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse the grouped template: one row per worker, one column per
+     * transaction type.
+     *
+     * Each worker row is expanded into the flat importData shape the preview and
+     * confirmImport already expect — one entry carrying the OT hours, plus one
+     * entry per transaction found on that row.
+     */
+    protected function parseGroupedImportRows(array $rows, int $headerRowIndex): void
+    {
+        // $headerRowIndex points at the column-header row (the banner row sits
+        // above it), so worker rows begin on the very next index.
+        foreach ($rows as $index => $row) {
+            if ($index <= $headerRowIndex) {
+                continue;
+            }
+
+            $row = (array) $row;
+            $rowNumber = $index + 1;
+
+            $passport = trim((string) ($row[0] ?? ''));
+            $name = trim((string) ($row[1] ?? ''));
+
+            if ($passport === '' && $name === '') {
+                continue;
+            }
+
+            // Ignore the sample rows shipped with hand-made templates.
+            if (in_array(strtoupper($passport), ['AB012345', 'AB012346'], true)) {
+                continue;
+            }
+
+            $otNormal = $this->sanitizeNumericValue($row[2] ?? '');
+            $otRest = $this->sanitizeNumericValue($row[3] ?? '');
+            $otPublic = $this->sanitizeNumericValue($row[4] ?? '');
+
+            $rawNplMonth = is_string($row[10] ?? null) ? trim($row[10]) : ($row[10] ?? '');
+            $rawNplDays = trim((string) ($row[11] ?? ''));
+            $sharedRemarks = trim((string) ($row[12] ?? ''));
+
+            $hasOtData = $otNormal !== null || $otRest !== null || $otPublic !== null;
+            $hasAmounts = false;
+
+            foreach (array_keys(self::TEMPLATE_AMOUNT_COLUMNS) as $col) {
+                $colIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($col) - 1;
+                if (trim((string) ($row[$colIndex] ?? '')) !== '') {
+                    $hasAmounts = true;
+                    break;
+                }
+            }
+
+            $hasNpl = ($rawNplMonth !== '' && $rawNplMonth !== null) || $rawNplDays !== '';
+
+            // Every worker is pre-filled into the template, so a row left blank
+            // simply means "nothing to report" — not an error.
+            if (! $hasOtData && ! $hasAmounts && ! $hasNpl) {
+                continue;
+            }
+
+            $workerExists = collect($this->entries)
+                ->contains(fn ($entry) => $entry['worker_passport'] === $passport);
+
+            if (! $workerExists) {
+                $this->importErrors[] = "Row {$rowNumber}: Worker with passport '{$passport}' not found in your worker list";
+
+                continue;
+            }
+
+            $rowHasError = false;
+
+            foreach ([
+                ['OT Normal Hours', $otNormal, trim((string) ($row[2] ?? ''))],
+                ['OT Rest Hours', $otRest, trim((string) ($row[3] ?? ''))],
+                ['OT Public Hours', $otPublic, trim((string) ($row[4] ?? ''))],
+            ] as [$label, $value, $raw]) {
+                if ($raw === '') {
+                    continue;
+                }
+
+                if ($value === null) {
+                    $this->importErrors[] = "Row {$rowNumber}: Invalid {$label} value '{$raw}'. Must be a valid number";
+                    $rowHasError = true;
+                } elseif ($value < 0) {
+                    $this->importErrors[] = "Row {$rowNumber}: {$label} cannot be negative ({$value})";
+                    $rowHasError = true;
+                } elseif ($value > 200) {
+                    $this->importErrors[] = "Row {$rowNumber}: {$label} seems too high ({$value}). Maximum allowed is 200 hours";
+                    $rowHasError = true;
+                }
+            }
+
+            // Collect the transaction columns that were filled in.
+            $transactions = [];
+
+            foreach (self::TEMPLATE_AMOUNT_COLUMNS as $col => $type) {
+                $colIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($col) - 1;
+                $raw = trim((string) ($row[$colIndex] ?? ''));
+
+                if ($raw === '') {
+                    continue;
+                }
+
+                $amount = $this->sanitizeNumericValue($row[$colIndex]);
+                $label = self::TEMPLATE_COLUMNS[$col]['label'];
+
+                if ($amount === null) {
+                    $this->importErrors[] = "Row {$rowNumber}: Invalid {$label} value '{$raw}'. Must be a valid number";
+                    $rowHasError = true;
+
+                    continue;
+                }
+
+                if ($amount <= 0) {
+                    $this->importErrors[] = "Row {$rowNumber}: {$label} must be greater than 0 (got {$amount})";
+                    $rowHasError = true;
+
+                    continue;
+                }
+
+                if ($type === 'accommodation' && $amount > 100) {
+                    $this->importErrors[] = "Row {$rowNumber}: Accommodation cannot exceed RM 100.00 per month (got RM ".number_format($amount, 2).')';
+                    $rowHasError = true;
+
+                    continue;
+                }
+
+                if ($amount > 100000) {
+                    $this->importErrors[] = "Row {$rowNumber}: {$label} seems too high (RM {$amount}). Maximum allowed is RM 100,000";
+                    $rowHasError = true;
+
+                    continue;
+                }
+
+                $transactions[] = [
+                    'type' => $type,
+                    'amount' => $amount,
+                    'remarks' => $sharedRemarks !== '' ? $sharedRemarks : 'Imported: '.$this->transactionTypeLabel($type),
+                    'npl_year' => null,
+                    'npl_month' => null,
+                    'npl_days' => null,
+                ];
+            }
+
+            // NPL needs both of its columns, or neither.
+            if ($hasNpl) {
+                $nplDays = $this->sanitizeNumericValue($row[11] ?? '');
+                [$nplYear, $nplMonth] = $this->nplCalculator->parseNplMonthInput($rawNplMonth);
+
+                if ($this->validateImportedNplRow($rowNumber, $rawNplMonth, $rawNplDays, $nplYear, $nplMonth, $nplDays)) {
+                    $rowHasError = true;
+                } else {
+                    $transactions[] = [
+                        'type' => 'npl',
+                        'amount' => $nplDays,
+                        'remarks' => $sharedRemarks !== '' ? $sharedRemarks : 'Imported: No-Pay Leave',
+                        'npl_year' => $nplYear,
+                        'npl_month' => $nplMonth,
+                        'npl_days' => $nplDays,
+                    ];
+                }
+            }
+
+            if ($rowHasError) {
+                continue;
+            }
+
+            // OT hours ride on their own entry so confirmImport applies them once.
+            if ($hasOtData) {
+                $this->importData[] = [
+                    'passport' => $passport,
+                    'name' => $name,
+                    'ot_normal' => $otNormal,
+                    'ot_rest' => $otRest,
+                    'ot_public' => $otPublic,
+                    'transaction_type' => null,
+                    'transaction_amount' => null,
+                    'transaction_remarks' => null,
+                    'npl_year' => null,
+                    'npl_month' => null,
+                    'npl_days' => null,
+                    'row_number' => $rowNumber,
+                ];
+            }
+
+            foreach ($transactions as $transaction) {
+                $this->importData[] = [
+                    'passport' => $passport,
+                    'name' => $name,
+                    'ot_normal' => null,
+                    'ot_rest' => null,
+                    'ot_public' => null,
+                    'transaction_type' => $transaction['type'],
+                    'transaction_amount' => $transaction['amount'],
+                    'transaction_remarks' => $transaction['remarks'],
+                    'npl_year' => $transaction['npl_year'],
+                    'npl_month' => $transaction['npl_month'],
+                    'npl_days' => $transaction['npl_days'],
+                    'row_number' => $rowNumber,
+                ];
+            }
+        }
+
+        // Duplicate NPL months are checked by processImport once both layouts
+        // have contributed their rows.
+    }
+
+    /**
+     * Human-readable name for a transaction type.
+     */
+    protected function transactionTypeLabel(string $type): string
+    {
+        return [
+            'allowance' => 'Allowance',
+            'backpay' => 'Backpay',
+            'medical_claim' => 'Medical Claim',
+            'accommodation' => 'Accommodation',
+            'advance_payment' => 'Advance Payment',
+            'npl' => 'No-Pay Leave',
+        ][$type] ?? ucfirst(str_replace('_', ' ', $type));
+    }
+
+    /**
+     * Worker id for a passport in the current entry list.
+     */
+    protected function workerIdForPassport(string $passport): int
+    {
+        foreach ($this->entries as $entry) {
+            if ($entry['worker_passport'] === $passport) {
+                return (int) $entry['worker_id'];
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Validate the NPL Month / NPL Days columns of one imported row.
+     *
+     * @return bool true when the row has an error
+     */
+    protected function validateImportedNplRow(
+        int $rowNumber,
+        $rawNplMonth,
+        string $rawNplDays,
+        ?int $nplYear,
+        ?int $nplMonth,
+        ?float $nplDays
+    ): bool {
+        $hasError = false;
+
+        if ($rawNplMonth === '' || $rawNplMonth === null) {
+            $this->importErrors[] = "Row {$rowNumber}: NPL Month is required for npl transactions (e.g. Jul-2025)";
+            $hasError = true;
+        } elseif ($nplYear === null || $nplMonth === null) {
+            $this->importErrors[] = "Row {$rowNumber}: Invalid NPL Month '{$rawNplMonth}'. Use a format like Jul-2025";
+            $hasError = true;
+        } else {
+            // Same window the on-screen picker offers.
+            $allowed = collect($this->nplCalculator->selectableMonths($this->nplEntryAnchorMonth()))
+                ->pluck('key')
+                ->all();
+            $key = sprintf('%04d-%02d', $nplYear, $nplMonth);
+
+            if (! in_array($key, $allowed, true)) {
+                $oldest = \Carbon\Carbon::create($nplYear, $nplMonth, 1)->format('M Y');
+                $this->importErrors[] = "Row {$rowNumber}: NPL Month {$oldest} is outside the allowed range (".
+                    end($allowed).' to '.reset($allowed).')';
+                $hasError = true;
+            }
+        }
+
+        if ($rawNplDays === '') {
+            $this->importErrors[] = "Row {$rowNumber}: NPL Days is required for npl transactions";
+
+            return true;
+        }
+
+        if ($nplDays === null) {
+            $this->importErrors[] = "Row {$rowNumber}: Invalid NPL Days '{$rawNplDays}'. Must be a valid number";
+
+            return true;
+        }
+
+        if ($nplDays <= 0) {
+            $this->importErrors[] = "Row {$rowNumber}: NPL Days must be greater than 0 (got {$nplDays})";
+
+            return true;
+        }
+
+        // Cannot take more unpaid days than the month actually has.
+        if ($nplYear !== null && $nplMonth !== null) {
+            $daysInMonth = $this->nplCalculator->daysInMonth($nplYear, $nplMonth);
+
+            if ($nplDays > $daysInMonth) {
+                $label = \Carbon\Carbon::create($nplYear, $nplMonth, 1)->format('M Y');
+                $this->importErrors[] = "Row {$rowNumber}: NPL Days ({$nplDays}) cannot exceed the {$daysInMonth} days in {$label}";
+                $hasError = true;
+            }
+        }
+
+        return $hasError;
+    }
+
+    /**
+     * Reject the same NPL month appearing twice for one worker, whether across
+     * two import rows or against a transaction the worker already has.
+     */
+    protected function validateImportedNplDuplicates(): void
+    {
+        $seen = [];
+        $rejected = [];
+
+        foreach ($this->importData as $position => $item) {
+            if ($item['transaction_type'] !== 'npl' || empty($item['npl_year'])) {
+                continue;
+            }
+
+            $key = $item['passport'].'|'.sprintf('%04d-%02d', $item['npl_year'], $item['npl_month']);
+            $label = \Carbon\Carbon::create($item['npl_year'], $item['npl_month'], 1)->format('M Y');
+
+            if (isset($seen[$key])) {
+                $this->importErrors[] = "Row {$item['row_number']}: NPL for {$label} is already listed on row {$seen[$key]} for '{$item['name']}'";
+                $rejected[] = $position;
+
+                continue;
+            }
+
+            $seen[$key] = $item['row_number'];
+
+            // Also guard against months already recorded on the worker's entry.
+            // In override mode the existing transactions are discarded, so skip.
+            if ($this->importMode === 'override') {
+                continue;
+            }
+
+            foreach ($this->entries as $entry) {
+                if ($entry['worker_passport'] !== $item['passport']) {
+                    continue;
+                }
+
+                $existing = collect($entry['transactions'] ?? [])
+                    ->where('type', 'npl')
+                    ->flatMap(fn ($txn) => collect($txn['npl_details'] ?? [])
+                        ->map(fn ($d) => sprintf('%04d-%02d', $d['npl_year'], $d['npl_month'])))
+                    ->all();
+
+                if (in_array(sprintf('%04d-%02d', $item['npl_year'], $item['npl_month']), $existing, true)) {
+                    $this->importErrors[] = "Row {$item['row_number']}: NPL for {$label} is already recorded for '{$item['name']}'";
+                    $rejected[] = $position;
+                }
+
+                break;
+            }
+        }
+
+        // Drop the rejected rows so a flagged duplicate cannot be imported
+        // anyway — the preview lists only what will actually be applied.
+        foreach ($rejected as $position) {
+            unset($this->importData[$position]);
+        }
+
+        $this->importData = array_values($this->importData);
     }
 
     public function confirmImport()
@@ -968,11 +1748,31 @@ class OTEntry extends Component
 
                 // Add transaction if provided
                 if ($item['transaction_type']) {
-                    $groupedData[$passport]['transactions'][] = [
+                    $transaction = [
                         'type' => $item['transaction_type'],
                         'amount' => $item['transaction_amount'],
                         'remarks' => $item['transaction_remarks'],
                     ];
+
+                    // Build the per-month NPL breakdown so imported NPL is
+                    // valued the same way as NPL entered on screen.
+                    if ($item['transaction_type'] === 'npl' && ! empty($item['npl_year'])) {
+                        $monthlySalary = $this->nplCalculator->resolveMonthlySalary(
+                            $this->workerIdForPassport($passport),
+                            auth()->user()->contractor_clab_no
+                        );
+
+                        $transaction['npl_details'] = [
+                            $this->nplCalculator->calculateMonth(
+                                $monthlySalary,
+                                $item['npl_year'],
+                                $item['npl_month'],
+                                (float) $item['npl_days']
+                            ),
+                        ];
+                    }
+
+                    $groupedData[$passport]['transactions'][] = $transaction;
                 }
             }
 
@@ -999,7 +1799,7 @@ class OTEntry extends Component
 
                     $totalAccommodation = $existingAccommodation + $importAccommodation;
                     if ($totalAccommodation > 100) {
-                        $accommodationErrors[] = "Worker '{$data['name']}' ({$passport}): Total accommodation RM " . number_format($totalAccommodation, 2) . " exceeds RM 100.00 limit";
+                        $accommodationErrors[] = "Worker '{$data['name']}' ({$passport}): Total accommodation RM ".number_format($totalAccommodation, 2).' exceeds RM 100.00 limit';
                     }
                 }
             }
@@ -1010,6 +1810,7 @@ class OTEntry extends Component
                     heading: 'Accommodation Limit Exceeded',
                     text: implode('. ', $accommodationErrors)
                 );
+
                 return;
             }
 

@@ -98,7 +98,7 @@ class SalaryDetail extends Component
     {
         $activeWorkerIds = \App\Models\Worker::where('wkr_status', '1')->pluck('wkr_id');
         $this->workers = $this->submission->workers()
-            ->with(['worker', 'transactions'])
+            ->with(['worker', 'transactions.nplDetails'])
             ->whereIn('worker_id', $activeWorkerIds)
             ->get();
     }

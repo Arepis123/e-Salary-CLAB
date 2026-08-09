@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Contractor;
 use App\Models\ContractWorker;
+use App\Models\MonthlyOTEntry;
 use App\Models\Worker;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -334,12 +336,14 @@ class ContractWorkerService
             $previousYear--;
         }
 
-        // Get workers who had OT in the previous month's payroll
-        $workersWithOT = \App\Models\PayrollWorker::whereHas('payrollSubmission', function ($query) use ($clabNo, $previousMonth, $previousYear) {
-            $query->where('contractor_clab_no', $clabNo)
-                ->where('month', $previousMonth)
-                ->where('year', $previousYear);
-        })
+        // Read OT from the same source the payroll build reads it from
+        // (MonthlyOTEntry). Deriving it from the previous month's
+        // PayrollSubmission instead makes each generated submission re-trigger
+        // the carry-over the following month, chaining indefinitely.
+        $workersWithOT = MonthlyOTEntry::where('contractor_clab_no', $clabNo)
+            ->where('entry_month', $previousMonth)
+            ->where('entry_year', $previousYear)
+            ->whereIn('status', ['submitted', 'locked'])
             ->where(function ($query) {
                 $query->where('ot_normal_hours', '>', 0)
                     ->orWhere('ot_rest_hours', '>', 0)
@@ -351,6 +355,9 @@ class ContractWorkerService
         if ($workersWithOT->isEmpty()) {
             return collect([]);
         }
+
+        $otMonthStart = Carbon::create($previousYear, $previousMonth, 1)->startOfMonth();
+        $otMonthEnd = $otMonthStart->copy()->endOfMonth();
 
         // Get these workers from Worker model with their contract info
         return Worker::whereIn('wkr_id', $workersWithOT)
@@ -366,7 +373,21 @@ class ContractWorkerService
                 $worker->contract_info = $contract;
 
                 return $worker;
-            });
+            })
+            ->filter(function ($worker) use ($otMonthStart, $otMonthEnd) {
+                $contract = $worker->contract_info;
+
+                if ($contract === null || ! $contract->con_end || ! $contract->con_start) {
+                    return false;
+                }
+
+                // The contract must have been running during the OT month itself.
+                // This carries unpaid OT exactly one month past contract end,
+                // rather than trailing the worker forever.
+                return $contract->con_end->greaterThanOrEqualTo($otMonthStart)
+                    && $contract->con_start->lessThanOrEqualTo($otMonthEnd);
+            })
+            ->values();
     }
 
     /**

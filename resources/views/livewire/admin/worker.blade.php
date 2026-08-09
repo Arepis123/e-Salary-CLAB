@@ -132,10 +132,20 @@
                 <flux:table.rows>
                     @forelse($workers as $index => $worker)
                         @php
-                            $passportExpiryTime = $worker['passport_expiry'] !== 'N/A' ? strtotime($worker['passport_expiry']) : null;
-                            $permitExpiryTime = $worker['permit_expiry'] !== 'N/A' ? strtotime($worker['permit_expiry']) : null;
-                            $oneMonthAway = strtotime('+1 month');
-                            $threeMonthsAway = strtotime('+3 months');
+                            // Dates arrive as d/m/Y; strtotime() would read them as m/d/Y
+                            $expiryToTimestamp = function ($date) {
+                                if ($date === 'N/A' || empty($date)) {
+                                    return null;
+                                }
+                                $parsed = \DateTime::createFromFormat('d/m/Y', $date);
+
+                                return $parsed ? $parsed->setTime(0, 0)->getTimestamp() : null;
+                            };
+
+                            $passportExpiryTime = $expiryToTimestamp($worker['passport_expiry']);
+                            $permitExpiryTime = $expiryToTimestamp($worker['permit_expiry']);
+                            $oneMonthAway = strtotime('+1 month midnight');
+                            $threeMonthsAway = strtotime('+3 months midnight');
 
                             $passportClass = '';
                             $permitClass = '';

@@ -775,7 +775,7 @@ class Report extends Component
             ->keyBy('contractor_clab_no');
 
         // Get OT entries with transactions for this submission period
-        $otEntries = MonthlyOTEntry::with('transactions')
+        $otEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('submission_month', $selectedMonth)
             ->where('submission_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
@@ -871,6 +871,10 @@ class Report extends Component
                 $advanceSalary = 0;
                 $clientDeduction = 0;
                 $npl = 0;
+                // NPL is recorded in days; these carry the ringgit value and the
+                // months the leave was actually taken.
+                $nplAmount = 0;
+                $nplMonths = [];
                 $accommodation = 0;
                 $medicalClaim = 0;
 
@@ -886,6 +890,10 @@ class Report extends Component
                             $clientDeduction += $transaction->amount;
                         } elseif ($transaction->type === 'npl') {
                             $npl += $transaction->amount;
+                            $nplAmount += $transaction->nplAmount((float) $salary);
+                            foreach ($transaction->nplDetails as $detail) {
+                                $nplMonths[] = $detail->month_label;
+                            }
                         } elseif ($transaction->type === 'accommodation') {
                             $accommodation += $transaction->amount;
                         } elseif ($transaction->type === 'medical_claim') {
@@ -945,6 +953,8 @@ class Report extends Component
                     'advance_salary' => $advanceSalary,
                     'client_deduction' => $clientDeduction,
                     'npl' => $npl,
+                    'npl_amount' => $nplAmount,
+                    'npl_months' => array_values(array_unique($nplMonths)),
                     'accommodation' => $accommodation,
                     'medical_claim' => $medicalClaim,
                     'template_deductions' => $templateDeductions,
@@ -979,7 +989,7 @@ class Report extends Component
      *  - Single month (default): a roster of every eligible worker with their
      *    payroll period for the selected month and whether it is charged that
      *    month (period matches a target period).
-     *  - All periods ($phoneAllPeriods): the full history — one row per month
+     *  - All periods ($phoneAllPeriods): the full history â€” one row per month
      *    where the deduction was actually charged across the worker's payroll
      *    record.
      */
@@ -989,7 +999,7 @@ class Report extends Component
         $selectedYear = $this->selectedYear ?? now()->year;
         $allPeriods = $this->phoneAllPeriods;
 
-        // Active phone deduction template(s) — the contractor-level "Phone Topup"
+        // Active phone deduction template(s) â€” the contractor-level "Phone Topup"
         $phoneTemplates = \App\Models\DeductionTemplate::active()
             ->where('name', 'like', '%phone%')
             ->get();
@@ -1228,7 +1238,7 @@ class Report extends Component
             ->keyBy('contractor_clab_no');
 
         // Get OT entries with transactions for this submission period
-        $otEntries = MonthlyOTEntry::with('transactions')
+        $otEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('submission_month', $selectedMonth)
             ->where('submission_year', $selectedYear)
             ->whereIn('contractor_clab_no', $allClabNos)
@@ -1349,7 +1359,7 @@ class Report extends Component
         // Get all OT entries for the selected period (with their transactions)
         // This shows OT entries where entry_month/year matches the selected period
         // Include draft, submitted, and locked statuses
-        $entries = MonthlyOTEntry::with('transactions')
+        $entries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
@@ -1389,8 +1399,13 @@ class Report extends Component
             $advanceSalary = 0;
             $deduction = 0;
             $npl = 0;
+            // NPL is recorded in days; these carry the ringgit value and the
+            // months the leave was actually taken.
+            $nplAmount = 0;
+            $nplMonths = [];
             $accommodation = 0;
             $medicalClaim = 0;
+            $entrySalary = (float) ($workerSalaries[$entry->worker_id] ?? 0);
 
             foreach ($entry->transactions as $transaction) {
                 if ($transaction->type === 'allowance') {
@@ -1403,6 +1418,10 @@ class Report extends Component
                     $deduction += $transaction->amount;
                 } elseif ($transaction->type === 'npl') {
                     $npl += $transaction->amount;
+                    $nplAmount += $transaction->nplAmount($entrySalary);
+                    foreach ($transaction->nplDetails as $detail) {
+                        $nplMonths[] = $detail->month_label;
+                    }
                 } elseif ($transaction->type === 'accommodation') {
                     $accommodation += $transaction->amount;
                 } elseif ($transaction->type === 'medical_claim') {
@@ -1427,6 +1446,8 @@ class Report extends Component
                 'advance_salary' => $advanceSalary,
                 'deduction' => $deduction,
                 'npl' => $npl,
+                'npl_amount' => $nplAmount,
+                'npl_months' => array_values(array_unique($nplMonths)),
                 'accommodation' => $accommodation,
                 'medical_claim' => $medicalClaim,
                 'ot_normal' => $entry->ot_normal_hours,
@@ -1450,7 +1471,7 @@ class Report extends Component
         $selectedYear = $this->selectedYear ?? now()->year;
 
         // Get all OT entries for the selected period (include draft, submitted, locked)
-        $entries = MonthlyOTEntry::with('transactions')
+        $entries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('entry_month', $selectedMonth)
             ->where('entry_year', $selectedYear)
             ->whereIn('status', ['draft', 'submitted', 'locked'])
