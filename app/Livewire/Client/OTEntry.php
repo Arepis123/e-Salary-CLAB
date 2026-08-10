@@ -834,7 +834,7 @@ class OTEntry extends Component
         'H' => ['label' => 'Medical Claim Transaction Amount (RM)', 'group' => 'earning', 'width' => 23.4],
         'I' => ['label' => 'Accommodation Transaction Amount (RM)', 'group' => 'deduction', 'width' => 23.4],
         'J' => ['label' => 'Advance Payment Transaction Amount (RM)', 'group' => 'deduction', 'width' => 23.4],
-        'K' => ['label' => 'NPL Month', 'group' => 'deduction', 'width' => 11.7],
+        'K' => ['label' => 'NPL Month & Year', 'group' => 'deduction', 'width' => 11.7],
         'L' => ['label' => 'NPL Days', 'group' => 'deduction', 'width' => 10.6],
         'M' => ['label' => 'Remarks', 'group' => 'identity', 'width' => 30],
     ];
@@ -847,6 +847,12 @@ class OTEntry extends Component
         'earning' => 'EBF1DE',
         'deduction' => 'F2DBDB',
     ];
+
+    /**
+     * Passport used by the worked example in the template. The importer skips
+     * this value, so the example row is harmless if left in place.
+     */
+    protected const TEMPLATE_EXAMPLE_PASSPORT = 'AB012345';
 
     /**
      * Transaction-amount columns, keyed by the transaction type they create.
@@ -922,8 +928,52 @@ class OTEntry extends Component
         $sheet->getRowDimension(1)->setRowHeight(20);
         $sheet->getRowDimension(2)->setRowHeight(46);
 
-        // --- Rows 3+: one pre-filled row per worker ---------------------------
-        $row = 3;
+        // --- Row 3: a worked example covering every column ---------------------
+        // The passport is one of the reserved sample values the importer skips,
+        // so this row is ignored even if the client forgets to delete it.
+        $exampleRow = 3;
+        $exampleMonth = $this->nplEntryAnchorMonth()->format('M-Y');
+
+        $example = [
+            'A' => self::TEMPLATE_EXAMPLE_PASSPORT,
+            'B' => 'JOHN DOE  <-- EXAMPLE ROW, DELETE BEFORE IMPORTING',
+            'C' => 10,
+            'D' => 8,
+            'E' => 4,
+            'F' => 100,
+            'G' => 200,
+            'H' => 50,
+            'I' => 80,
+            'J' => 230,
+            'K' => $exampleMonth,
+            'L' => 2,
+            'M' => 'Example only - one row per worker, fill just the columns you need',
+        ];
+
+        foreach ($example as $col => $value) {
+            if (in_array($col, ['A', 'K'], true)) {
+                $sheet->setCellValueExplicit(
+                    $col.$exampleRow,
+                    (string) $value,
+                    \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                );
+
+                continue;
+            }
+
+            $sheet->setCellValue($col.$exampleRow, $value);
+        }
+
+        $sheet->getStyle('A'.$exampleRow.':M'.$exampleRow)->applyFromArray([
+            'font' => ['italic' => true, 'color' => ['rgb' => '9C6500']],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FFF2CC'],
+            ],
+        ]);
+
+        // --- Rows 4+: one pre-filled row per worker ---------------------------
+        $row = 4;
 
         foreach ($this->entries as $entry) {
             $sheet->setCellValueExplicit(
@@ -945,17 +995,18 @@ class OTEntry extends Component
             $row++;
         }
 
-        $lastRow = max($row - 1, 3);
+        // Includes the example row, so never below its own row number.
+        $lastRow = max($row - 1, $exampleRow);
 
         // Keep NPL Month as text so Excel does not rewrite "Jul-2025" as a date.
-        // Scoped to the worker rows so the sheet's used range stays accurate.
-        $sheet->getStyle('K3:K'.$lastRow)
+        // Scoped to the filled rows so the sheet's used range stays accurate.
+        $sheet->getStyle('K'.$exampleRow.':K'.$lastRow)
             ->getNumberFormat()
             ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
 
         // Light grid over the fillable area so the groups stay readable.
-        if ($row > 3) {
-            $sheet->getStyle('A3:M'.$lastRow)->applyFromArray([
+        if ($lastRow >= $exampleRow) {
+            $sheet->getStyle('A'.$exampleRow.':M'.$lastRow)->applyFromArray([
                 'borders' => [
                     'allBorders' => [
                         'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
@@ -1368,8 +1419,9 @@ class OTEntry extends Component
                 continue;
             }
 
-            // Ignore the sample rows shipped with hand-made templates.
-            if (in_array(strtoupper($passport), ['AB012345', 'AB012346'], true)) {
+            // Ignore the worked example shipped in the template, so leaving it
+            // in place cannot create a phantom worker.
+            if (in_array(strtoupper($passport), [self::TEMPLATE_EXAMPLE_PASSPORT, 'AB012346'], true)) {
                 continue;
             }
 
