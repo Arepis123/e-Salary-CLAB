@@ -1647,7 +1647,8 @@ class OTEntry extends Component
             $this->importErrors[] = "Row {$rowNumber}: NPL Month is required for npl transactions (e.g. Jul-2025)";
             $hasError = true;
         } elseif ($nplYear === null || $nplMonth === null) {
-            $this->importErrors[] = "Row {$rowNumber}: Invalid NPL Month '{$rawNplMonth}'. Use a format like Jul-2025";
+            $this->importErrors[] = "Row {$rowNumber}: Invalid NPL Month '{$rawNplMonth}'. "
+                .'Accepted formats include Jul-2026, July-2026, Jul 2026, July 2026, 7-2026 or 2026-07';
             $hasError = true;
         } else {
             // Same window the on-screen picker offers.

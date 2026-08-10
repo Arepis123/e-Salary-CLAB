@@ -236,7 +236,9 @@ class NplCalculatorService
         }
 
         // Excel stored it as a date serial (e.g. 45839) rather than text.
-        if (is_numeric($value) && (float) $value > 1000) {
+        // Bounded to 2000-01-01..2100-01-01 so a bare year like "2026" is not
+        // mistaken for a serial (serial 2026 would be July 1905).
+        if (is_numeric($value) && (float) $value >= 36526 && (float) $value <= 73051) {
             try {
                 $date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value);
 
@@ -282,27 +284,47 @@ class NplCalculatorService
             return [$year, $month];
         }
 
-        // Anything else Carbon can make sense of (e.g. a full date).
+        // A bare number carries no month ("2026" is a year, not a period), and
+        // Carbon would read it as a time. Reject rather than guess.
+        if (preg_match('/^\d+$/', $text)) {
+            return [null, null];
+        }
+
+        // Anything else Carbon can make sense of (e.g. a full date like
+        // "01-Jul-2026"). Carbon is too permissive on its own — it reads a bare
+        // "Jul" as the current year and a bare "2026" as the time 20:26 — so
+        // only trust it when the input actually carried the year it returned.
         try {
             $date = Carbon::parse($text);
-
-            return [(int) $date->year, (int) $date->month];
         } catch (\Exception $e) {
             return [null, null];
         }
+
+        if (! preg_match('/\d{4}/', $text) || ! str_contains($text, (string) $date->year)) {
+            return [null, null];
+        }
+
+        return [(int) $date->year, (int) $date->month];
     }
 
     /**
-     * Month number from an English month name or abbreviation.
+     * Month number from a month name or abbreviation.
+     *
+     * Matched on the first three letters, so both the abbreviation and the full
+     * name work ("Jul" and "July", "Ogos" and "Ogo"). Bahasa Malaysia names are
+     * accepted alongside English, since clients type either.
      */
     protected function monthNumberFromName(string $name): ?int
     {
         $name = strtolower(substr($name, 0, 3));
 
         $months = [
+            // English
             'jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4,
             'may' => 5, 'jun' => 6, 'jul' => 7, 'aug' => 8,
             'sep' => 9, 'oct' => 10, 'nov' => 11, 'dec' => 12,
+            // Bahasa Malaysia (only those that differ from the English form)
+            'mac' => 3, 'mei' => 5, 'ogo' => 8, 'okt' => 10, 'dis' => 12,
         ];
 
         return $months[$name] ?? null;
