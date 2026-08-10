@@ -78,7 +78,9 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'ADVANCE SALARY',
             'ACCOMODATION',
             'MEDICAL CLAIM',
-            'NPL',
+            // NPL is reported as the month the leave was taken plus the day count.
+            'NPL MONTH',
+            'NPL DAYS',
             'Other Deduction',
             'Normal',
             'Rest Day',
@@ -106,6 +108,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
         $accommodation = 0;
         $medicalClaim = 0;
         $npl = 0;
+        $nplMonths = [];
         $otherDeduction = 0;
 
         if ($entry->transactions) {
@@ -122,6 +125,9 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
                     $medicalClaim += $transaction->amount;
                 } elseif ($transaction->type === 'npl') {
                     $npl += $transaction->amount;
+                    foreach ($transaction->nplDetails as $detail) {
+                        $nplMonths[] = $detail->short_month_label;
+                    }
                 } elseif ($transaction->type === 'deduction') {
                     $otherDeduction += $transaction->amount;
                 }
@@ -146,7 +152,8 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             $advanceSalary > 0 ? $advanceSalary : '', // ADVANCE SALARY
             $accommodation > 0 ? $accommodation : '', // ACCOMODATION
             $medicalClaim > 0 ? $medicalClaim : '', // MEDICAL CLAIM
-            $npl > 0 ? $npl : '', // NPL
+            ! empty($nplMonths) ? implode(', ', array_unique($nplMonths)) : '', // NPL MONTH
+            $npl > 0 ? $npl : '', // NPL DAYS
             $otherDeduction > 0 ? $otherDeduction : '', // Other Deduction
             $entry->ot_normal_hours > 0 ? $entry->ot_normal_hours : '', // Normal OT
             $entry->ot_rest_hours > 0 ? $entry->ot_rest_hours : '', // Rest OT
@@ -220,16 +227,17 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'M' => 14, // ADVANCE SALARY
             'N' => 14, // ACCOMODATION
             'O' => 14, // MEDICAL CLAIM
-            'P' => 10, // NPL
-            'Q' => 15, // Other Deduction
-            'R' => 12, // Normal
-            'S' => 12, // Rest Day
-            'T' => 14, // Public holiday
-            'U' => 12, // Total OT
+            'P' => 22, // NPL MONTH
+            'Q' => 10, // NPL DAYS
+            'R' => 15, // Other Deduction
+            'S' => 12, // Normal
+            'T' => 12, // Rest Day
+            'U' => 14, // Public holiday
+            'V' => 12, // Total OT
         ];
 
-        // Add column widths for deduction templates (starting after the fixed columns at column V)
-        $columnIndex = 21; // V = 22nd column (0-indexed = 21)
+        // Add column widths for deduction templates (starting after the fixed columns at column W)
+        $columnIndex = 22; // W = 23rd column (0-indexed = 22)
         foreach ($this->deductionTemplates as $template) {
             $columnLetter = $this->getColumnLetter($columnIndex);
             $widths[$columnLetter] = max(15, strlen($template->name) + 2);

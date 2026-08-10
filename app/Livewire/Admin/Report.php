@@ -892,7 +892,7 @@ class Report extends Component
                             $npl += $transaction->amount;
                             $nplAmount += $transaction->nplAmount((float) $salary);
                             foreach ($transaction->nplDetails as $detail) {
-                                $nplMonths[] = $detail->month_label;
+                                $nplMonths[] = $detail->short_month_label;
                             }
                         } elseif ($transaction->type === 'accommodation') {
                             $accommodation += $transaction->amount;
@@ -1420,7 +1420,7 @@ class Report extends Component
                     $npl += $transaction->amount;
                     $nplAmount += $transaction->nplAmount($entrySalary);
                     foreach ($transaction->nplDetails as $detail) {
-                        $nplMonths[] = $detail->month_label;
+                        $nplMonths[] = $detail->short_month_label;
                     }
                 } elseif ($transaction->type === 'accommodation') {
                     $accommodation += $transaction->amount;

@@ -554,7 +554,7 @@
                                     <th rowspan="2" class="px-4 py-3 text-left align-bottom text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Department</th>
                                     <th rowspan="2" class="px-4 py-3 text-right align-bottom text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Salary</th>
                                     <th colspan="4" class="{{ $groupBorder }} px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">Overtime <span class="font-normal normal-case text-zinc-400">(hrs)</span></th>
-                                    <th colspan="7" class="{{ $groupBorder }} px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Transactions <span class="font-normal normal-case text-zinc-400">(RM)</span></th>
+                                    <th colspan="8" class="{{ $groupBorder }} px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Transactions <span class="font-normal normal-case text-zinc-400">(RM)</span></th>
                                     @if($hasTemplates)
                                         <th colspan="{{ $allTemplateNames->count() }}" class="{{ $groupBorder }} px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">Deductions <span class="font-normal normal-case text-zinc-400">(RM)</span></th>
                                     @endif
@@ -571,7 +571,8 @@
                                     <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Backpay</th>
                                     <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Advance</th>
                                     <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Deduction</th>
-                                    <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">NPL</th>
+                                    <th class="px-4 pb-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">NPL Month</th>
+                                    <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">NPL Days</th>
                                     <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Accom.</th>
                                     <th class="px-4 pb-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400">Medical</th>
                                     @foreach($allTemplateNames as $templateName)
@@ -605,7 +606,8 @@
                                         <td class="{{ $num }} text-emerald-600 dark:text-emerald-400">@if($entry['backpay'] > 0){{ number_format($entry['backpay'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-amber-600 dark:text-amber-400">@if($entry['advance_salary'] > 0){{ number_format($entry['advance_salary'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-red-600 dark:text-red-400">@if($entry['client_deduction'] > 0){{ number_format($entry['client_deduction'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
-                                        <td class="{{ $num }} text-red-600 dark:text-red-400">@if($entry['npl'] > 0){{ number_format($entry['npl'], 1) }}<span class="text-xs text-zinc-400">d</span>@if(($entry['npl_amount'] ?? 0) > 0)<span class="block text-xs">RM {{ number_format($entry['npl_amount'], 2) }}</span>@endif @if(! empty($entry['npl_months']))<span class="block text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ implode(', ', $entry['npl_months']) }}</span>@endif @else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-left text-red-600 dark:text-red-400">@if(! empty($entry['npl_months'])){{ implode(', ', $entry['npl_months']) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
+                                        <td class="{{ $num }} text-red-600 dark:text-red-400">@if($entry['npl'] > 0){{ number_format($entry['npl'], 1) }}<span class="text-xs text-zinc-400">d</span>@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-yellow-600 dark:text-yellow-400">@if($entry['accommodation'] > 0){{ number_format($entry['accommodation'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         <td class="{{ $num }} text-teal-600 dark:text-teal-400">@if($entry['medical_claim'] > 0){{ number_format($entry['medical_claim'], 2) }}@else<span class="text-zinc-300 dark:text-zinc-600">&ndash;</span>@endif</td>
                                         {{-- Deductions (RM) - dynamic templates --}}
@@ -636,7 +638,8 @@
                                     <td class="{{ $num }} text-emerald-600 dark:text-emerald-400">{{ number_format($sum('backpay'), 2) }}</td>
                                     <td class="{{ $num }} text-amber-600 dark:text-amber-400">{{ number_format($sum('advance_salary'), 2) }}</td>
                                     <td class="{{ $num }} text-red-600 dark:text-red-400">{{ number_format($sum('client_deduction'), 2) }}</td>
-                                    <td class="{{ $num }} text-red-600 dark:text-red-400">{{ number_format($sum('npl'), 1) }}<span class="text-xs text-zinc-400">d</span><span class="block text-xs">RM {{ number_format($sum('npl_amount'), 2) }}</span></td>
+                                    <td class="px-4 py-3 text-left text-xs font-normal text-zinc-500 dark:text-zinc-400">RM {{ number_format($sum('npl_amount'), 2) }}</td>
+                                    <td class="{{ $num }} text-red-600 dark:text-red-400">{{ number_format($sum('npl'), 1) }}<span class="text-xs text-zinc-400">d</span></td>
                                     <td class="{{ $num }} text-yellow-600 dark:text-yellow-400">{{ number_format($sum('accommodation'), 2) }}</td>
                                     <td class="{{ $num }} text-teal-600 dark:text-teal-400">{{ number_format($sum('medical_claim'), 2) }}</td>
                                     @foreach($allTemplateNames as $templateName)

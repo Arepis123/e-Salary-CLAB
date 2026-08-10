@@ -55,6 +55,14 @@ class NplMonthDetail extends Model
     }
 
     /**
+     * "Feb 2026" style label, for table cells where the full month name is too wide.
+     */
+    public function getShortMonthLabelAttribute(): string
+    {
+        return Carbon::create($this->npl_year, $this->npl_month, 1)->format('M Y');
+    }
+
+    /**
      * Sortable YYYY-MM key.
      */
     public function getMonthKeyAttribute(): string
