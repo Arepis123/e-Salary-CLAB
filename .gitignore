@@ -23,3 +23,5 @@ yarn-error.log
 /.zed
 nul
 database/migrations/2026_04_06_000000_seed_medical_claim_announcement.php
+.claude/settings.local.json
+/.claude

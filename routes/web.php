@@ -67,6 +67,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (\Illuminate\Http\Request $request) {
         if (in_array(auth()->user()->role, ['admin', 'super_admin', 'finance'])) {
             return view('admin.dashboard');
+        } elseif (auth()->user()->role === 'management') {
+            return view('management.dashboard');
         } elseif (auth()->user()->role === 'client') {
             return view('client.dashboard');
         }
