@@ -11,11 +11,17 @@
  * leaves closed submissions and adjustment history untouched. Safe to run daily;
  * it only writes rows that actually drifted, and does nothing when they all match.
  *
- * Usage (set this as a cron job on the server):
- *   0 19 * * * php /path/to/e-payroll/run-sync-worker-names.php >> /path/to/e-payroll/storage/logs/sync-worker-names-cron.log 2>&1
+ * This boots the framework in-process and calls the console kernel directly
+ * rather than shelling out to artisan. The production host (Plesk) has exec()
+ * in disable_functions, so any subprocess approach fails there with
+ * "Call to undefined function exec()".
  *
- * The server runs on UTC, so 19:00 UTC is 03:00 MYT the next day. The exact hour
- * is not important — the job is idempotent and cheap when nothing has drifted.
+ * Usage (set this as a cron job on the server):
+ *   0 3 * * * /opt/plesk/php/8.2/bin/php /path/to/e-payroll/run-sync-worker-names.php >> /path/to/e-payroll/storage/logs/sync-worker-names-cron.log 2>&1
+ *
+ * Cron fires on the server's clock, which is not necessarily MYT. Check with
+ * `date` on the server and adjust the hour if needed; the exact time does not
+ * matter much, as the job is idempotent and cheap when nothing has drifted.
  *
  * Or with a dry run (safe preview, no changes made):
  *   php run-sync-worker-names.php --dry-run
@@ -27,8 +33,6 @@
  */
 define('BASE_PATH', __DIR__);
 define('LOG_FILE', BASE_PATH.'/storage/logs/sync-worker-names.log');
-define('PHP_BIN', PHP_BINARY);
-define('ARTISAN', BASE_PATH.'/artisan');
 
 // --------------------------------------------------------------------------
 // Helpers
@@ -42,24 +46,6 @@ function log_line(string $message): void
     echo $line;
 }
 
-function run_artisan(string $command): int
-{
-    $cmd = escapeshellarg(PHP_BIN).' '.escapeshellarg(ARTISAN).' '.$command;
-
-    log_line("Running: {$cmd}");
-
-    $output = [];
-    $returnCode = 0;
-
-    exec($cmd.' 2>&1', $output, $returnCode);
-
-    foreach ($output as $line) {
-        log_line('  '.$line);
-    }
-
-    return $returnCode;
-}
-
 // --------------------------------------------------------------------------
 // Parse arguments
 //
@@ -69,19 +55,20 @@ function run_artisan(string $command): int
 
 $args = array_slice($argv ?? [], 1);
 
-$allowed = ['--dry-run', '--all'];
-$passThrough = [];
+// Always non-interactive: the command asks for confirmation before writing when
+// it detects a TTY, which would hang the cron job.
+$options = ['--no-interaction' => true];
 
 foreach ($args as $arg) {
-    if (in_array($arg, $allowed, true)) {
-        $passThrough[] = $arg;
+    if ($arg === '--dry-run' || $arg === '--all') {
+        $options[$arg] = true;
 
         continue;
     }
 
     // Value options: --worker=141141, --month=7, --year=2026
     if (preg_match('/^--(worker|month|year)=(.+)$/', $arg, $matches)) {
-        $passThrough[] = '--'.$matches[1].'='.escapeshellarg($matches[2]);
+        $options['--'.$matches[1]] = $matches[2];
 
         continue;
     }
@@ -97,13 +84,15 @@ $dryRun = in_array('--dry-run', $args, true);
 // Sanity checks
 // --------------------------------------------------------------------------
 
-if (! file_exists(ARTISAN)) {
-    log_line('ERROR: artisan not found at '.ARTISAN);
-    exit(1);
-}
-
 if (! is_dir(BASE_PATH.'/storage/logs')) {
     mkdir(BASE_PATH.'/storage/logs', 0755, true);
+}
+
+foreach ([BASE_PATH.'/vendor/autoload.php', BASE_PATH.'/bootstrap/app.php'] as $required) {
+    if (! file_exists($required)) {
+        log_line('ERROR: not found at '.$required.' — is this script in the project root?');
+        exit(1);
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -112,12 +101,29 @@ if (! is_dir(BASE_PATH.'/storage/logs')) {
 
 log_line('========== Worker Name Sync Started'.($dryRun ? ' [DRY RUN]' : '').' ==========');
 
-// --no-interaction is always sent: the artisan command asks for confirmation
-// before writing when it detects a TTY, which would hang the cron job.
-// --no-ansi keeps escape codes out of the log file.
-$artisanArgs = trim('workers:sync-names --no-interaction --no-ansi '.implode(' ', $passThrough));
+require BASE_PATH.'/vendor/autoload.php';
 
-$code = run_artisan($artisanArgs);
+/** @var Illuminate\Foundation\Application $app */
+$app = require BASE_PATH.'/bootstrap/app.php';
+
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
+
+log_line('Running: artisan workers:sync-names '.json_encode($options));
+
+try {
+    $code = $kernel->call('workers:sync-names', $options);
+    $output = trim((string) $kernel->output());
+} catch (Throwable $e) {
+    log_line('ERROR: '.get_class($e).': '.$e->getMessage());
+    log_line('  at '.$e->getFile().':'.$e->getLine());
+    log_line('========== Worker Name Sync FAILED ==========');
+    exit(1);
+}
+
+foreach (explode(PHP_EOL, $output) as $line) {
+    log_line('  '.$line);
+}
 
 log_line('Exit code: '.$code);
 

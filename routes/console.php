@@ -21,27 +21,23 @@ Schedule::command('reminders:payment')->dailyAt('09:00');
 // Note: Penalties are now applied immediately when client submits late
 Schedule::command('penalties:apply-overdue')->dailyAt('00:01');
 
-<<<<<<< Updated upstream
+// Refresh worker name/passport snapshots from worker_db (the external system)
+// Runs daily at 3:00 AM MYT. Renames made in the other system write straight to
+// the database, so nothing in this app invalidates the copies it took at
+// submission time; this closes that gap without rewriting closed periods.
+//
+// NOTE: the scheduler does not run on the production server, so in prod this is
+// driven by a server cron calling run-sync-worker-names.php directly.
+Schedule::command('workers:sync-names --no-interaction')
+    ->dailyAt('03:00')
+    ->timezone('Asia/Kuala_Lumpur');
+
 // Auto-submit OT entries on the 16th of every month at 12:01 AM MYT.
 // Times below are MYT: the scheduler resolves them against config('app.timezone')
 // (Asia/Kuala_Lumpur), NOT the server clock, so no UTC offset is applied here.
 Schedule::command('payroll:auto-submit-ot')
     ->monthlyOn(16, '00:01')
     ->timezone('Asia/Kuala_Lumpur');
-=======
-// Refresh worker name/passport snapshots from worker_db (the external system)
-// Runs daily at 3:00 AM. Renames made in the other system write straight to the
-// database, so nothing in this app invalidates the copies it took at submission
-// time; this closes that gap for the current period without rewriting history.
-//
-// NOTE: the scheduler does not run on the production server, so in prod this is
-// driven by a server cron calling run-sync-worker-names.php directly.
-Schedule::command('workers:sync-names --no-interaction')->dailyAt('03:00');
-
-// Auto-submit OT entries on the 16th of every month at 12:01 AM (MYT/UTC+8)
-// Server runs on UTC: 16th 00:01 MYT = 15th 16:01 UTC
-Schedule::command('payroll:auto-submit-ot')->monthlyOn(15, '16:01');
->>>>>>> Stashed changes
 
 // Auto-submit timesheets on the 16th of every month at 12:03 AM MYT.
 // Runs after auto-submit-ot so OT data is already submitted when payroll is built
