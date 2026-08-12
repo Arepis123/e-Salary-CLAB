@@ -17,14 +17,16 @@ use Illuminate\Support\Facades\Log;
  * out of the read-only worker_db at submission time.
  *
  * Those snapshots are deliberate for closed periods (a paid payslip should keep
- * the name it was issued under), so by default this only touches the current
- * period plus inactive_workers, which is a live registry rather than history.
+ * the name it was issued under), so the default scope is a rolling 12-month
+ * window plus inactive_workers, which is a live registry rather than history.
+ * Anything older than the window is only reachable with --all.
  */
 class SyncWorkerNames extends Command
 {
     protected $signature = 'workers:sync-names
-        {--month= : Period month to sync (1-12, defaults to current month)}
-        {--year= : Period year to sync (defaults to current year)}
+        {--months=12 : How many months back to sync, counting the current one (default 12)}
+        {--month= : Sync one specific period month (1-12); requires --year to be meaningful}
+        {--year= : Sync one specific period year, pinning the window to a single month}
         {--worker= : Limit the sync to a single wkr_id}
         {--all : Sync every period including closed ones, and salary_adjustments history}
         {--dry-run : Show what would change without writing}';
@@ -36,19 +38,21 @@ class SyncWorkerNames extends Command
         $dryRun = (bool) $this->option('dry-run');
         $syncAll = (bool) $this->option('all');
         $workerId = $this->option('worker');
-        $month = (int) ($this->option('month') ?: now()->month);
-        $year = (int) ($this->option('year') ?: now()->year);
 
-        if ($month < 1 || $month > 12) {
-            $this->error("Invalid month: {$month}. Expected 1-12.");
+        $periods = $this->resolvePeriods();
 
+        if ($periods === null) {
             return self::FAILURE;
         }
+
+        $scopeLabel = $syncAll
+            ? 'all'
+            : collect($periods)->map(fn ($p) => "{$p['month']}/{$p['year']}")->implode(', ');
 
         if ($syncAll) {
             $this->warn('--all: syncing every period, including closed submissions and adjustment history.');
         } else {
-            $this->info("Syncing period {$month}/{$year} (plus the inactive worker registry).");
+            $this->info("Syncing period(s) {$scopeLabel} (plus the inactive worker registry).");
         }
 
         if ($workerId) {
@@ -61,7 +65,7 @@ class SyncWorkerNames extends Command
 
         $this->newLine();
 
-        $targets = $this->targets($syncAll, $month, $year);
+        $targets = $this->targets($syncAll, $periods);
 
         // One pass to find every worker referenced by the rows in scope, so the
         // external database is queried once instead of per table.
@@ -168,7 +172,7 @@ class SyncWorkerNames extends Command
         $this->info("✓ Updated {$written} row(s) and cleared the cached worker lookups.");
 
         Log::info('Worker name snapshots synced from worker_db', [
-            'scope' => $syncAll ? 'all' : "{$month}/{$year}",
+            'scope' => $scopeLabel,
             'worker_filter' => $workerId,
             'rows_updated' => $written,
             'workers' => $changedWorkerIds,
@@ -178,17 +182,83 @@ class SyncWorkerNames extends Command
     }
 
     /**
+     * Work out which periods are in scope.
+     *
+     * The default is a rolling window ending at the current month. A single
+     * month is rarely the right default here: OT for month M is entered during
+     * days 1-15 of M+1, so the period actually being worked on is the previous
+     * one, and payment/receipt activity trails it by another month.
+     *
+     * @return array<int, array{month: int, year: int}>|null null on invalid input
+     */
+    protected function resolvePeriods(): ?array
+    {
+        $month = $this->option('month');
+        $year = $this->option('year');
+
+        // An explicit --month/--year pins the window to that single period.
+        if ($month !== null || $year !== null) {
+            $month = (int) ($month ?: now()->month);
+            $year = (int) ($year ?: now()->year);
+
+            if ($month < 1 || $month > 12) {
+                $this->error("Invalid month: {$month}. Expected 1-12.");
+
+                return null;
+            }
+
+            return [['month' => $month, 'year' => $year]];
+        }
+
+        $months = (int) $this->option('months');
+
+        if ($months < 1) {
+            $this->error("Invalid --months: {$months}. Expected 1 or more.");
+
+            return null;
+        }
+
+        $cursor = now()->startOfMonth();
+
+        return collect(range(0, $months - 1))
+            ->map(fn ($offset) => [
+                'month' => (int) $cursor->copy()->subMonths($offset)->month,
+                'year' => (int) $cursor->copy()->subMonths($offset)->year,
+            ])
+            ->all();
+    }
+
+    /**
+     * Constrain a query to the periods in scope, using the given column names.
+     *
+     * @param  array<int, array{month: int, year: int}>  $periods
+     */
+    protected function scopeToPeriods($query, array $periods, string $monthColumn, string $yearColumn)
+    {
+        return $query->where(function ($outer) use ($periods, $monthColumn, $yearColumn) {
+            foreach ($periods as $period) {
+                $outer->orWhere(fn ($q) => $q
+                    ->where($monthColumn, $period['month'])
+                    ->where($yearColumn, $period['year'])
+                );
+            }
+        });
+    }
+
+    /**
      * The snapshot tables to sync, each with the scope that keeps closed
      * periods out of the way unless --all is passed.
+     *
+     * @param  array<int, array{month: int, year: int}>  $periods
      */
-    protected function targets(bool $syncAll, int $month, int $year): array
+    protected function targets(bool $syncAll, array $periods): array
     {
         $targets = [
             [
                 'label' => 'monthly_ot_entries',
                 'query' => fn () => $syncAll
                     ? MonthlyOTEntry::query()
-                    : MonthlyOTEntry::query()->where('entry_month', $month)->where('entry_year', $year),
+                    : $this->scopeToPeriods(MonthlyOTEntry::query(), $periods, 'entry_month', 'entry_year'),
             ],
             [
                 'label' => 'payroll_workers',
@@ -196,7 +266,7 @@ class SyncWorkerNames extends Command
                     ? PayrollWorker::query()
                     : PayrollWorker::query()->whereHas(
                         'payrollSubmission',
-                        fn ($q) => $q->where('month', $month)->where('year', $year)
+                        fn ($q) => $this->scopeToPeriods($q, $periods, 'month', 'year')
                     ),
             ],
             // Not period-scoped: this is a live registry of who is currently

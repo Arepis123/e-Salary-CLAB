@@ -7,9 +7,12 @@
  * of worker_db at submission time. Renames made in the other system write
  * straight to the database, so nothing here invalidates those copies on its own.
  *
- * Default scope is the current period plus the inactive worker registry, which
- * leaves closed submissions and adjustment history untouched. Safe to run daily;
- * it only writes rows that actually drifted, and does nothing when they all match.
+ * Default scope is a rolling 12-month window ending at the current month, plus
+ * the inactive worker registry. The window matters: OT for month M is entered
+ * during days 1-15 of M+1, so the period being worked on is the previous one,
+ * and a single-month scope would look at an empty period for half the cycle.
+ * Anything older than the window, and adjustment history, is left untouched.
+ * Safe to run daily; it only writes rows that actually drifted.
  *
  * This boots the framework in-process and calls the console kernel directly
  * rather than shelling out to artisan. The production host (Plesk) has exec()
@@ -29,6 +32,7 @@
  * Other options are passed straight through to the artisan command:
  *   php run-sync-worker-names.php --all
  *   php run-sync-worker-names.php --worker=141141
+ *   php run-sync-worker-names.php --months=6
  *   php run-sync-worker-names.php --month=7 --year=2026
  */
 define('BASE_PATH', __DIR__);
@@ -66,15 +70,15 @@ foreach ($args as $arg) {
         continue;
     }
 
-    // Value options: --worker=141141, --month=7, --year=2026
-    if (preg_match('/^--(worker|month|year)=(.+)$/', $arg, $matches)) {
+    // Value options: --worker=141141, --months=6, --month=7, --year=2026
+    if (preg_match('/^--(worker|months|month|year)=(.+)$/', $arg, $matches)) {
         $options['--'.$matches[1]] = $matches[2];
 
         continue;
     }
 
     log_line("ERROR: unrecognised argument '{$arg}'.");
-    log_line('Supported: --dry-run, --all, --worker=ID, --month=N, --year=YYYY');
+    log_line('Supported: --dry-run, --all, --worker=ID, --months=N, --month=N, --year=YYYY');
     exit(1);
 }
 
