@@ -123,11 +123,28 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is management (read-only executive oversight)
+     */
+    public function isManagement(): bool
+    {
+        return $this->role === 'management';
+    }
+
+    /**
      * Check if user has admin privileges (super admin or admin only)
      */
     public function hasAdminAccess(): bool
     {
         return in_array($this->role, ['super_admin', 'admin']);
+    }
+
+    /**
+     * Roles whose credentials live in this database (bcrypt) rather than the
+     * third-party auth_db. Client accounts are the only externally-authenticated role.
+     */
+    public static function locallyAuthenticatedRoles(): array
+    {
+        return ['admin', 'super_admin', 'finance', 'management'];
     }
 
     /**

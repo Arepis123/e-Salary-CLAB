@@ -40,7 +40,7 @@ class UserCreate extends Component
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:20'],
             'person_in_charge' => ['nullable', 'string', 'max:255'],
-            'role' => ['required', 'in:admin,super_admin,finance'],
+            'role' => ['required', 'in:admin,super_admin,finance,management'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 

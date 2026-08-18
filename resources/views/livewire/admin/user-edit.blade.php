@@ -19,6 +19,7 @@
             <flux:select wire:model="role" label="{{ __('Role') }}" required>
                 <option value="admin">{{ __('Admin') }}</option>
                 <option value="finance">{{ __('Finance') }}</option>
+                <option value="management">{{ __('Management') }}</option>
                 <option value="super_admin">{{ __('Super Admin') }}</option>
             </flux:select>
 

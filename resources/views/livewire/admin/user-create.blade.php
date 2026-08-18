@@ -21,7 +21,8 @@
                 <flux:select.option value="super_admin">{{ __('Super Admin') }}</flux:select.option>
                 <flux:select.option value="admin">{{ __('Admin') }}</flux:select.option>
                 <flux:select.option value="finance">{{ __('Finance') }}</flux:select.option>
-            </flux:select>            
+                <flux:select.option value="management">{{ __('Management') }}</flux:select.option>
+            </flux:select>
 
             <flux:input wire:model="password" label="{{ __('Password') }}" type="password" viewable required />
 

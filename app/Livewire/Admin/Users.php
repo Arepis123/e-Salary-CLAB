@@ -113,6 +113,7 @@ class Users extends Component
             'super_admin' => User::where('role', 'super_admin')->count(),
             'admin' => User::where('role', 'admin')->count(),
             'finance' => User::where('role', 'finance')->count(),
+            'management' => User::where('role', 'management')->count(),
         ];
 
         return view('livewire.admin.users', compact('users', 'stats'))

@@ -12,7 +12,7 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="grid gap-4 md:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
@@ -52,6 +52,16 @@
                 <flux:icon.banknotes class="size-8 text-orange-600 dark:text-orange-400" />
             </div>
         </flux:card>
+
+        <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ __('Management') }}</p>
+                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ $stats['management'] }}</p>
+                </div>
+                <flux:icon.chart-bar class="size-8 text-blue-600 dark:text-blue-400" />
+            </div>
+        </flux:card>
     </div>
 
     <!-- Users Table -->
@@ -88,6 +98,7 @@
                         <flux:select.option value="super_admin">{{ __('Super Admin') }}</flux:select.option>
                         <flux:select.option value="admin">{{ __('Admin') }}</flux:select.option>
                         <flux:select.option value="finance">{{ __('Finance') }}</flux:select.option>
+                        <flux:select.option value="management">{{ __('Management') }}</flux:select.option>
                     </flux:select>
                 </div>
                 <div>
@@ -131,6 +142,7 @@
                                     'super_admin' => 'purple',
                                     'admin' => 'green',
                                     'finance' => 'orange',
+                                    'management' => 'blue',
                                     default => 'zinc',
                                 };
                             @endphp

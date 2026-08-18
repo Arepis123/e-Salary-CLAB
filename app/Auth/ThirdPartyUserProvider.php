@@ -57,8 +57,8 @@ class ThirdPartyUserProvider implements UserProvider
                 ->orWhere('email', $username);
         })->first();
 
-        // If local user is admin, super_admin, or finance, return immediately
-        if ($localUser && in_array($localUser->role, ['admin', 'super_admin', 'finance'])) {
+        // If local user is an internal (locally-authenticated) role, return immediately
+        if ($localUser && in_array($localUser->role, User::locallyAuthenticatedRoles())) {
             return $localUser;
         }
 
@@ -105,8 +105,8 @@ class ThirdPartyUserProvider implements UserProvider
             return false;
         }
 
-        // For admin, super_admin, and finance, validate against local bcrypt password
-        if (in_array($user->role, ['admin', 'super_admin', 'finance'])) {
+        // For internal roles, validate against the local bcrypt password
+        if (in_array($user->role, User::locallyAuthenticatedRoles())) {
             return \Illuminate\Support\Facades\Hash::check($password, $user->password);
         }
 

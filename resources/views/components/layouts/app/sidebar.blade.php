@@ -18,6 +18,11 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
+                @php
+                    // Management is a read-only oversight role: it gets the dashboard and
+                    // nothing else, so it is excluded from every operational nav item below.
+                    $isManagement = auth()->user()->isManagement();
+                @endphp
                 <div class="px-3 py-2 mt-4 in-data-flux-sidebar-collapsed-desktop:hidden">
                     <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider">{{ __('MAIN') }}</h3>
                 </div>
@@ -27,7 +32,7 @@
                     <flux:sidebar.item icon="clock" :href="route('ot-entry')" :current="request()->routeIs('ot-entry')" wire:navigate>{{ __('OT Entry') }}</flux:sidebar.item>
                 @endif
 
-                @if(!auth()->user()->isFinance())
+                @if(!auth()->user()->isFinance() && !$isManagement)
                     <flux:sidebar.item icon="users" :href="route('workers')" :current="request()->routeIs('workers')" wire:navigate>{{ __('Worker') }}</flux:sidebar.item>
                     <flux:sidebar.item icon="building-office" :href="route('contractors')" :current="request()->routeIs('contractors')" wire:navigate>{{ __('Contractors') }}</flux:sidebar.item>
                 @endif
@@ -92,8 +97,10 @@
                     @endif
                 @endif
 
-                <flux:sidebar.item icon="document-text" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>{{ __('Invoices') }}</flux:sidebar.item>
-                @if(!auth()->user()->isFinance())
+                @unless($isManagement)
+                    <flux:sidebar.item icon="document-text" :href="route('invoices')" :current="request()->routeIs('invoices')" wire:navigate>{{ __('Invoices') }}</flux:sidebar.item>
+                @endunless
+                @if(!auth()->user()->isFinance() && !$isManagement)
                     <flux:sidebar.item icon="bell" :href="route('notifications')" :current="request()->routeIs('notifications')" wire:navigate>{{ __('Reminders') }}</flux:sidebar.item>
                     <flux:sidebar.item icon="newspaper" :href="route('news')" :current="request()->routeIs('news')" wire:navigate>{{ __('News') }}</flux:sidebar.item>
                 @endif

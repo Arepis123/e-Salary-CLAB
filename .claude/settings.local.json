@@ -105,7 +105,16 @@
       "PowerShell(php artisan tinker --execute=\"echo 'app.timezone = '.config\\('app.timezone'\\).PHP_EOL; \\\\$s=App\\\\Models\\\\PayrollSubmission::find\\(398\\); echo 'sub398 submitted_at \\(app tz\\): '.\\\\$s->submitted_at->toDateTimeString\\(\\).PHP_EOL; \\\\$s2=App\\\\Models\\\\PayrollSubmission::find\\(473\\); echo 'sub473 submitted_at \\(app tz\\): '.\\\\$s2->submitted_at->toDateTimeString\\(\\).PHP_EOL;\")",
       "PowerShell(php artisan tinker --execute=\"require 'C:\\\\Users\\\\offic\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--xampp-htdocs-e-payroll\\\\ae4a4143-e738-4e6e-969e-a436b5195a0b\\\\scratchpad\\\\tz.php';\")",
       "PowerShell(php artisan schedule:list)",
-      "PowerShell(.\\\\vendor\\\\bin\\\\pint routes/console.php)"
+      "PowerShell(.\\\\vendor\\\\bin\\\\pint routes/console.php)",
+      "PowerShell(php artisan tinker --execute=\"echo implode\\(',', array_map\\(fn\\(\\\\$r\\)=>array_values\\(\\(array\\)\\\\$r\\)[0], DB::select\\('SHOW TABLES'\\)\\)\\);\")",
+      "PowerShell(php artisan tinker --execute=\"require 'C:/Users/HAFIZ/AppData/Local/Temp/claude/C--xampp-htdocs-e-payroll/44487414-ce02-4707-bd3b-bf2423d68ed0/scratchpad/probe.php';\")",
+      "PowerShell(php artisan tinker --execute=\"require 'C:/Users/HAFIZ/AppData/Local/Temp/claude/C--xampp-htdocs-e-payroll/44487414-ce02-4707-bd3b-bf2423d68ed0/scratchpad/render.php';\")",
+      "PowerShell(php artisan view:clear; php artisan tinker --execute=\"require 'C:/Users/HAFIZ/AppData/Local/Temp/claude/C--xampp-htdocs-e-payroll/44487414-ce02-4707-bd3b-bf2423d68ed0/scratchpad/render.php';\")",
+      "PowerShell(./vendor/bin/pint app/Services/ManagementMetricsService.php app/Livewire/Management app/Models/User.php app/Auth/ThirdPartyUserProvider.php app/Livewire/Admin/Users.php app/Livewire/Admin/UserCreate.php app/Livewire/Admin/UserEdit.php routes/web.php)",
+      "PowerShell(php artisan test 2>&1 | Select-Object -Last 25)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(echo \"bad-arg exit code: $?\")",
+      "PowerShell($p = \"C:\\\\xampp\\\\htdocs\\\\e-payroll\\\\.claude\\\\settings.local.json\"; try { $j = Get-Content $p -Raw | ConvertFrom-Json; Write-Output \"JSON: VALID\"; Write-Output \\(\"allow entries: \" + $j.permissions.allow.Count\\); Write-Output \\(\"deny: \" + $j.permissions.deny.Count + \"  ask: \" + $j.permissions.ask.Count\\); $dupes = $j.permissions.allow | Group-Object | Where-Object { $_.Count -gt 1 }; if \\($dupes\\) { Write-Output \"duplicates:\"; $dupes | ForEach-Object { Write-Output \\(\"  x\" + $_.Count + \"  \" + $_.Name\\) } } else { Write-Output \"duplicates: none\" } } catch { Write-Output \"JSON: INVALID -> $_\" }; Write-Output \"--- leftover markers repo-wide ---\"; git diff --check; if \\($?\\) { Write-Output \"none\" })"
     ],
     "deny": [],
     "ask": []
