@@ -132,10 +132,14 @@ class PaymentCalculatorService
 
     /**
      * Calculate worker's EPF deduction (2%)
+     *
+     * EPF contributions are rounded up to the next whole ringgit. On a full
+     * RM1,700 the 2% lands on exactly RM34.00 so nothing changes; it only
+     * shows up once the wage is reduced, e.g. by unpaid leave.
      */
     public function calculateWorkerEPF(float $basicSalary): float
     {
-        return round($basicSalary * self::EPF_WORKER_RATE, 2);
+        return $this->roundEpfUp($basicSalary * self::EPF_WORKER_RATE);
     }
 
     /**
@@ -143,7 +147,18 @@ class PaymentCalculatorService
      */
     public function calculateEmployerEPF(float $basicSalary): float
     {
-        return round($basicSalary * self::EPF_EMPLOYER_RATE, 2);
+        return $this->roundEpfUp($basicSalary * self::EPF_EMPLOYER_RATE);
+    }
+
+    /**
+     * Round an EPF contribution up to the next whole ringgit.
+     *
+     * The inner round() keeps binary floating point from pushing an exact
+     * figure such as 34.00 over the line into 35.
+     */
+    protected function roundEpfUp(float $amount): float
+    {
+        return (float) ceil(round($amount, 2));
     }
 
     /**
@@ -269,11 +284,18 @@ class PaymentCalculatorService
         float $restDayOTHours = 0,
         float $publicHolidayOTHours = 0
     ): float {
-        $weekdayOT = $this->calculateWeekdayOTRate($basicSalary) * $weekdayOTHours;
-        $restDayOT = $this->calculateRestDayOTRate($basicSalary) * $restDayOTHours;
-        $publicHolidayOT = $this->calculatePublicHolidayOTRate($basicSalary) * $publicHolidayOTHours;
+        // Carry full precision through the rate chain and round once, at the
+        // end. The individual rate getters above round for display (RM8.17,
+        // RM12.26); compounding those rounded figures across a month's hours
+        // drifts by a few sen per worker against the payroll system, which
+        // works from the unrounded hourly rate.
+        $hourlyRate = $basicSalary / self::WORKING_DAYS_PER_MONTH / self::WORKING_HOURS_PER_DAY;
 
-        return round($weekdayOT + $restDayOT + $publicHolidayOT, 2);
+        return round($hourlyRate * (
+            self::OT_WEEKDAY_MULTIPLIER * $weekdayOTHours
+            + self::OT_REST_DAY_MULTIPLIER * $restDayOTHours
+            + self::OT_PUBLIC_HOLIDAY_MULTIPLIER * $publicHolidayOTHours
+        ), 2);
     }
 
     /**

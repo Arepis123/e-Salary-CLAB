@@ -76,8 +76,16 @@ class AppServiceProvider extends ServiceProvider
                             return $submission->workers->pluck('worker_id');
                         })->unique()->toArray();
 
-                        $unsubmittedWorkersCount = $activeContracts->filter(function ($contract) use ($submittedWorkerIds) {
-                            return ! in_array($contract->worker->wkr_id, $submittedWorkerIds);
+                        // Exclude workers manually deactivated by admin — the Timesheet
+                        // page filters these out, so the badge must match it.
+                        $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+
+                        $unsubmittedWorkersCount = $activeContracts->filter(function ($contract) use ($submittedWorkerIds, $manuallyInactiveIds) {
+                            $workerId = $contract->worker->wkr_id ?? null;
+
+                            return $workerId !== null
+                                && ! in_array($workerId, $manuallyInactiveIds)
+                                && ! in_array($workerId, $submittedWorkerIds);
                         })->count();
 
                         // Get pending payments count (submissions that need payment)

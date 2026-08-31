@@ -179,6 +179,58 @@ class PayrollWorker extends Model
     }
 
     /**
+     * Get total accommodation charged from all transactions.
+     *
+     * Accommodation is a DEDUCTION (see the transaction type options in
+     * resources/views/livewire/client/o-t-entry.blade.php), not an earning.
+     */
+    public function getTotalAccommodationAttribute(): float
+    {
+        return $this->transactions()
+            ->where('type', 'accommodation')
+            ->sum('amount') ?? 0;
+    }
+
+    /**
+     * Get total medical claim from all transactions.
+     *
+     * Medical claim is an EARNING, alongside allowance and backpay.
+     */
+    public function getTotalMedicalClaimAttribute(): float
+    {
+        return $this->transactions()
+            ->where('type', 'medical_claim')
+            ->sum('amount') ?? 0;
+    }
+
+    /**
+     * Every transaction type that pays the worker: allowance, backpay and
+     * medical claim.
+     *
+     * Kept separate from total_allowance because that accessor feeds
+     * calculateSalary()'s gross figure and must not change meaning.
+     */
+    public function getTotalTransactionEarningsAttribute(): float
+    {
+        return round($this->total_allowance + $this->total_medical_claim, 2);
+    }
+
+    /**
+     * Every transaction type that is charged against the worker: advance
+     * payment, deduction, NPL and accommodation.
+     */
+    public function getTotalTransactionDeductionsAttribute(): float
+    {
+        return round(
+            $this->total_advance_payment
+            + $this->total_deduction
+            + $this->total_npl
+            + $this->total_accommodation,
+            2
+        );
+    }
+
+    /**
      * Calculate all salary components using PaymentCalculatorService
      *
      * NEW SYSTEM: Contractor enters PREVIOUS month's OT hours in current month's payroll

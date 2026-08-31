@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Client;
 
+use App\Models\SalaryDeductionForm;
 use App\Services\NplCalculatorService;
 use App\Services\OTEntryService;
 use App\Services\OutstandingPayrollService;
+use App\Services\SalaryDeductionFormService;
 use App\Traits\LogsActivity;
 use Flux;
 use Livewire\Attributes\Title;
@@ -71,6 +73,21 @@ class OTEntry extends Component
 
     public $importMode = 'add'; // 'add' or 'override'
 
+    // Salary Deduction Form — the CLAB declaration the contractor's officer and
+    // the worker both sign. Generated from the deductions keyed in below, then
+    // uploaded back once signed.
+    public $deductionFormFile;
+
+    /** @var array|null metadata of the signed form already on file, if any */
+    public ?array $signedDeductionForm = null;
+
+    /**
+     * Deduction count as of the last render, so the Salary Deduction Form card
+     * is spotlighted only on the transition into needing one — not on every
+     * save once it is already showing.
+     */
+    public int $lastDeductionCount = 0;
+
     public string $autoSaveStatus = ''; // '', 'saved', 'error'
 
     public bool $isLoading = true;
@@ -87,10 +104,16 @@ class OTEntry extends Component
 
     protected NplCalculatorService $nplCalculator;
 
-    public function boot(OTEntryService $otEntryService, NplCalculatorService $nplCalculator)
-    {
+    protected SalaryDeductionFormService $deductionFormService;
+
+    public function boot(
+        OTEntryService $otEntryService,
+        NplCalculatorService $nplCalculator,
+        SalaryDeductionFormService $deductionFormService
+    ) {
         $this->otEntryService = $otEntryService;
         $this->nplCalculator = $nplCalculator;
+        $this->deductionFormService = $deductionFormService;
     }
 
     public function mount()
@@ -143,6 +166,13 @@ class OTEntry extends Component
 
         // Get or create entries for this contractor
         $this->loadEntries();
+
+        // Salary Deduction Form already signed and uploaded for this period?
+        $this->loadSignedDeductionForm();
+
+        // Baseline for the spotlight: deductions already present on load are
+        // not "new", so the card stays calm until one is actually added.
+        $this->lastDeductionCount = $this->deductionWorkersCount;
 
         // Check submission status
         $this->hasSubmitted = $this->otEntryService->hasSubmittedEntries($clabNo);
@@ -201,6 +231,242 @@ class OTEntry extends Component
                 })->toArray(),
             ];
         })->toArray();
+    }
+
+    /**
+     * How many workers currently have a deduction that needs a signed form.
+     *
+     * Computed rather than stored: transactions are mutated from several paths
+     * (the modal, removals, imports) that never round-trip through
+     * loadEntries(), so a cached count would go stale and the form panel would
+     * not react to what was just keyed in.
+     */
+    public function getDeductionWorkersCountProperty(): int
+    {
+        return $this->deductionFormService->countWorkersWithDeductions($this->entries);
+    }
+
+    /**
+     * Load the signed Salary Deduction Form already uploaded for this period.
+     */
+    protected function loadSignedDeductionForm(): void
+    {
+        $record = SalaryDeductionForm::forPeriod(
+            auth()->user()->contractor_clab_no,
+            (int) $this->period['entry_month'],
+            (int) $this->period['entry_year']
+        );
+
+        $this->signedDeductionForm = $record ? [
+            'id' => $record->id,
+            'file_name' => $record->file_name,
+            'file_size' => $record->file_size_for_humans,
+            'workers_count' => $record->workers_count,
+            'uploaded_at' => optional($record->uploaded_at)->format('d M Y, g:i A'),
+        ] : null;
+    }
+
+    /**
+     * Download the pre-filled Salary Deduction Form — one signature page per
+     * worker who has a deduction keyed in for this entry period, bundled into
+     * a single PDF the contractor prints, signs with the worker, and uploads
+     * back via uploadDeductionForm().
+     */
+    public function downloadDeductionForm()
+    {
+        $clabNo = auth()->user()->contractor_clab_no;
+
+        // Deductions may have been typed but not yet flushed to the database;
+        // the form is built from the in-memory entries so it always matches
+        // what the client sees on screen.
+        $forms = $this->deductionFormService->buildFormsFromEntries($this->entries);
+
+        if (empty($forms)) {
+            Flux::toast(
+                variant: 'warning',
+                heading: 'No Deductions',
+                text: 'No worker has a deduction recorded for this period, so there is nothing to declare.'
+            );
+
+            return null;
+        }
+
+        $logoPath = public_path('logo-clab.png');
+
+        $pdf = \PDF::loadView('client.salary-deduction-form-pdf', [
+            'forms' => $forms,
+            'applicant' => $this->deductionFormService->applicantDetails($clabNo),
+            'entryPeriodName' => $this->period['entry_month_name'],
+            'logoPath' => file_exists($logoPath) ? $logoPath : null,
+        ])->setPaper('a4', 'portrait');
+
+        $fileName = $this->deductionFormService->fileName(
+            $clabNo,
+            (int) $this->period['entry_month'],
+            (int) $this->period['entry_year']
+        );
+
+        $this->logOTActivity(
+            action: 'downloaded_deduction_form',
+            description: 'Downloaded Salary Deduction Form for '.$this->period['entry_month_name'],
+            properties: [
+                'entry_period' => $this->period['entry_month_name'],
+                'workers_count' => count($forms),
+            ]
+        );
+
+        return response()->streamDownload(
+            fn () => print ($pdf->output()),
+            $fileName,
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
+    /**
+     * Store the signed Salary Deduction Form. One file per entry period —
+     * re-uploading replaces whatever was there before.
+     */
+    public function uploadDeductionForm()
+    {
+        $this->validate([
+            'deductionFormFile' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ], [
+            'deductionFormFile.required' => 'Please choose the signed form to upload.',
+            'deductionFormFile.mimes' => 'The signed form must be a PDF or an image (JPG/PNG).',
+            'deductionFormFile.max' => 'The signed form may not be larger than 10 MB.',
+        ]);
+
+        $clabNo = auth()->user()->contractor_clab_no;
+        $month = (int) $this->period['entry_month'];
+        $year = (int) $this->period['entry_year'];
+
+        try {
+            $existing = SalaryDeductionForm::forPeriod($clabNo, $month, $year);
+
+            $directory = 'salary-deduction-forms/'.$clabNo.'/'.$year.'-'.str_pad((string) $month, 2, '0', STR_PAD_LEFT);
+
+            // Whatever the client named it on their machine, it is stored and
+            // served back as Deduction_Form_<Client>_<Month>_<Year>.
+            $fileName = $this->deductionFormService->fileName(
+                $clabNo,
+                $month,
+                $year,
+                $this->deductionFormFile->getClientOriginalExtension() ?: $this->deductionFormFile->extension()
+            );
+
+            $storedPath = $this->deductionFormFile->storeAs($directory, $fileName, 'local');
+
+            // Drop the superseded file only after the new one is safely stored,
+            // and never when re-uploading has just written over it in place.
+            if ($existing && $existing->file_path !== $storedPath
+                && \Storage::disk('local')->exists($existing->file_path)) {
+                \Storage::disk('local')->delete($existing->file_path);
+            }
+
+            SalaryDeductionForm::updateOrCreate(
+                [
+                    'contractor_clab_no' => $clabNo,
+                    'entry_month' => $month,
+                    'entry_year' => $year,
+                ],
+                [
+                    'file_path' => $storedPath,
+                    'file_name' => $fileName,
+                    'file_size' => $this->deductionFormFile->getSize(),
+                    'mime_type' => $this->deductionFormFile->getMimeType(),
+                    'workers_count' => $this->deductionWorkersCount,
+                    'uploaded_by' => auth()->id(),
+                    'uploaded_at' => now(),
+                ]
+            );
+
+            $this->reset('deductionFormFile');
+            $this->loadSignedDeductionForm();
+
+            $this->logOTActivity(
+                action: 'uploaded_deduction_form',
+                description: 'Uploaded signed Salary Deduction Form for '.$this->period['entry_month_name'],
+                properties: [
+                    'entry_period' => $this->period['entry_month_name'],
+                    'workers_count' => $this->deductionWorkersCount,
+                ]
+            );
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Uploaded',
+                text: 'Signed Salary Deduction Form uploaded successfully.'
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Upload Failed',
+                text: 'Could not upload the signed form: '.$e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Download the signed form back, so the client can check what they sent.
+     */
+    public function downloadSignedDeductionForm()
+    {
+        $record = SalaryDeductionForm::forPeriod(
+            auth()->user()->contractor_clab_no,
+            (int) $this->period['entry_month'],
+            (int) $this->period['entry_year']
+        );
+
+        if (! $record || ! \Storage::disk('local')->exists($record->file_path)) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'File Missing',
+                text: 'The signed form could not be found in storage. Please upload it again.'
+            );
+
+            $this->loadSignedDeductionForm();
+
+            return null;
+        }
+
+        return \Storage::disk('local')->download($record->file_path, $record->file_name);
+    }
+
+    /**
+     * Remove the signed form so a corrected one can be uploaded.
+     */
+    public function removeSignedDeductionForm()
+    {
+        $record = SalaryDeductionForm::forPeriod(
+            auth()->user()->contractor_clab_no,
+            (int) $this->period['entry_month'],
+            (int) $this->period['entry_year']
+        );
+
+        if (! $record) {
+            $this->loadSignedDeductionForm();
+
+            return;
+        }
+
+        if (\Storage::disk('local')->exists($record->file_path)) {
+            \Storage::disk('local')->delete($record->file_path);
+        }
+
+        $record->delete();
+        $this->loadSignedDeductionForm();
+
+        $this->logOTActivity(
+            action: 'removed_deduction_form',
+            description: 'Removed signed Salary Deduction Form for '.$this->period['entry_month_name'],
+            properties: ['entry_period' => $this->period['entry_month_name']]
+        );
+
+        Flux::toast(
+            variant: 'success',
+            heading: 'Removed',
+            text: 'Signed form removed. You can upload a replacement.'
+        );
     }
 
     public function saveDraft()
@@ -406,6 +672,24 @@ class OTEntry extends Component
         } catch (\Exception $e) {
             $this->autoSaveStatus = 'error';
         }
+
+        $this->spotlightDeductionFormIfNewlyNeeded();
+    }
+
+    /**
+     * Tell the browser to draw attention to the Salary Deduction Form card the
+     * moment a worker first needs one. The card sits below the entry table, so
+     * without this the client can finish keying in and never notice it.
+     */
+    protected function spotlightDeductionFormIfNewlyNeeded(): void
+    {
+        $count = $this->deductionWorkersCount;
+
+        if ($count > 0 && $this->lastDeductionCount === 0) {
+            $this->dispatch('salary-deduction-form-needed');
+        }
+
+        $this->lastDeductionCount = $count;
     }
 
     public function openTransactionModal($workerIndex)
@@ -1529,7 +1813,7 @@ class OTEntry extends Component
                 $transactions[] = [
                     'type' => $type,
                     'amount' => $amount,
-                    'remarks' => $sharedRemarks !== '' ? $sharedRemarks : 'Imported: '.$this->transactionTypeLabel($type),
+                    'remarks' => $sharedRemarks,
                     'npl_year' => null,
                     'npl_month' => null,
                     'npl_days' => null,
@@ -1547,7 +1831,7 @@ class OTEntry extends Component
                     $transactions[] = [
                         'type' => 'npl',
                         'amount' => $nplDays,
-                        'remarks' => $sharedRemarks !== '' ? $sharedRemarks : 'Imported: No-Pay Leave',
+                        'remarks' => $sharedRemarks,
                         'npl_year' => $nplYear,
                         'npl_month' => $nplMonth,
                         'npl_days' => $nplDays,

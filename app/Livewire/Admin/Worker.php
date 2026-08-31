@@ -173,8 +173,8 @@ class Worker extends Component
         $trueActiveCount = $activeContractWorkerIds->diff($manuallyInactiveIds)->count();
 
         $this->stats = [
-            'total'    => $totalWorkers,
-            'active'   => $trueActiveCount,
+            'total' => $totalWorkers,
+            'active' => $trueActiveCount,
             'on_leave' => 0,
             'inactive' => $inactiveCount,
         ];
@@ -203,7 +203,7 @@ class Worker extends Component
     public function getWorkersData()
     {
         // Start with all contracted workers
-        $query = ContractWorker::with(['worker.country', 'contractor']);
+        $query = ContractWorker::with(['worker.country', 'worker.latestBank', 'contractor']);
 
         // Apply search filter
         if ($this->search) {
@@ -256,6 +256,9 @@ class Worker extends Component
                 'country' => $worker && $worker->country
                     ? $worker->country->cty_desc
                     : 'N/A',
+                'bank_name' => $worker?->latestBank?->bank_name ?: 'N/A',
+                'bank_color' => \App\Models\WorkerBank::colorFor($worker?->latestBank?->bank_name),
+                'account_no' => $worker?->latestBank?->account_no ?: 'N/A',
                 'contract_start' => $contractWorker->con_start ? $contractWorker->con_start->format('d/m/Y') : 'N/A',
                 'contract_end' => $contractWorker->con_end ? $contractWorker->con_end->format('d/m/Y') : 'N/A',
             ];
@@ -294,6 +297,8 @@ class Worker extends Component
                 'position' => strtolower($a['position']),
                 'country' => strtolower($a['country']),
                 'client' => strtolower($a['client']),
+                'bank_name' => strtolower($a['bank_name']),
+                'account_no' => strtolower($a['account_no']),
                 'passport_expiry' => $dateToTimestamp($a['passport_expiry']),
                 'permit_expiry' => $dateToTimestamp($a['permit_expiry']),
                 'status' => $a['status'] === 'Active' ? 0 : 1,
@@ -306,6 +311,8 @@ class Worker extends Component
                 'position' => strtolower($b['position']),
                 'country' => strtolower($b['country']),
                 'client' => strtolower($b['client']),
+                'bank_name' => strtolower($b['bank_name']),
+                'account_no' => strtolower($b['account_no']),
                 'passport_expiry' => $dateToTimestamp($b['passport_expiry']),
                 'permit_expiry' => $dateToTimestamp($b['permit_expiry']),
                 'status' => $b['status'] === 'Active' ? 0 : 1,

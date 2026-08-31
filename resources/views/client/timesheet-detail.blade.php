@@ -179,6 +179,10 @@
                                                     <div class="text-xs text-zinc-900 dark:text-zinc-100">
                                                         @if($transaction->type === 'allowance')
                                                             +RM {{ number_format($transaction->amount, 2) }} (Allowance)
+                                                        @elseif($transaction->type === 'backpay')
+                                                            +RM {{ number_format($transaction->amount, 2) }} (Backpay)
+                                                        @elseif($transaction->type === 'medical_claim')
+                                                            +RM {{ number_format($transaction->amount, 2) }} (Medical Claim)
                                                         @elseif($transaction->type === 'npl')
                                                             {{ $transaction->amount }} {{ $transaction->amount == 1 ? 'day' : 'days' }} (NPL)
                                                         @elseif($transaction->type === 'advance_payment')
@@ -261,38 +265,45 @@
                 <!-- Invoice Summary -->
                 <div class="mt-6">
                     <h3 class="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">Invoice Summary</h3>
-                    <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                        <div class="space-y-2">
-                            <div class="flex justify-between text-sm">
-                                <span class="text-zinc-600 dark:text-zinc-400">Total Amount (Payroll)</span>
-                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->admin_final_amount, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }})</span>
-                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->service_charge, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-zinc-600 dark:text-zinc-400">SST (8%)</span>
-                                <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->sst, 2) }}</span>
-                            </div>
-                            @if($submission->has_penalty)
-                                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2 flex justify-between">
-                                    <span class="font-semibold text-zinc-900 dark:text-zinc-100">Grand Total</span>
-                                    <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
+                    {{-- Without the approved file's itemisation the detail would be
+                         derived rather than billed figures, so fall back to the
+                         plain summary. --}}
+                    @if($submission->hasBreakdownItemisation())
+                        <x-payment-breakdown :submission="$submission" />
+                    @else
+                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-zinc-600 dark:text-zinc-400">Total Amount (Payroll)</span>
+                                    <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->admin_final_amount, 2) }}</span>
                                 </div>
-                                <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2">
-                                    <div class="flex justify-between text-sm text-red-600 dark:text-red-400">
-                                        <span>Late Payment Penalty (8%)</span>
-                                        <span class="font-medium">RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }})</span>
+                                    <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->service_charge, 2) }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-zinc-600 dark:text-zinc-400">SST (8%)</span>
+                                    <span class="font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->sst, 2) }}</span>
+                                </div>
+                                @if($submission->has_penalty)
+                                    <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2 flex justify-between">
+                                        <span class="font-semibold text-zinc-900 dark:text-zinc-100">Grand Total</span>
+                                        <span class="font-semibold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->client_total, 2) }}</span>
                                     </div>
+                                    <div class="border-t border-zinc-200 dark:border-zinc-700 pt-2">
+                                        <div class="flex justify-between text-sm text-red-600 dark:text-red-400">
+                                            <span>Late Payment Penalty (8%)</span>
+                                            <span class="font-medium">RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
+                                        </div>
+                                    </div>
+                                @endif
+                                <div class="border-t-2 border-zinc-300 dark:border-zinc-600 pt-2 flex justify-between">
+                                    <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due</span>
+                                    <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</span>
                                 </div>
-                            @endif
-                            <div class="border-t-2 border-zinc-300 dark:border-zinc-600 pt-2 flex justify-between">
-                                <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">Total Amount Due</span>
-                                <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($submission->total_due, 2) }}</span>
                             </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
             </flux:card>
 
@@ -398,6 +409,10 @@
                                                     <div class="text-zinc-900 dark:text-zinc-100">
                                                         @if($txn->type === 'allowance')
                                                             +RM {{ number_format($txn->amount, 2) }} (Allowance)
+                                                        @elseif($txn->type === 'backpay')
+                                                            +RM {{ number_format($txn->amount, 2) }} (Backpay)
+                                                        @elseif($txn->type === 'medical_claim')
+                                                            +RM {{ number_format($txn->amount, 2) }} (Medical Claim)
                                                         @elseif($txn->type === 'npl')
                                                             {{ $txn->amount }} {{ $txn->amount == 1 ? 'day' : 'days' }} (NPL)
                                                         @elseif($txn->type === 'advance_payment')

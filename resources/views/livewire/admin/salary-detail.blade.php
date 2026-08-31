@@ -78,21 +78,19 @@
 
     <!-- Approved Info -->
     @if($submission->hasAdminReview())
-    <flux:card class="p-6 bg-green-50 dark:bg-green-900/20">
-        <h3 class="text-lg font-semibold text-green-900 dark:text-green-100 mb-4">
-            Admin Review Completed
-        </h3>
+    <flux:card class="p-4 sm:p-6 bg-green-50 dark:bg-zinc-900 rounded-lg">
+        <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Admin Review Completed</h2>
         <div class="grid gap-4 md:grid-cols-3">
             <div>
-                <p class="text-sm text-green-700 dark:text-green-300">Reviewed By:</p>
-                <p class="font-medium">{{ $submission->adminReviewer ? $submission->adminReviewer->name : 'N/A' }}</p>
+                <span class="text-sm text-zinc-600 dark:text-zinc-400">Reviewed By:</span>
+                <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $submission->adminReviewer ? $submission->adminReviewer->name : 'N/A' }}</p>
             </div>
-            <div>
-                <p class="text-sm text-green-700 dark:text-green-300">Reviewed At:</p>
-                <p class="font-medium">{{ $submission->admin_reviewed_at ? $submission->admin_reviewed_at->format('d M Y, H:i') : 'N/A' }}</p>
+            <div>              
+                <span class="text-sm text-zinc-600 dark:text-zinc-400">Reviewed At:</span>
+                <p class="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $submission->admin_reviewed_at ? $submission->admin_reviewed_at->format('d M Y, H:i') : 'N/A' }}</p>                
             </div>
-            <div>
-                <p class="text-sm text-green-700 dark:text-green-300">Breakdown File:</p>
+            <div>               
+                <p class="text-sm text-zinc-600 dark:text-zinc-300">Breakdown File:</p>
                 @if($submission->hasBreakdownFile())
                     <flux:button size="sm" class="mt-2" variant="filled" wire:click="downloadBreakdown" icon="arrow-down-tray" title="{{ $submission->breakdown_file_name }}">
                         <span class="sm:hidden">{{ Str::limit($submission->breakdown_file_name, 25) }}</span>
@@ -103,7 +101,7 @@
                 @endif
             </div>
             <div>
-                <p class="text-sm text-green-700 dark:text-green-300">Payslip File (ZIP):</p>
+                <p class="text-sm text-zinc-600 dark:text-zinc-300">Payslip File (ZIP):</p>
                 @if($submission->hasPayslipFile())
                     <flux:button size="sm" class="mt-2" variant="filled" wire:click="downloadPayslip" icon="arrow-down-tray">
                         {{ $submission->payslip_file_name }}
@@ -118,43 +116,79 @@
             </div>
         </div>
 
-        <!-- Amount Breakdown for Client -->
-        <div class="mt-6 bg-white dark:bg-zinc-800 p-4 rounded-lg border border-green-200 dark:border-green-900">
-            <h4 class="font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Client Payment Breakdown:</h4>
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $submission->total_workers }} workers):</span>
-                    <span class="font-medium">RM {{ number_format($submission->admin_final_amount, 2) }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $submission->billable_workers_count }} {{ Str::plural('worker', $submission->billable_workers_count) }}):</span>
-                    <span class="font-medium">RM {{ number_format($submission->calculated_service_charge, 2) }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-zinc-600 dark:text-zinc-400">SST (8% of service charge):</span>
-                    <span class="font-medium">RM {{ number_format($submission->calculated_sst, 2) }}</span>
-                </div>
-                <div class="border-t border-zinc-200 dark:border-zinc-500 pt-2 mt-2 flex justify-between">
-                    <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ ($submission->has_penalty || $submission->isOverdue()) ? 'Subtotal:' : 'Total Amount Due:' }}</span>
-                    <span class="font-medium">RM {{ number_format($submission->client_total, 2) }}</span>
-                </div>
-                @if($submission->has_penalty || $submission->isOverdue())
-                <div class="flex justify-between">
-                    <span class="text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%):</span>
-                    <span class="font-medium">RM {{ number_format($submission->has_penalty && $submission->penalty_amount > 0 ? $submission->penalty_amount : $submission->calculatePenalty(), 2) }}</span>
-                </div>
-                <div class="border-t border-zinc-200 dark:border-zinc-500 pt-2 mt-2 flex justify-between">
-                    <span class="font-medium text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
-                    <span class="font-medium">RM {{ number_format($submission->total_due, 2) }}</span>
-                </div>
-                @endif
-            </div>
-        </div>
+        <!-- Client Payment Breakdown -->
+        <x-payment-breakdown
+            :submission="$submission"
+            :breakdown="$clientBreakdown"
+            heading="Client Payment Breakdown:"
+            internal
+            class="mt-5"
+        />
 
-        @if($submission->admin_notes)
-        <div class="mt-4">
-            <p class="text-sm text-green-700 dark:text-green-300">Admin Notes:</p>
-            <p class="text-sm bg-white dark:bg-zinc-800 p-3 rounded mt-1">{{ $submission->admin_notes }}</p>
+        @php
+            // Newest first: the last thing an admin did is what a reviewer
+            // opening this page needs to see.
+            $noteEntries = array_reverse($submission->adminNoteEntries());
+        @endphp
+
+        @if($noteEntries !== [])
+        @php
+            // How many fit across depends on the screen: one at a time on a
+            // phone, two on a tablet, four on a desktop. Entries are sized as a
+            // fraction of the visible strip and the rest are reached by
+            // scrolling, so a quarter-width card is never forced onto a phone.
+            $notesHorizontal = count($noteEntries) > 1;
+            $notesOverflow = count($noteEntries) > 4;
+        @endphp
+
+        <p class="mb-2 mt-5 text-sm text-zinc-600 dark:text-zinc-300">
+            Admin Notes:
+            @if($notesHorizontal)
+                <span class="text-xs text-zinc-500 dark:text-zinc-400">({{ count($noteEntries) }} entries &mdash; scroll for older)</span>
+            @endif
+        </p>
+        <div class="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-800 sm:p-4">
+            <div @class(['@container', 'overflow-x-auto pb-2' => $notesHorizontal])>
+            <flux:timeline :horizontal="count($noteEntries) > 1">
+                @foreach($noteEntries as $entry)
+                    {{-- The newest entry carries the accent indicator; older ones stay muted. --}}
+                    <flux:timeline.item @class([
+                        'w-[82cqw] sm:w-[46cqw]' => $notesHorizontal,
+                        'lg:w-[25cqw]' => $notesOverflow,
+                        'lg:w-auto' => $notesHorizontal && ! $notesOverflow,
+                    ])>
+                        <flux:timeline.indicator :color="$loop->first ? 'green' : null">
+                            @if($entry['type'] === 'review')
+                                <flux:icon.check class="size-4" variant="micro"/>
+                            @else
+                                <flux:icon.pencil class="size-3.5" variant="micro" />
+                            @endif
+                        </flux:timeline.indicator>
+
+                        {{-- Flux centres horizontal content at its natural width, so a long
+                             note spills over the neighbouring entries once the item has a
+                             fixed width. Stretching it to the column, with min-w-0 so the
+                             track may shrink, keeps each note inside its own card. --}}
+                        <flux:timeline.content class="min-w-0 justify-self-stretch! break-words">
+                            {{-- Narrow columns: let the author, time and badge wrap onto their own lines. --}}
+                            <flux:heading class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                                <span class="text-sm font-medium text-zinc-800 dark:text-zinc-100">{{ $entry['author'] ?: 'Admin' }}</span>
+                                {{-- A review note predating admin_reviewed_at has no timestamp to show. --}}
+                                @if($entry['at'])
+                                    <flux:text inline class="whitespace-nowrap">{{ $entry['at']->format('d M Y, H:i') }}</flux:text>
+                                @endif
+                                <flux:badge size="sm" color="zinc">{{ $entry['type'] === 'review' ? 'Review' : 'Update' }}</flux:badge>
+                            </flux:heading>
+                            
+
+                            {{-- whitespace-pre-line keeps the line breaks the reviewer typed. --}}
+                            {{-- break-words keeps long file names inside the column. --}}
+                            <p class="mt-0.5 whitespace-pre-line break-words text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{{ $entry['body'] }}</p>
+                        </flux:timeline.content>
+                    </flux:timeline.item>
+                @endforeach
+            </flux:timeline>
+            </div>
         </div>
         @endif
     </flux:card>
@@ -243,6 +277,88 @@
                 </div>
                 @endif
             </div>
+        </div>
+    </flux:card>
+
+    <!-- Salary Deduction Form (signed by contractor + worker) -->
+    <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Salary Deduction Form</h2>
+                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    Declaration signed by the contractor's officer and the worker, covering deductions recorded for
+                    <strong>{{ $deductionForm['entry_period'] ?? \Carbon\Carbon::create($submission->year, $submission->month, 1)->subMonth()->format('F Y') }}</strong>.
+                </p>
+            </div>
+            <flux:dropdown position="bottom" align="end">
+                <flux:button icon="ellipsis-horizontal" variant="ghost" size="sm" inset="top right" />
+
+                <flux:menu>
+                    <flux:menu.item icon="envelope" wire:click="openDeductionEmailModal">
+                        Send email
+                    </flux:menu.item>
+                    <flux:menu.item icon="clock" wire:click="openDeductionHistoryModal">
+                        History
+                    </flux:menu.item>
+                    <flux:menu.item icon="arrow-up-tray" wire:click="$set('showDeductionUploadModal', true)">
+                        Upload
+                    </flux:menu.item>
+                </flux:menu>
+            </flux:dropdown>
+        </div>
+
+        <div class="mt-4">
+            @if($deductionForm)
+                <div class="rounded-xl border border-zinc-200 p-3 dark:border-zinc-700 flex flex-wrap items-center gap-3">
+                    <flux:icon.check-circle class="size-5 flex-shrink-0 text-green-600 dark:text-green-400" />
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                            {{ $deductionForm['file_name'] }}
+                        </p>
+                        <p class="text-xs text-zinc-600 dark:text-zinc-400">
+                            {{ $deductionForm['file_size'] }}
+                            @if($deductionForm['uploaded_at'])
+                                &middot; uploaded {{ $deductionForm['uploaded_at'] }}
+                            @endif
+                            @if($deductionWorkersCount > 0)
+                                &middot; {{ $deductionWorkersCount }} {{ \Str::plural('worker', $deductionWorkersCount) }} with deductions
+                            @endif
+                        </p>
+                    </div>
+                    <div class="flex flex-shrink-0 gap-2">
+                        {{-- Livewire turns any file response into a download, so viewing goes through a route. --}}
+                        <flux:button
+                            size="sm"
+                            variant="filled"
+                            icon="eye"
+                            :href="route('salary-deduction-forms.view', [$deductionForm['id'], $deductionForm['file_name']])"
+                            target="_blank"
+                        >
+                            View
+                        </flux:button>
+                        <flux:button
+                            size="sm"
+                            variant="filled"
+                            icon="arrow-down-tray"
+                            :href="route('salary-deduction-forms.download', $deductionForm['id'])"
+                        >
+                            Download
+                        </flux:button>
+                    </div>
+                </div>
+            @elseif($deductionWorkersCount > 0)
+                <div class="rounded-xl border border-zinc-200 p-3 dark:border-zinc-700 flex flex-wrap items-center gap-3">
+                    <flux:icon.exclamation-triangle class="size-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                    <p class="text-sm text-zinc-700 dark:text-zinc-300">
+                        Not uploaded. {{ $deductionWorkersCount }} {{ \Str::plural('worker', $deductionWorkersCount) }}
+                        had deductions this period, so a signed form is outstanding.
+                    </p>
+                </div>
+            @else
+                <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                    No deductions were recorded for this period, so no form is required.
+                </p>
+            @endif
         </div>
     </flux:card>
 
@@ -371,7 +487,7 @@
     <!-- Workers List - RAW DATA ONLY (No Calculations) -->
     <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
         <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Client Submission</h2>
+            <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Client Submission</h2>
             <span class="text-sm text-zinc-600 dark:text-zinc-400">{{ $stats['total_workers'] }} {{ Str::plural('worker', $stats['total_workers']) }}</span>
         </div>
 
@@ -484,6 +600,10 @@
                                             <div class="text-zinc-900 dark:text-zinc-100">
                                                 @if($txn->type === 'allowance')
                                                     +RM {{ number_format($txn->amount, 2) }} (Allowance)
+                                                @elseif($txn->type === 'backpay')
+                                                    +RM {{ number_format($txn->amount, 2) }} (Backpay)
+                                                @elseif($txn->type === 'medical_claim')
+                                                    +RM {{ number_format($txn->amount, 2) }} (Medical Claim)
                                                 @elseif($txn->type === 'npl')
                                                     {{ $txn->amount }} {{ $txn->amount == 1 ? 'day' : 'days' }} (NPL)
                                                     @if($txn->nplDetails->isNotEmpty())
@@ -557,6 +677,162 @@
         </div>
     </flux:card>
 
+
+    <!-- Send email: composed here so the admin sees what goes out before it does -->
+    <flux:modal wire:model="showDeductionEmailModal" class="w-full max-w-lg">
+        <div class="space-y-4">
+            <div>
+                <flux:heading size="lg">Send Reminder</flux:heading>
+                <flux:subheading>
+                    @if($submission->user)
+                        To {{ $submission->user->name }} &middot; {{ $submission->user->email }}
+                    @else
+                        This submission has no user account to email.
+                    @endif
+                </flux:subheading>
+            </div>
+
+            <flux:input label="Subject" wire:model="deductionEmailSubject" />
+
+            <flux:textarea label="Message" wire:model="deductionEmailMessage" rows="10" />
+
+            <div class="flex justify-end gap-2">
+                <flux:button variant="ghost" size="sm" wire:click="$set('showDeductionEmailModal', false)">
+                    Cancel
+                </flux:button>
+                <flux:button
+                    variant="primary"
+                    size="sm"
+                    icon="paper-airplane"
+                    wire:click="sendDeductionFormReminder"
+                    wire:loading.attr="disabled"
+                    wire:target="sendDeductionFormReminder"
+                    :disabled="!$submission->user"
+                >
+                    <span wire:loading.remove wire:target="sendDeductionFormReminder">Send Email</span>
+                    <span wire:loading wire:target="sendDeductionFormReminder">Sending...</span>
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    <!-- History of reminders sent for this form -->
+    <flux:modal wire:model="showDeductionHistoryModal" class="w-full max-w-2xl">
+        <div class="space-y-4">
+            <div>
+                <flux:heading size="lg">Email History</flux:heading>
+                <flux:subheading>
+                    Reminders sent about the Salary Deduction Form for this payroll.
+                </flux:subheading>
+            </div>
+
+            @forelse($deductionEmailHistory as $entry)
+                <div class="rounded-md border border-zinc-200 p-3 dark:border-zinc-700">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                            {{ $entry['subject'] }}
+                        </p>
+                        <flux:badge
+                            size="sm"
+                            :color="match($entry['status']) {
+                                'sent' => 'green',
+                                'failed' => 'red',
+                                default => 'zinc',
+                            }"
+                        >
+                            {{ ucfirst($entry['status']) }}
+                        </flux:badge>
+                    </div>
+                    <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                        {{ $entry['recipient'] }} &middot; {{ $entry['sent_at'] }}
+                        @if($entry['sent_by'])
+                            &middot; by {{ $entry['sent_by'] }}
+                        @endif
+                    </p>
+                    @if($entry['opened_at'])
+                        <p class="mt-1 text-xs text-green-700 dark:text-green-400">
+                            Opened {{ $entry['opened_at'] }}
+                        </p>
+                    @elseif($entry['bounced_at'])
+                        <p class="mt-1 text-xs text-red-700 dark:text-red-400">
+                            Bounced {{ $entry['bounced_at'] }}
+                        </p>
+                    @endif
+                    @if($entry['error'])
+                        <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $entry['error'] }}</p>
+                    @endif
+                </div>
+            @empty
+                <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                    No reminder has been sent for this form yet.
+                </p>
+            @endforelse
+
+            <div class="flex justify-end">
+                <flux:button variant="ghost" size="sm" wire:click="$set('showDeductionHistoryModal', false)">
+                    Close
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    <!-- Upload on the contractor's behalf -->
+    <flux:modal wire:model="showDeductionUploadModal" class="w-full max-w-lg">
+        <div class="space-y-4">
+            <div>
+                <flux:heading size="lg">Upload on Behalf</flux:heading>
+                <flux:subheading>
+                    Record the signed form for
+                    <strong>{{ \Carbon\Carbon::create($deductionEntryYear, $deductionEntryMonth, 1)->format('F Y') }}</strong>
+                    when the contractor sends it outside the system.
+                    @if($deductionForm)
+                        This replaces the copy already on file.
+                    @endif
+                </flux:subheading>
+            </div>
+
+            <flux:file-upload wire:model="adminDeductionFormFile" accept=".pdf,.jpg,.jpeg,.png">
+                <flux:file-upload.dropzone
+                    heading="Drop the signed form or click to browse"
+                    text="PDF, JPG or PNG up to 10 MB"
+                    with-progress
+                    inline
+                />
+            </flux:file-upload>
+
+            @if($adminDeductionFormFile)
+                <flux:file-item
+                    heading="{{ $adminDeductionFormFile->getClientOriginalName() }}"
+                    :size="$adminDeductionFormFile->getSize()"
+                    class="my-2"
+                >
+                    <x-slot name="actions">
+                        <flux:file-item.remove wire:click="$set('adminDeductionFormFile', null)" />
+                    </x-slot>
+                </flux:file-item>
+            @endif
+
+            <flux:error name="adminDeductionFormFile" />
+
+            <div class="flex justify-end gap-2">
+                <flux:button variant="ghost" size="sm" wire:click="$set('showDeductionUploadModal', false)">
+                    Cancel
+                </flux:button>
+                @if($adminDeductionFormFile)
+                    <flux:button
+                        variant="primary"
+                        size="sm"
+                        icon="arrow-up-tray"
+                        wire:click="uploadDeductionFormOnBehalf"
+                        wire:loading.attr="disabled"
+                        wire:target="uploadDeductionFormOnBehalf"
+                    >
+                        Upload Signed Form
+                    </flux:button>
+                @endif
+            </div>
+        </div>
+    </flux:modal>
 
     <!-- Review Modal -->
     <flux:modal wire:model="showReviewModal" size="lg">
@@ -642,6 +918,48 @@
                             <span class="font-bold text-lg text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['total'], 2) }}</span>
                         </div>
                     </div>
+                </div>
+            @endif
+
+            {{-- The file and the contractor's submission disagree, or the amount
+                 has been edited away from the file. Approving is still allowed;
+                 it just has to be deliberate. --}}
+            @if($this->reviewVariance()['has_difference'])
+                @php($v = $this->reviewVariance())
+                <div class="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+                    <h4 class="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        <flux:icon.exclamation-triangle class="size-4" />
+                        Figures Do Not Match
+                    </h4>
+
+                    <div class="space-y-1 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-amber-800 dark:text-amber-200">Uploaded file total:</span>
+                            <span class="font-medium tabular-nums text-amber-900 dark:text-amber-100">RM {{ number_format($v['file_total'], 2) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-amber-800 dark:text-amber-200">Contractor's submission:</span>
+                            <span class="font-medium tabular-nums text-amber-900 dark:text-amber-100">RM {{ number_format($v['submitted'], 2) }}</span>
+                        </div>
+                        @if($v['against_submission'] != 0.0)
+                            <div class="flex justify-between border-t border-amber-300 pt-1 dark:border-amber-700">
+                                <span class="font-semibold text-amber-900 dark:text-amber-100">File vs submission:</span>
+                                <span class="font-semibold tabular-nums text-amber-900 dark:text-amber-100">{{ $v['against_submission'] < 0 ? '−' : '+' }}RM {{ number_format(abs($v['against_submission']), 2) }}</span>
+                            </div>
+                        @endif
+                        @if($v['against_file'] != 0.0)
+                            <div class="flex justify-between border-t border-amber-300 pt-1 dark:border-amber-700">
+                                <span class="font-semibold text-amber-900 dark:text-amber-100">Amount you entered vs file:</span>
+                                <span class="font-semibold tabular-nums text-amber-900 dark:text-amber-100">{{ $v['against_file'] < 0 ? '−' : '+' }}RM {{ number_format(abs($v['against_file']), 2) }}</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <label class="mt-3 flex items-start gap-2 text-xs text-amber-900 dark:text-amber-100">
+                        <input type="checkbox" wire:model.live="varianceAcknowledged" class="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500" />
+                        <span>I have checked the difference and want to approve <span class="font-semibold">RM {{ number_format($v['entered'], 2) }}</span>.</span>
+                    </label>
+                    <flux:error name="varianceAcknowledged" />
                 </div>
             @endif
 
@@ -773,6 +1091,47 @@
                             <span class="font-bold text-lg text-green-900 dark:text-green-100">RM {{ number_format($calculatedBreakdown['total'], 2) }}</span>
                         </div>
                     </div>
+                </div>
+            @endif
+
+            {{-- Same guard as the review modal: a saved figure that disagrees
+                 with the file or the submission has to be confirmed. --}}
+            @if($this->editVariance()['has_difference'])
+                @php($ev = $this->editVariance())
+                <div class="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+                    <h4 class="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        <flux:icon.exclamation-triangle class="size-4" />
+                        Figures Do Not Match
+                    </h4>
+
+                    <div class="space-y-1 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-amber-800 dark:text-amber-200">{{ $calculatedBreakdown ? 'Uploaded file total:' : 'Stored breakdown total:' }}</span>
+                            <span class="font-medium tabular-nums text-amber-900 dark:text-amber-100">RM {{ number_format($ev['file_total'], 2) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-amber-800 dark:text-amber-200">Contractor's submission:</span>
+                            <span class="font-medium tabular-nums text-amber-900 dark:text-amber-100">RM {{ number_format($ev['submitted'], 2) }}</span>
+                        </div>
+                        @if($ev['against_submission'] != 0.0)
+                            <div class="flex justify-between border-t border-amber-300 pt-1 dark:border-amber-700">
+                                <span class="font-semibold text-amber-900 dark:text-amber-100">Breakdown vs submission:</span>
+                                <span class="font-semibold tabular-nums text-amber-900 dark:text-amber-100">{{ $ev['against_submission'] < 0 ? '−' : '+' }}RM {{ number_format(abs($ev['against_submission']), 2) }}</span>
+                            </div>
+                        @endif
+                        @if($ev['against_file'] != 0.0)
+                            <div class="flex justify-between border-t border-amber-300 pt-1 dark:border-amber-700">
+                                <span class="font-semibold text-amber-900 dark:text-amber-100">Amount you entered vs breakdown:</span>
+                                <span class="font-semibold tabular-nums text-amber-900 dark:text-amber-100">{{ $ev['against_file'] < 0 ? '−' : '+' }}RM {{ number_format(abs($ev['against_file']), 2) }}</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <label class="mt-3 flex items-start gap-2 text-xs text-amber-900 dark:text-amber-100">
+                        <input type="checkbox" wire:model.live="editVarianceAcknowledged" class="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500" />
+                        <span>I have checked the difference and want to save <span class="font-semibold">RM {{ number_format($ev['entered'], 2) }}</span>.</span>
+                    </label>
+                    <flux:error name="editVarianceAcknowledged" />
                 </div>
             @endif
 

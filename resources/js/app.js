@@ -269,18 +269,10 @@ const tutorialConfigs = {
                 }
             },
             {
-                element: '#timesheet-stats',
-                popover: {
-                    title: 'Submission Overview',
-                    description: 'Quick summary of your payroll status: total submissions this month, how many are paid, pending payment, and workers not yet submitted.',
-                    side: 'bottom'
-                }
-            },
-            {
                 element: '#current-period-info',
                 popover: {
-                    title: 'Current Period & Payment Deadline',
-                    description: 'Shows the current payroll period and invoice payment deadline. Pay attention to the deadline to avoid late payment penalties (8%)!',
+                    title: 'Period & Key Dates',
+                    description: 'The period you are reviewing, how many workers it covers, and the two dates that matter: when the timesheet submits automatically, and when payment falls due. Watch the deadline to avoid the 8% late payment penalty.',
                     side: 'bottom'
                 }
             },
@@ -493,7 +485,7 @@ const tutorialConfigs = {
                 element: '[wire\\:model\\.live\\.debounce\\.500ms="search"]',
                 popover: {
                     title: 'Smart Search Bar',
-                    description: 'Search workers by name or passport number. The search updates automatically as you type (with a 500ms delay to avoid lag). Very useful for quickly finding specific workers!',
+                    description: 'Search workers by name or passport number. The search updates automatically as you type. Very useful for quickly finding specific workers!',
                     side: 'bottom'
                 }
             },

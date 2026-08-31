@@ -26,6 +26,17 @@ define('ARTISAN', BASE_PATH . '/artisan');
 // Helpers
 // --------------------------------------------------------------------------
 
+/**
+ * PHP prints a startup warning for every extension enabled in php.ini whose
+ * module file is missing - on this server that is pdo_sqlsrv.so. It is
+ * harmless (this app talks to MariaDB only, never SQL Server) but it is
+ * repeated on every artisan call, so keep it out of the run log.
+ */
+function is_php_startup_noise(string $line): bool
+{
+    return (bool) preg_match('/PHP Startup: Unable to load dynamic library/i', $line);
+}
+
 function log_line(string $message): void
 {
     $line = '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL;
@@ -48,8 +59,28 @@ function run_artisan(string $command, bool $dryRun = false): int
 
     exec($artisanCmd . ' 2>&1', $output, $returnCode);
 
+    $suppressed  = 0;
+    $lastWasNoise = false;
+
     foreach ($output as $line) {
+        if (is_php_startup_noise($line)) {
+            $suppressed++;
+            $lastWasNoise = true;
+            continue;
+        }
+
+        // The warning is followed by a blank line on stdout; drop that too.
+        if ($lastWasNoise && trim($line) === '') {
+            $lastWasNoise = false;
+            continue;
+        }
+
+        $lastWasNoise = false;
         log_line('  ' . $line);
+    }
+
+    if ($suppressed > 0) {
+        log_line("  ({$suppressed} PHP startup warning line(s) hidden - a php.ini extension is enabled without its module file)");
     }
 
     return $returnCode;

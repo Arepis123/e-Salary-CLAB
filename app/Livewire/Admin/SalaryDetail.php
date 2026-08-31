@@ -2,9 +2,15 @@
 
 namespace App\Livewire\Admin;
 
+use App\Exceptions\BreakdownFileParseException;
 use App\Mail\PayrollApproved;
 use App\Mail\PayslipReady;
+use App\Models\MonthlyOTEntry;
 use App\Models\PayrollSubmission;
+use App\Models\SalaryDeductionForm;
+use App\Services\BreakdownFileParser;
+use App\Services\SalaryDeductionFormService;
+use App\Services\TimesheetDriftService;
 use App\Traits\LogsActivity;
 use Flux\Flux;
 use Illuminate\Support\Facades\Mail;
@@ -46,6 +52,13 @@ class SalaryDetail extends Component
 
     public $calculatedBreakdown = null; // Store parsed Excel breakdown
 
+    // Set by the admin to confirm they have seen a difference between the
+    // uploaded file, the contractor's submission and the amount being saved.
+    public $varianceAcknowledged = false;
+
+    // The same confirmation for the edit modal.
+    public $editVarianceAcknowledged = false;
+
     // Re-upload modal properties
     public $showReuploadModal = false;
 
@@ -84,6 +97,41 @@ class SalaryDetail extends Component
 
     public $isRecordingPayment = false;
 
+    /**
+     * The signed Salary Deduction Form the contractor uploaded for the OT
+     * entry period this payroll was raised from, plus how many workers
+     * actually needed one. Null when nothing has been uploaded.
+     */
+    public ?array $deductionForm = null;
+
+    public int $deductionWorkersCount = 0;
+
+    /**
+     * The entry period the deduction form belongs to (the month before
+     * payroll), resolved once in mount() so the reminder, the history lookup
+     * and the on-behalf upload all agree on which period they are acting on.
+     */
+    public int $deductionEntryMonth = 0;
+
+    public int $deductionEntryYear = 0;
+
+    public bool $showDeductionEmailModal = false;
+
+    public bool $showDeductionHistoryModal = false;
+
+    public bool $showDeductionUploadModal = false;
+
+    public string $deductionEmailSubject = '';
+
+    public string $deductionEmailMessage = '';
+
+    public bool $isSendingDeductionEmail = false;
+
+    /** Previously sent reminders, newest first. Loaded when the modal opens. */
+    public array $deductionEmailHistory = [];
+
+    public $adminDeductionFormFile;
+
     public function mount($id)
     {
         $this->submission = PayrollSubmission::with(['user', 'payment', 'workers.worker'])
@@ -92,14 +140,279 @@ class SalaryDetail extends Component
         $this->loadWorkers();
         $this->calculateStats();
         $this->loadPreviousMonthOT();
+        $this->loadDeductionForm();
+    }
+
+    /**
+     * Resolve the signed Salary Deduction Form for this submission.
+     *
+     * The form belongs to the OT entry period (the month before payroll), so
+     * the mapping is borrowed from TimesheetDriftService rather than repeating
+     * the year-rollover arithmetic here.
+     */
+    protected function loadDeductionForm(): void
+    {
+        [$entryMonth, $entryYear] = app(TimesheetDriftService::class)
+            ->otEntryPeriod($this->submission->month, $this->submission->year);
+
+        $this->deductionEntryMonth = $entryMonth;
+        $this->deductionEntryYear = $entryYear;
+
+        // How many workers had a deduction keyed in for that period — the same
+        // source the client's form was generated from, so admins can tell an
+        // outstanding form from one that was never needed.
+        $this->deductionWorkersCount = MonthlyOTEntry::where('contractor_clab_no', $this->submission->contractor_clab_no)
+            ->where('entry_month', $entryMonth)
+            ->where('entry_year', $entryYear)
+            ->whereHas('transactions', fn ($query) => $query
+                ->whereIn('type', SalaryDeductionFormService::DEDUCTION_TYPES)
+                ->where('amount', '>', 0))
+            ->count();
+
+        $record = SalaryDeductionForm::forPeriod(
+            $this->submission->contractor_clab_no,
+            $entryMonth,
+            $entryYear
+        );
+
+        $this->deductionForm = $record ? [
+            'id' => $record->id,
+            'file_name' => $record->file_name,
+            'file_size' => $record->file_size_for_humans,
+            'workers_count' => $record->workers_count,
+            'uploaded_at' => optional($record->uploaded_at)->format('d M Y, H:i'),
+            'uploaded_by' => $record->uploadedBy?->name,
+            'entry_period' => $record->entry_period,
+        ] : null;
+    }
+
+    /**
+     * How notification logs for the deduction form are tagged, so the History
+     * modal can tell a form reminder apart from the payment reminders that
+     * also reference this submission.
+     *
+     * A plain string rather than a model class: the reminder exists precisely
+     * when there is no SalaryDeductionForm row to point at.
+     */
+    public const DEDUCTION_REMINDER_REFERENCE = 'salary_deduction_form';
+
+    /**
+     * Open the reminder composer, pre-filled but editable — the admin sees
+     * exactly what the contractor will receive before anything is sent.
+     */
+    public function openDeductionEmailModal(): void
+    {
+        $period = \Carbon\Carbon::create($this->deductionEntryYear, $this->deductionEntryMonth, 1)->format('F Y');
+
+        $this->deductionEmailSubject = 'Signed Salary Deduction Form outstanding — '.$period;
+
+        $this->deductionEmailMessage = implode("\n\n", [
+            'Dear '.($this->submission->user?->name ?: 'Sir/Madam').',',
+            'Our records show that the signed Salary Deduction Form for '.$period.' has not yet been '
+                .'uploaded. '.$this->deductionWorkersCount.' '.\Str::plural('worker', $this->deductionWorkersCount)
+                .' had deductions recorded for that period, so a signed declaration is required.',
+            'Please log in to the eSalary CLAB system, download the pre-filled form from the OT & '
+                .'Transaction Entry page, have it signed, and upload the signed copy.',
+            'Thank you.',
+        ]);
+
+        $this->showDeductionEmailModal = true;
+    }
+
+    /**
+     * Send the reminder to the contractor's account holder.
+     */
+    public function sendDeductionFormReminder(): void
+    {
+        $this->validate([
+            'deductionEmailSubject' => 'required|string|max:255',
+            'deductionEmailMessage' => 'required|string|max:5000',
+        ], [], [
+            'deductionEmailSubject' => 'subject',
+            'deductionEmailMessage' => 'message',
+        ]);
+
+        $recipient = $this->submission->user;
+
+        if (! $recipient) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'No Recipient',
+                text: 'This submission has no user account to email.'
+            );
+
+            return;
+        }
+
+        $this->isSendingDeductionEmail = true;
+
+        try {
+            $log = app(\App\Services\NotificationService::class)->sendCustom(
+                recipient: $recipient,
+                subject: $this->deductionEmailSubject,
+                body: $this->deductionEmailMessage,
+                referenceType: self::DEDUCTION_REMINDER_REFERENCE,
+                referenceId: $this->submission->id,
+            );
+
+            // sendCustom() records a failure on the log rather than throwing,
+            // so the outcome has to be read back off it.
+            if ($log->status === 'failed') {
+                Flux::toast(
+                    variant: 'danger',
+                    heading: 'Not Sent',
+                    text: 'The email could not be sent: '.($log->error_message ?: 'unknown error').'.'
+                );
+
+                return;
+            }
+
+            $this->showDeductionEmailModal = false;
+
+            $this->logActivity(
+                module: 'ot_entry',
+                action: 'sent_deduction_form_reminder',
+                description: 'Sent Salary Deduction Form reminder to '.$recipient->email,
+                subject: $this->submission,
+                properties: [
+                    'submission_id' => $this->submission->id,
+                    'entry_period' => $this->deductionEntryMonth.'/'.$this->deductionEntryYear,
+                    'notification_log_id' => $log->id,
+                ]
+            );
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Reminder Sent',
+                text: 'Emailed '.$recipient->email.'.'
+            );
+        } finally {
+            $this->isSendingDeductionEmail = false;
+        }
+    }
+
+    /**
+     * Open the log of reminders already sent for this form.
+     */
+    public function openDeductionHistoryModal(): void
+    {
+        $this->deductionEmailHistory = \App\Models\NotificationLog::with('sender')
+            ->where('reference_type', self::DEDUCTION_REMINDER_REFERENCE)
+            ->where('reference_id', $this->submission->id)
+            ->latest('id')
+            ->get()
+            ->map(fn ($log) => [
+                'id' => $log->id,
+                'subject' => $log->subject,
+                'recipient' => $log->recipient_email,
+                'status' => $log->status,
+                'error' => $log->error_message,
+                'sent_at' => optional($log->sent_at ?? $log->created_at)->format('d M Y, H:i'),
+                'sent_by' => $log->sender?->name,
+                'opened_at' => optional($log->opened_at)->format('d M Y, H:i'),
+                'bounced_at' => optional($log->bounced_at)->format('d M Y, H:i'),
+            ])
+            ->all();
+
+        $this->showDeductionHistoryModal = true;
+    }
+
+    /**
+     * Store the signed form on the contractor's behalf — for the cases where
+     * they hand it in by email or on paper. Deliberately mirrors
+     * OTEntry::uploadDeductionForm() so both routes produce the same record.
+     */
+    public function uploadDeductionFormOnBehalf(): void
+    {
+        $this->validate([
+            'adminDeductionFormFile' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ], [
+            'adminDeductionFormFile.required' => 'Please choose the signed form to upload.',
+            'adminDeductionFormFile.mimes' => 'The signed form must be a PDF or an image (JPG/PNG).',
+            'adminDeductionFormFile.max' => 'The signed form may not be larger than 10 MB.',
+        ]);
+
+        $clabNo = $this->submission->contractor_clab_no;
+        $month = $this->deductionEntryMonth;
+        $year = $this->deductionEntryYear;
+
+        try {
+            $existing = SalaryDeductionForm::forPeriod($clabNo, $month, $year);
+
+            $directory = 'salary-deduction-forms/'.$clabNo.'/'.$year.'-'.str_pad((string) $month, 2, '0', STR_PAD_LEFT);
+
+            $fileName = app(SalaryDeductionFormService::class)->fileName(
+                $clabNo,
+                $month,
+                $year,
+                $this->adminDeductionFormFile->getClientOriginalExtension() ?: $this->adminDeductionFormFile->extension()
+            );
+
+            $storedPath = $this->adminDeductionFormFile->storeAs($directory, $fileName, 'local');
+
+            // Drop the superseded file only after the new one is safely stored,
+            // and never when re-uploading has just written over it in place.
+            if ($existing && $existing->file_path !== $storedPath
+                && \Storage::disk('local')->exists($existing->file_path)) {
+                \Storage::disk('local')->delete($existing->file_path);
+            }
+
+            SalaryDeductionForm::updateOrCreate(
+                [
+                    'contractor_clab_no' => $clabNo,
+                    'entry_month' => $month,
+                    'entry_year' => $year,
+                ],
+                [
+                    'file_path' => $storedPath,
+                    'file_name' => $fileName,
+                    'file_size' => $this->adminDeductionFormFile->getSize(),
+                    'mime_type' => $this->adminDeductionFormFile->getMimeType(),
+                    'workers_count' => $this->deductionWorkersCount,
+                    'uploaded_by' => auth()->id(),
+                    'uploaded_at' => now(),
+                ]
+            );
+
+            $this->reset('adminDeductionFormFile');
+            $this->showDeductionUploadModal = false;
+            $this->loadDeductionForm();
+
+            $this->logActivity(
+                module: 'ot_entry',
+                action: 'uploaded_deduction_form_on_behalf',
+                description: 'Uploaded signed Salary Deduction Form on behalf of '.$clabNo,
+                subject: $this->submission,
+                properties: [
+                    'submission_id' => $this->submission->id,
+                    'entry_period' => $month.'/'.$year,
+                    'file_name' => $fileName,
+                ]
+            );
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Uploaded',
+                text: 'Signed form recorded for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y').'.'
+            );
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Upload Failed',
+                text: 'Could not upload the signed form: '.$e->getMessage()
+            );
+        }
     }
 
     protected function loadWorkers()
     {
-        $activeWorkerIds = \App\Models\Worker::where('wkr_status', '1')->pluck('wkr_id');
+        // A submission is a snapshot of a payroll that was already run, so it
+        // lists every worker it was raised for. Filtering on the worker's
+        // *current* status used to drop people whose contract ended after the
+        // fact, silently removing their salary from the client breakdown of an
+        // already-approved month.
         $this->workers = $this->submission->workers()
             ->with(['worker', 'transactions.nplDetails'])
-            ->whereIn('worker_id', $activeWorkerIds)
             ->get();
     }
 
@@ -654,7 +967,92 @@ class SalaryDetail extends Component
         $this->reviewFinalAmount = '';
         $this->reviewNotes = $this->submission->admin_notes ?? '';
         $this->calculatedBreakdown = null;
+        $this->varianceAcknowledged = false;
         $this->showReviewModal = true;
+    }
+
+    /**
+     * Differences the admin should see before approving.
+     *
+     * Two can arise, and they mean different things:
+     *  - the uploaded file's total against what the contractor submitted, which
+     *    says the two sources disagree about the payroll; and
+     *  - the amount being saved against the file's total, which is the admin
+     *    overriding the file by hand.
+     *
+     * Either is legitimate, neither should pass unnoticed.
+     */
+    public function reviewVariance(): array
+    {
+        return $this->varianceAgainst(
+            $this->calculatedBreakdown !== null ? (float) ($this->calculatedBreakdown['total'] ?? 0) : null,
+            $this->reviewFinalAmount
+        );
+    }
+
+    /**
+     * The same comparison for the edit modal.
+     *
+     * An edit does not have to carry a new file, so the figure the amount is
+     * judged against falls back to the itemisation already stored — and, where
+     * even that is missing, there is nothing to compare and only the
+     * contractor's submission is left.
+     */
+    public function editVariance(): array
+    {
+        $fileTotal = match (true) {
+            $this->calculatedBreakdown !== null => (float) ($this->calculatedBreakdown['total'] ?? 0),
+            $this->submission->hasBreakdownItemisation() => (float) ($this->submission->admin_breakdown['total'] ?? 0),
+            default => null,
+        };
+
+        // An untouched amount field means the stored amount stands.
+        $entered = $this->editPayrollAmount === '' || $this->editPayrollAmount === null
+            ? (string) $this->submission->admin_final_amount
+            : $this->editPayrollAmount;
+
+        return $this->varianceAgainst($fileTotal, $entered);
+    }
+
+    /**
+     * Compare a file total and an entered amount against the contractor's
+     * submission. Shared by both modals so they cannot drift apart.
+     */
+    protected function varianceAgainst(?float $fileTotal, $enteredAmount): array
+    {
+        $submitted = round((float) $this->clientBreakdown['computed_payroll'], 2);
+
+        // Only meaningful once there is a file total to compare with.
+        $parsed = $fileTotal !== null;
+        $fileTotal = round((float) $fileTotal, 2);
+
+        $entered = is_numeric($enteredAmount) ? round((float) $enteredAmount, 2) : $fileTotal;
+
+        $againstSubmission = $parsed ? round($fileTotal - $submitted, 2) : 0.0;
+        $againstFile = $parsed ? round($entered - $fileTotal, 2) : 0.0;
+
+        return [
+            'parsed' => $parsed,
+            'file_total' => $fileTotal,
+            'submitted' => $submitted,
+            'entered' => $entered,
+            'against_submission' => $againstSubmission,
+            'against_file' => $againstFile,
+            'has_difference' => $parsed && ($againstSubmission != 0.0 || $againstFile != 0.0),
+        ];
+    }
+
+    /**
+     * A hand-edited amount has to be confirmed again.
+     */
+    public function updatedReviewFinalAmount()
+    {
+        $this->varianceAcknowledged = false;
+    }
+
+    public function updatedEditPayrollAmount()
+    {
+        $this->editVarianceAcknowledged = false;
     }
 
     /**
@@ -669,187 +1067,53 @@ class SalaryDetail extends Component
         ]);
 
         try {
-            $filePath = $this->breakdownFile->getRealPath();
+            $breakdown = app(BreakdownFileParser::class)
+                ->parse($this->breakdownFile->getRealPath());
 
-            // Load the spreadsheet
-            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
-            $sheet = $spreadsheet->getActiveSheet();
-
-            $highestColumn = $sheet->getHighestColumn();
-            $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
-
-            // Search for header row in the first 10 rows
-            $headerRow = null;
-            $headers = [];
-            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS', 'HRDF'];
-
-            for ($row = 1; $row <= min(10, $sheet->getHighestRow()); $row++) {
-                $rowHeaders = [];
-                for ($col = 1; $col <= $highestColumnIndex; $col++) {
-                    $cellValue = $sheet->getCellByColumnAndRow($col, $row)->getValue();
-                    if ($cellValue) {
-                        // Normalize: trim whitespace and remove extra spaces
-                        $normalized = preg_replace('/\s+/', ' ', trim($cellValue));
-                        $rowHeaders[$col] = $normalized;
-                    }
-                }
-
-                // Check if this row contains at least 3 of the required columns (to be flexible)
-                $foundCount = 0;
-                foreach ($requiredColumns as $requiredCol) {
-                    foreach ($rowHeaders as $headerName) {
-                        if (strcasecmp($headerName, $requiredCol) === 0) {
-                            $foundCount++;
-                            break;
-                        }
-                    }
-                }
-
-                // If we found at least 3 required columns, this is likely the header row
-                if ($foundCount >= 3) {
-                    $headerRow = $row;
-                    $headers = $rowHeaders;
-                    break;
-                }
-            }
-
-            if ($headerRow === null) {
-                Flux::toast(
-                    variant: 'danger',
-                    heading: 'Header Row Not Found',
-                    text: 'Could not find header row with required columns in the first 10 rows.'
-                );
-                $this->breakdownFile = null;
-
-                return;
-            }
-
-            // Log found headers for debugging
-            \Log::info('Excel headers found', [
-                'headers' => $headers,
-                'submission_id' => $this->submission->id,
-            ]);
-
-            // Find required columns (case-insensitive)
-            // Note: HRDF is optional as some Excel formats don't have it
-            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
-            $optionalColumns = ['HRDF', 'Backpay'];
-            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation', 'Custom Npl'];
-            $columnIndices = [];
-            $missingColumns = [];
-
-            foreach ($requiredColumns as $requiredCol) {
-                $found = false;
-                foreach ($headers as $colIndex => $headerName) {
-                    if (strcasecmp($headerName, $requiredCol) === 0) {
-                        // For EPF, SOCSO, EIS: Take the LAST occurrence (employer contribution)
-                        // Don't break, keep searching for later occurrences
-                        $columnIndices[$requiredCol] = $colIndex;
-                        $found = true;
-                        // Don't break - continue searching to find the last occurrence
-                    }
-                }
-
-                if (! $found) {
-                    $missingColumns[] = $requiredCol;
-                }
-            }
-
-            // Check for optional columns (additions)
-            foreach ($optionalColumns as $optionalCol) {
-                foreach ($headers as $colIndex => $headerName) {
-                    if (strcasecmp($headerName, $optionalCol) === 0) {
-                        $columnIndices[$optionalCol] = $colIndex;
-                        // Don't break - take last occurrence
-                    }
-                }
-            }
-
-            // Check for optional deduction columns (subtractions)
-            foreach ($optionalDeductionColumns as $deductionCol) {
-                foreach ($headers as $colIndex => $headerName) {
-                    if (strcasecmp($headerName, $deductionCol) === 0) {
-                        $columnIndices[$deductionCol] = $colIndex;
-                        // Don't break - take last occurrence
-                    }
-                }
-            }
-
-            if (! empty($missingColumns)) {
-                $foundColumnsList = implode(', ', array_values($headers));
-
-                Flux::toast(
-                    variant: 'danger',
-                    heading: 'Invalid Excel Format',
-                    text: 'Missing required columns: '.implode(', ', $missingColumns).'. Found columns: '.$foundColumnsList
-                );
-
-                \Log::warning('Excel parsing failed - missing columns', [
-                    'submission_id' => $this->submission->id,
-                    'missing' => $missingColumns,
-                    'found' => $headers,
-                ]);
-
-                $this->breakdownFile = null;
-
-                return;
-            }
-
-            // Read totals from the last row (which contains the sum of all columns)
-            $highestRow = $sheet->getHighestRow();
-
-            // Read CALCULATED values from the last row (formulas are evaluated)
-            $totals = [];
-            foreach (array_merge($requiredColumns, $optionalColumns) as $colName) {
-                if (isset($columnIndices[$colName])) {
-                    $value = $sheet->getCellByColumnAndRow($columnIndices[$colName], $highestRow)->getCalculatedValue();
-                    $totals[$colName] = floatval($value);
-                } else {
-                    // Optional column not found, set to 0
-                    $totals[$colName] = 0;
-                }
-            }
-
-            // Read optional deduction columns (use abs() since Excel values are negative)
-            $deductions = [];
-            foreach ($optionalDeductionColumns as $deductionCol) {
-                if (isset($columnIndices[$deductionCol])) {
-                    $value = $sheet->getCellByColumnAndRow($columnIndices[$deductionCol], $highestRow)->getCalculatedValue();
-                    $deductions[$deductionCol] = abs(floatval($value));
-                } else {
-                    $deductions[$deductionCol] = 0;
-                }
-            }
-
-            // Calculate total payroll amount (additions - deductions)
-            // Backpay is read for the breakdown record but deliberately excluded from the total.
-            $totalAdditions = array_sum($totals) - ($totals['Backpay'] ?? 0);
-            $totalDeductions = array_sum($deductions);
-            $totalAmount = $totalAdditions - $totalDeductions;
-
-            // Store breakdown for display
-            $this->calculatedBreakdown = [
-                'gross_salary' => $totals['Gross Salary'],
-                'epf' => $totals['EPF'],
-                'socso' => $totals['SOCSO'],
-                'eis' => $totals['EIS'],
-                'hrdf' => $totals['HRDF'],
-                'backpay' => $totals['Backpay'],
-                'custom_advance_salary' => $deductions['Custom Advance Salary'],
-                'custom_accomodation' => $deductions['Custom Accomodation'],
-                'custom_npl' => $deductions['Custom Npl'],
-                'total' => $totalAmount,
-            ];
+            $this->calculatedBreakdown = $breakdown;
 
             // Auto-fill the amount
-            $this->reviewFinalAmount = number_format($totalAmount, 2, '.', '');
+            $this->reviewFinalAmount = number_format($breakdown['total'], 2, '.', '');
 
+            // A fresh file has to be confirmed on its own merits.
+            $this->varianceAcknowledged = false;
+
+            $variance = $this->reviewVariance();
+
+            if ($variance['against_submission'] != 0.0) {
+                Flux::toast(
+                    variant: 'warning',
+                    heading: 'Excel Parsed &mdash; Difference Found',
+                    text: 'File total RM '.number_format($variance['file_total'], 2)
+                        .' differs from the contractor\'s submission by RM '
+                        .number_format(abs($variance['against_submission']), 2)
+                        .'. Review the comparison before approving.'
+                );
+            } else {
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Excel Parsed Successfully',
+                    text: 'Total payroll amount: RM '.number_format($breakdown['total'], 2)
+                );
+            }
+
+        } catch (BreakdownFileParseException $e) {
             Flux::toast(
-                variant: 'success',
-                heading: 'Excel Parsed Successfully',
-                text: 'Total payroll amount: RM '.number_format($totalAmount, 2)
+                variant: 'danger',
+                heading: $e->missingColumns === [] ? 'Header Row Not Found' : 'Invalid Excel Format',
+                text: $e->missingColumns === []
+                    ? $e->getMessage()
+                    : $e->getMessage().'. Found columns: '.implode(', ', $e->foundColumns)
             );
 
+            \Log::warning('Excel parsing failed - invalid format', [
+                'submission_id' => $this->submission->id,
+                'missing' => $e->missingColumns,
+                'found' => $e->foundColumns,
+            ]);
+
+            $this->breakdownFile = null;
+            $this->calculatedBreakdown = null;
         } catch (\Exception $e) {
             Flux::toast(
                 variant: 'danger',
@@ -874,6 +1138,35 @@ class SalaryDetail extends Component
         $this->resetValidation();
     }
 
+    /**
+     * Build the stored name for a breakdown file: Breakdown_<Client>_<Month>_<Year>.
+     *
+     * The trading name is what identifies the file at a glance, so the legal
+     * suffix (Sdn. Bhd., Enterprise and friends) is dropped from it.
+     */
+    protected function breakdownFileName(string $extension): string
+    {
+        $clientName = \App\Models\Contractor::find($this->submission->contractor_clab_no)?->ctr_comp_name
+            ?: $this->submission->user?->name
+            ?: $this->submission->contractor_clab_no;
+
+        $shortName = \App\Models\Contractor::fileNameSlug($clientName);
+
+        if ($shortName === '') {
+            $shortName = $this->submission->contractor_clab_no;
+        }
+
+        $monthName = date('M', mktime(0, 0, 0, $this->submission->month, 1));
+
+        return sprintf(
+            'Breakdown_%s_%s_%s.%s',
+            $shortName,
+            $monthName,
+            $this->submission->year,
+            $extension
+        );
+    }
+
     public function approveSubmission()
     {
         $this->validate([
@@ -882,18 +1175,28 @@ class SalaryDetail extends Component
             'reviewNotes' => 'nullable|string|max:1000',
         ]);
 
+        // The figures disagree somewhere. Approving is still the admin's call,
+        // but it has to be a deliberate one.
+        $variance = $this->reviewVariance();
+
+        if ($variance['has_difference'] && ! $this->varianceAcknowledged) {
+            $this->addError('varianceAcknowledged', 'Tick the box to confirm you want to approve despite the difference.');
+
+            Flux::toast(
+                variant: 'warning',
+                heading: 'Difference Not Confirmed',
+                text: 'The figures do not match. Check the comparison and confirm before approving.'
+            );
+
+            return;
+        }
+
         try {
             $this->isReviewing = true;
 
-            // Generate custom filename: worker_breakdown_CLAB000000_DEC_2025.xlsx
-            $extension = $this->breakdownFile->getClientOriginalExtension();
-            $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));
-            $customFileName = sprintf(
-                'worker_breakdown_%s_%s_%s.%s',
-                $this->submission->contractor_clab_no,
-                $monthName,
-                $this->submission->year,
-                $extension
+            // Generate custom filename: Breakdown_Miqabina_December_2025.xlsx
+            $customFileName = $this->breakdownFileName(
+                $this->breakdownFile->getClientOriginalExtension()
             );
 
             // Ensure directory exists
@@ -907,13 +1210,27 @@ class SalaryDetail extends Component
             // Store breakdown file with custom name
             $filePath = $this->breakdownFile->storeAs($directory, $customFileName, 'local');
 
+            // Leave a trace of what was approved over, so the decision is
+            // readable later without re-deriving the figures.
+            $notes = $this->reviewNotes;
+
+            if ($variance['has_difference']) {
+                $notes = trim($notes."\n\nApproved with a known difference: file total RM "
+                    .number_format($variance['file_total'], 2).' vs submission RM '
+                    .number_format($variance['submitted'], 2)
+                    .($variance['against_file'] != 0.0
+                        ? '; amount saved RM '.number_format($variance['entered'], 2)
+                        : '').'.');
+            }
+
             // Update submission with admin review
             $this->submission->update([
                 'status' => 'approved',
                 'admin_reviewed_by' => auth()->id(),
                 'admin_reviewed_at' => now(),
                 'admin_final_amount' => $this->reviewFinalAmount,
-                'admin_notes' => $this->reviewNotes,
+                'admin_breakdown' => $this->calculatedBreakdown,
+                'admin_notes' => $notes,
                 'breakdown_file_path' => $filePath,
                 'breakdown_file_name' => $customFileName,
             ]);
@@ -1172,15 +1489,9 @@ class SalaryDetail extends Component
                 \Log::info('Deleted old breakdown file', ['old_path' => $this->submission->breakdown_file_path]);
             }
 
-            // Generate custom filename: worker_breakdown_CLAB000000_DEC_2025.xlsx
-            $extension = $this->newBreakdownFile->getClientOriginalExtension();
-            $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));
-            $customFileName = sprintf(
-                'worker_breakdown_%s_%s_%s.%s',
-                $this->submission->contractor_clab_no,
-                $monthName,
-                $this->submission->year,
-                $extension
+            // Generate custom filename: Breakdown_Miqabina_December_2025.xlsx
+            $customFileName = $this->breakdownFileName(
+                $this->newBreakdownFile->getClientOriginalExtension()
             );
 
             // Ensure directory exists
@@ -1273,6 +1584,7 @@ class SalaryDetail extends Component
         $this->newBreakdownFile = null;
         $this->editAmountNotes = '';
         $this->calculatedBreakdown = null;
+        $this->editVarianceAcknowledged = false;
         $this->showEditAmountModal = true;
     }
 
@@ -1288,187 +1600,53 @@ class SalaryDetail extends Component
         ]);
 
         try {
-            $filePath = $this->newBreakdownFile->getRealPath();
+            $breakdown = app(BreakdownFileParser::class)
+                ->parse($this->newBreakdownFile->getRealPath());
 
-            // Load the spreadsheet
-            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
-            $sheet = $spreadsheet->getActiveSheet();
-
-            $highestColumn = $sheet->getHighestColumn();
-            $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
-
-            // Search for header row in the first 10 rows
-            $headerRow = null;
-            $headers = [];
-            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS', 'HRDF'];
-
-            for ($row = 1; $row <= min(10, $sheet->getHighestRow()); $row++) {
-                $rowHeaders = [];
-                for ($col = 1; $col <= $highestColumnIndex; $col++) {
-                    $cellValue = $sheet->getCellByColumnAndRow($col, $row)->getValue();
-                    if ($cellValue) {
-                        // Normalize: trim whitespace and remove extra spaces
-                        $normalized = preg_replace('/\s+/', ' ', trim($cellValue));
-                        $rowHeaders[$col] = $normalized;
-                    }
-                }
-
-                // Check if this row contains at least 3 of the required columns (to be flexible)
-                $foundCount = 0;
-                foreach ($requiredColumns as $requiredCol) {
-                    foreach ($rowHeaders as $headerName) {
-                        if (strcasecmp($headerName, $requiredCol) === 0) {
-                            $foundCount++;
-                            break;
-                        }
-                    }
-                }
-
-                // If we found at least 3 required columns, this is likely the header row
-                if ($foundCount >= 3) {
-                    $headerRow = $row;
-                    $headers = $rowHeaders;
-                    break;
-                }
-            }
-
-            if ($headerRow === null) {
-                Flux::toast(
-                    variant: 'danger',
-                    heading: 'Header Row Not Found',
-                    text: 'Could not find header row with required columns in the first 10 rows.'
-                );
-                $this->newBreakdownFile = null;
-
-                return;
-            }
-
-            // Log found headers for debugging
-            \Log::info('Excel headers found', [
-                'headers' => $headers,
-                'submission_id' => $this->submission->id,
-            ]);
-
-            // Find required columns (case-insensitive)
-            // Note: HRDF is optional as some Excel formats don't have it
-            $requiredColumns = ['Gross Salary', 'EPF', 'SOCSO', 'EIS'];
-            $optionalColumns = ['HRDF', 'Backpay'];
-            $optionalDeductionColumns = ['Custom Advance Salary', 'Custom Accomodation', 'Custom Npl'];
-            $columnIndices = [];
-            $missingColumns = [];
-
-            foreach ($requiredColumns as $requiredCol) {
-                $found = false;
-                foreach ($headers as $colIndex => $headerName) {
-                    if (strcasecmp($headerName, $requiredCol) === 0) {
-                        // For EPF, SOCSO, EIS: Take the LAST occurrence (employer contribution)
-                        // Don't break, keep searching for later occurrences
-                        $columnIndices[$requiredCol] = $colIndex;
-                        $found = true;
-                        // Don't break - continue searching to find the last occurrence
-                    }
-                }
-
-                if (! $found) {
-                    $missingColumns[] = $requiredCol;
-                }
-            }
-
-            // Check for optional columns (additions)
-            foreach ($optionalColumns as $optionalCol) {
-                foreach ($headers as $colIndex => $headerName) {
-                    if (strcasecmp($headerName, $optionalCol) === 0) {
-                        $columnIndices[$optionalCol] = $colIndex;
-                        // Don't break - take last occurrence
-                    }
-                }
-            }
-
-            // Check for optional deduction columns (subtractions)
-            foreach ($optionalDeductionColumns as $deductionCol) {
-                foreach ($headers as $colIndex => $headerName) {
-                    if (strcasecmp($headerName, $deductionCol) === 0) {
-                        $columnIndices[$deductionCol] = $colIndex;
-                        // Don't break - take last occurrence
-                    }
-                }
-            }
-
-            if (! empty($missingColumns)) {
-                $foundColumnsList = implode(', ', array_values($headers));
-
-                Flux::toast(
-                    variant: 'danger',
-                    heading: 'Invalid Excel Format',
-                    text: 'Missing required columns: '.implode(', ', $missingColumns).'. Found columns: '.$foundColumnsList
-                );
-
-                \Log::warning('Excel parsing failed - missing columns', [
-                    'submission_id' => $this->submission->id,
-                    'missing' => $missingColumns,
-                    'found' => $headers,
-                ]);
-
-                $this->newBreakdownFile = null;
-
-                return;
-            }
-
-            // Read totals from the last row (which contains the sum of all columns)
-            $highestRow = $sheet->getHighestRow();
-
-            // Read CALCULATED values from the last row (formulas are evaluated)
-            $totals = [];
-            foreach (array_merge($requiredColumns, $optionalColumns) as $colName) {
-                if (isset($columnIndices[$colName])) {
-                    $value = $sheet->getCellByColumnAndRow($columnIndices[$colName], $highestRow)->getCalculatedValue();
-                    $totals[$colName] = floatval($value);
-                } else {
-                    // Optional column not found, set to 0
-                    $totals[$colName] = 0;
-                }
-            }
-
-            // Read optional deduction columns (use abs() since Excel values are negative)
-            $deductions = [];
-            foreach ($optionalDeductionColumns as $deductionCol) {
-                if (isset($columnIndices[$deductionCol])) {
-                    $value = $sheet->getCellByColumnAndRow($columnIndices[$deductionCol], $highestRow)->getCalculatedValue();
-                    $deductions[$deductionCol] = abs(floatval($value));
-                } else {
-                    $deductions[$deductionCol] = 0;
-                }
-            }
-
-            // Calculate total payroll amount (additions - deductions)
-            // Backpay is read for the breakdown record but deliberately excluded from the total.
-            $totalAdditions = array_sum($totals) - ($totals['Backpay'] ?? 0);
-            $totalDeductions = array_sum($deductions);
-            $totalAmount = $totalAdditions - $totalDeductions;
-
-            // Store breakdown for display
-            $this->calculatedBreakdown = [
-                'gross_salary' => $totals['Gross Salary'],
-                'epf' => $totals['EPF'],
-                'socso' => $totals['SOCSO'],
-                'eis' => $totals['EIS'],
-                'hrdf' => $totals['HRDF'],
-                'backpay' => $totals['Backpay'],
-                'custom_advance_salary' => $deductions['Custom Advance Salary'],
-                'custom_accomodation' => $deductions['Custom Accomodation'],
-                'custom_npl' => $deductions['Custom Npl'],
-                'total' => $totalAmount,
-            ];
+            $this->calculatedBreakdown = $breakdown;
 
             // Auto-fill the amount
-            $this->editPayrollAmount = number_format($totalAmount, 2, '.', '');
+            $this->editPayrollAmount = number_format($breakdown['total'], 2, '.', '');
 
+            // A fresh file has to be confirmed on its own merits.
+            $this->editVarianceAcknowledged = false;
+
+            $variance = $this->editVariance();
+
+            if ($variance['against_submission'] != 0.0) {
+                Flux::toast(
+                    variant: 'warning',
+                    heading: 'Excel Parsed - Difference Found',
+                    text: 'File total RM '.number_format($variance['file_total'], 2)
+                        .' differs from the contractor\x27s submission by RM '
+                        .number_format(abs($variance['against_submission']), 2)
+                        .'. Review the comparison before saving.'
+                );
+            } else {
+                Flux::toast(
+                    variant: 'success',
+                    heading: 'Excel Parsed Successfully',
+                    text: 'Total payroll amount: RM '.number_format($breakdown['total'], 2)
+                );
+            }
+
+        } catch (BreakdownFileParseException $e) {
             Flux::toast(
-                variant: 'success',
-                heading: 'Excel Parsed Successfully',
-                text: 'Total payroll amount: RM '.number_format($totalAmount, 2)
+                variant: 'danger',
+                heading: $e->missingColumns === [] ? 'Header Row Not Found' : 'Invalid Excel Format',
+                text: $e->missingColumns === []
+                    ? $e->getMessage()
+                    : $e->getMessage().'. Found columns: '.implode(', ', $e->foundColumns)
             );
 
+            \Log::warning('Excel parsing failed - invalid format', [
+                'submission_id' => $this->submission->id,
+                'missing' => $e->missingColumns,
+                'found' => $e->foundColumns,
+            ]);
+
+            $this->newBreakdownFile = null;
+            $this->calculatedBreakdown = null;
         } catch (\Exception $e) {
             Flux::toast(
                 variant: 'danger',
@@ -1513,6 +1691,23 @@ class SalaryDetail extends Component
             Flux::toast(
                 variant: 'warning',
                 text: 'Please update the amount or upload a new file.'
+            );
+
+            return;
+        }
+
+        // Same rule as the review: an edit that leaves the figures disagreeing
+        // has to be confirmed. This one can cancel a live bill, so it matters
+        // at least as much.
+        $variance = $this->editVariance();
+
+        if ($variance['has_difference'] && ! $this->editVarianceAcknowledged) {
+            $this->addError('editVarianceAcknowledged', 'Tick the box to confirm you want to save despite the difference.');
+
+            Flux::toast(
+                variant: 'warning',
+                heading: 'Difference Not Confirmed',
+                text: 'The figures do not match. Check the comparison and confirm before saving.'
             );
 
             return;
@@ -1598,15 +1793,9 @@ class SalaryDetail extends Component
                     \Storage::disk('local')->delete($this->submission->breakdown_file_path);
                 }
 
-                // Generate custom filename
-                $extension = $this->newBreakdownFile->getClientOriginalExtension();
-                $monthName = strtoupper(date('M', mktime(0, 0, 0, $this->submission->month, 1)));
-                $customFileName = sprintf(
-                    'worker_breakdown_%s_%s_%s.%s',
-                    $this->submission->contractor_clab_no,
-                    $monthName,
-                    $this->submission->year,
-                    $extension
+                // Generate custom filename: Breakdown_Miqabina_December_2025.xlsx
+                $customFileName = $this->breakdownFileName(
+                    $this->newBreakdownFile->getClientOriginalExtension()
                 );
 
                 // Store file
@@ -1622,7 +1811,22 @@ class SalaryDetail extends Component
                 $updateData['breakdown_file_path'] = $filePath;
                 $updateData['breakdown_file_name'] = $customFileName;
 
+                // Keep the stored itemisation in step with the file it came
+                // from; a file we could not parse clears the stale one.
+                $updateData['admin_breakdown'] = $this->calculatedBreakdown;
+
                 $changes[] = 'File: '.$customFileName;
+            }
+
+            // Leave a trace of what was saved over, so the decision is readable
+            // later without re-deriving the figures.
+            if ($variance['has_difference']) {
+                $changes[] = 'Saved with a known difference: file total RM '
+                    .number_format($variance['file_total'], 2).' vs submission RM '
+                    .number_format($variance['submitted'], 2)
+                    .($variance['against_file'] != 0.0
+                        ? '; amount saved RM '.number_format($variance['entered'], 2)
+                        : '');
             }
 
             // Append update notes
@@ -1676,11 +1880,24 @@ class SalaryDetail extends Component
         }
     }
 
+    /**
+     * Build the client payment breakdown.
+     *
+     * The arithmetic lives in ClientBreakdownBuilder so the client-facing
+     * pages bill from exactly the same figures this screen reviews.
+     */
+    public function getClientBreakdownProperty(): array
+    {
+        return (new \App\Services\ClientBreakdownBuilder)->build($this->submission, collect($this->workers));
+    }
+
     public function render()
     {
         // Refresh submission from database to get latest payment data
         $this->submission->refresh();
 
-        return view('livewire.admin.salary-detail');
+        return view('livewire.admin.salary-detail', [
+            'clientBreakdown' => $this->clientBreakdown,
+        ]);
     }
 }

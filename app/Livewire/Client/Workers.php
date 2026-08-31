@@ -152,9 +152,26 @@ class Workers extends Component
             });
         }
 
-        $fileName = 'workers_'.now()->format('Y-m-d_His').'.xlsx';
+        // Name the file after the client's registered company so a downloaded
+        // export is identifiable without opening it.
+        $companyName = \App\Models\Contractor::where('ctr_clab_no', $clabNo)->value('ctr_comp_name')
+            ?: (auth()->user()->name ?: $clabNo);
 
-        return Excel::download(new WorkersExport($allWorkers), $fileName);
+        $fileName = $this->sanitiseFileName($companyName).'_Workers_'.now()->format('Y-m-d').'.xlsx';
+
+        return Excel::download(new WorkersExport($allWorkers, $clabNo), $fileName);
+    }
+
+    /**
+     * Reduce a company name to something safe for a download filename:
+     * no path separators or characters Windows/Excel reject.
+     */
+    protected function sanitiseFileName(string $name): string
+    {
+        $name = preg_replace('/[\\/:*?"<>|]+/', ' ', $name);
+        $name = preg_replace('/\s+/', ' ', trim((string) $name));
+
+        return $name !== '' ? str_replace(' ', '_', $name) : 'Workers';
     }
 
     public function render()
@@ -177,6 +194,10 @@ class Workers extends Component
 
         // Get all contracted workers
         $allWorkers = $this->contractWorkerService->getContractedWorkers($clabNo);
+
+        // Pull the current bank record for every worker in one query rather than
+        // lazy-loading it per row while sorting/rendering.
+        $allWorkers->load('latestBank');
 
         $manuallyInactiveIds = InactiveWorker::getInactiveWorkerIds();
         $isActive = fn ($worker) => $worker->contract_info && $worker->contract_info->isActive() && ! in_array($worker->wkr_id, $manuallyInactiveIds);
@@ -249,6 +270,8 @@ class Workers extends Component
                 'country' => strtolower($a->country->cty_desc ?? ''),
                 'position' => strtolower($a->workTrade->trade_desc ?? ''),
                 'basic_salary' => $a->basic_salary ?? 0,
+                'bank_name' => strtolower($a->latestBank->bank_name ?? ''),
+                'account_no' => strtolower($a->latestBank->account_no ?? ''),
                 'status' => $isActive($a) ? 0 : 1,
                 default => $a->wkr_id,
             };
@@ -262,6 +285,8 @@ class Workers extends Component
                 'country' => strtolower($b->country->cty_desc ?? ''),
                 'position' => strtolower($b->workTrade->trade_desc ?? ''),
                 'basic_salary' => $b->basic_salary ?? 0,
+                'bank_name' => strtolower($b->latestBank->bank_name ?? ''),
+                'account_no' => strtolower($b->latestBank->account_no ?? ''),
                 'status' => $isActive($b) ? 0 : 1,
                 default => $b->wkr_id,
             };

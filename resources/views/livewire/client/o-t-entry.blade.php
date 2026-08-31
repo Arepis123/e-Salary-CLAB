@@ -26,7 +26,7 @@
             <div>
                 <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">OT & Transaction Entry</h1>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                    Enter overtime hours for {{ $period['entry_month_name'] ?? 'previous month' }}
+                    Enter overtime hours and transactions for {{ $period['entry_month_name'] ?? 'previous month' }}
                 </p>
             </div>
             <div class="flex gap-2">
@@ -98,7 +98,7 @@
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                                 You can enter OT hours for <strong>{{ $period['entry_month_name'] }}</strong>
                             </p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                                 Window closes on {{ $period['window_end']->format('F d, Y') }} at 11:59 PM
                             </p>
                         </div>
@@ -109,7 +109,7 @@
                             <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                                 OT entry window is only open from 1st to 15th of each month
                             </p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+                            <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                                 Next window opens: {{ now()->addMonth()->startOfMonth()->format('F 1, Y') }}
                             </p>
                         </div>
@@ -150,7 +150,7 @@
                     @if($isLoading)
                         <flux:skeleton animate="shimmer" class="h-6 w-56 rounded inline-block" />
                     @else
-                        Overtime Hours for {{ $period['entry_month_name'] }}
+                        OT &amp; Transactions for {{ $period['entry_month_name'] }}
                     @endif
                 </h3>
             </div>
@@ -168,8 +168,6 @@
                             <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span></flux:table.column>
                             <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span></flux:table.column>
                             <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span></flux:table.column>
-                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
-                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
                         </flux:table.columns>
                         <flux:table.rows>
                             <flux:skeleton.group>
@@ -183,8 +181,6 @@
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
                                     <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
-                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-7 w-16 rounded" /></flux:table.cell>
-                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-5 w-14 rounded-full" /></flux:table.cell>
                                 </flux:table.rows>
                                 @endfor
                             </flux:skeleton.group>
@@ -226,12 +222,6 @@
                             </flux:table.column>
                             <flux:table.column>
                                 <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span>
-                            </flux:table.column>
-                            <flux:table.column align="center">
-                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span>
-                            </flux:table.column>
-                            <flux:table.column align="center">
-                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span>
                             </flux:table.column>
                         </flux:table.columns>
 
@@ -330,32 +320,6 @@
                                             <span class="text-sm text-zinc-400 dark:text-zinc-600">-</span>
                                         @endif
                                     </flux:table.cell>
-
-                                    <!-- Actions -->
-                                    <flux:table.cell align="center">
-                                        @if(!$entry['is_locked'] && $isWithinWindow)
-                                            <flux:button
-                                                wire:click="openTransactionModal({{ $index }})"
-                                                variant="filled"
-                                                size="sm"
-                                            >
-                                                Manage
-                                            </flux:button>
-                                        @else
-                                            <span class="text-xs text-zinc-400 dark:text-zinc-600">Locked</span>
-                                        @endif
-                                    </flux:table.cell>
-
-                                    <!-- Status Badge -->
-                                    <flux:table.cell align="center">
-                                        @if($entry['status'] === 'draft')
-                                            <flux:badge color="zinc" size="sm">Draft</flux:badge>
-                                        @elseif($entry['status'] === 'submitted')
-                                            <flux:badge color="blue" size="sm">Submitted</flux:badge>
-                                        @elseif($entry['status'] === 'locked')
-                                            <flux:badge color="green" size="sm">Locked</flux:badge>
-                                        @endif
-                                    </flux:table.cell>
                                 </flux:table.rows>
                             @endforeach
                         </flux:table.rows>
@@ -397,6 +361,148 @@
                 @endif
             @endif
         </flux:card>
+
+        <!-- Salary Deduction Form -->
+        @if(!$isLoading)
+            <flux:card
+                id="salary-deduction-form"
+                x-data="{ spotlight: false }"
+                x-on:salary-deduction-form-needed.window="
+                    spotlight = true;
+                    $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+                    setTimeout(() => spotlight = false, 6600);
+                "
+                x-bind:class="spotlight ? 'animate-deduction-breathe' : ''"
+                class="p-6 dark:bg-zinc-900 rounded-lg scroll-mt-6"
+            >
+                <div class="flex flex-col gap-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex items-start gap-3">
+                            <div>
+                                <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Salary Deduction Form</h3>
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                                    A declaration form signed by your officer and the worker, confirming the deductions recorded for
+                                    <strong>{{ $period['entry_month_name'] ?? 'this period' }}</strong>.
+                                    Download it, collect both signatures, then upload the signed copy back here.
+                                </p>
+                            </div>
+                        </div>
+                        @if($this->deductionWorkersCount > 0)
+                            <flux:badge color="amber" size="sm">
+                                {{ $this->deductionWorkersCount }} {{ \Str::plural('worker', $this->deductionWorkersCount) }} with deductions
+                            </flux:badge>
+                        @endif
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <!-- Step 1: download the pre-filled form -->
+                        <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                            <div class="flex items-center gap-2">
+                                <span class="flex size-5 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white dark:bg-white dark:text-zinc-900">1</span>
+                                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Download &amp; sign</span>
+                            </div>
+                            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                                One pre-filled signature page per worker, bundled into a single PDF.
+                            </p>
+                            <flux:button
+                                id="download-deduction-form-btn"
+                                wire:click="downloadDeductionForm"
+                                variant="primary"
+                                icon="arrow-down-tray"
+                                size="sm"
+                                class="mt-3"
+                                :disabled="$this->deductionWorkersCount === 0"
+                            >
+                                Download Deduction Form
+                            </flux:button>
+                            @if($this->deductionWorkersCount === 0)
+                                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                                    No deductions recorded for this period.
+                                </p>
+                            @endif
+                        </div>
+
+                        <!-- Step 2: upload the signed copy back -->
+                        <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                            <div class="flex items-center gap-2">
+                                <span class="flex size-5 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white dark:bg-white dark:text-zinc-900">2</span>
+                                <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Upload signed copy</span>
+                            </div>
+
+                            @if($signedDeductionForm)
+                                <div class="mt-3 flex flex-wrap items-center gap-3 rounded-md bg-green-50 p-3 dark:bg-green-900/20">
+                                    <flux:icon.check-circle class="size-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                            {{ $signedDeductionForm['file_name'] }}
+                                        </p>
+                                        <p class="text-xs text-zinc-600 dark:text-zinc-400">
+                                            {{ $signedDeductionForm['file_size'] }}
+                                            @if($signedDeductionForm['uploaded_at'])
+                                                &middot; uploaded {{ $signedDeductionForm['uploaded_at'] }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <flux:button wire:click="downloadSignedDeductionForm" variant="outline" icon="arrow-down-tray" size="sm">
+                                        View Uploaded
+                                    </flux:button>
+                                    @if($isWithinWindow)
+                                        <flux:button wire:click="removeSignedDeductionForm" variant="ghost" icon="trash" size="sm" class="text-red-600 dark:text-red-400">
+                                            Replace
+                                        </flux:button>
+                                    @endif
+                                </div>
+                            @elseif($isWithinWindow)
+                                <div class="mt-3 space-y-2">
+                                    <flux:file-upload wire:model="deductionFormFile" accept=".pdf,.jpg,.jpeg,.png">
+                                        <flux:file-upload.dropzone
+                                            heading="Drop the signed form or click to browse"
+                                            text="PDF, JPG or PNG up to 10 MB"
+                                            with-progress
+                                            inline
+                                        />
+                                    </flux:file-upload>
+
+                                    {{-- The dropzone shows progress but not the result, so name what is staged. --}}
+                                    @if($deductionFormFile)
+                                        <flux:file-item
+                                            heading="{{ $deductionFormFile->getClientOriginalName() }}"
+                                            :size="$deductionFormFile->getSize()"
+                                            class="my-2"
+                                        >
+                                            <x-slot name="actions">
+                                                <flux:file-item.remove wire:click="$set('deductionFormFile', null)" />
+                                            </x-slot>
+                                        </flux:file-item>
+                                    @endif
+
+                                    <flux:error name="deductionFormFile" />
+
+                                    {{-- Nothing to upload until a file is staged, so the button stays out of the way. --}}
+                                    @if($deductionFormFile)
+                                        <flux:button
+                                            id="upload-deduction-form-btn"
+                                            wire:click="uploadDeductionForm"
+                                            variant="primary"
+                                            icon="arrow-up-tray"
+                                            size="sm"
+                                        >
+                                            Upload Signed Form
+                                        </flux:button>
+                                    @endif
+                                </div>
+                            @else
+                                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                                    The entry window is closed, so the signed form can no longer be uploaded for this period.
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </flux:card>
+        @endif
 
         <!-- Help Information -->
         <flux:callout icon="information-circle" color="blue">

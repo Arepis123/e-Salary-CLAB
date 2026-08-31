@@ -185,4 +185,38 @@ class Contractor extends Model
     {
         return $this->ctr_status == '2' ? 'active' : 'inactive';
     }
+
+    /**
+     * The trading name reduced to something that can sit in a filename.
+     *
+     * What identifies a client at a glance is the trading name, so the legal
+     * suffix (Sdn. Bhd., Berhad, Enterprise and friends) is dropped, as is the
+     * "(M)" / "(Malaysia)" registration flourish that would otherwise leave a
+     * stray "_M_" behind. Whatever survives is collapsed to underscore-joined
+     * alphanumerics.
+     *
+     * "ADVATIS TECHNOLOGIES (M) SDN BHD" becomes "ADVATIS_TECHNOLOGIES".
+     *
+     * Returns an empty string when nothing usable is left; callers decide what
+     * to fall back to (usually the CLAB number).
+     */
+    public static function fileNameSlug(?string $companyName): string
+    {
+        $shortName = preg_split(
+            '/\s*\b(sdn\.?\s*bhd\.?|sendirian\s+berhad|berhad|bhd\.?|enterprise)\b/i',
+            (string) $companyName
+        )[0];
+
+        $shortName = preg_replace('/\s*\((?:m|malaysia)\)/i', '', $shortName);
+
+        return trim(preg_replace('/[^A-Za-z0-9]+/', '_', $shortName), '_');
+    }
+
+    /**
+     * This contractor's own filename slug. See fileNameSlug().
+     */
+    public function getFileNameSlugAttribute(): string
+    {
+        return static::fileNameSlug($this->ctr_comp_name);
+    }
 }

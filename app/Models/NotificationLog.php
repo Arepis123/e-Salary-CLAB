@@ -68,7 +68,10 @@ class NotificationLog extends Model
      */
     public function reference()
     {
-        if (! $this->reference_type || ! $this->reference_id) {
+        // Not every reference is a model: some logs are tagged with a plain
+        // string naming what they are about, because the thing they chase up
+        // does not exist yet.
+        if (! $this->reference_id || ! $this->reference_type || ! class_exists($this->reference_type)) {
             return null;
         }
 

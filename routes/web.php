@@ -146,6 +146,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // when the PDF opens inline (browsers use the last URL path segment as the tab name).
     Route::get('documents/{document}/{filename?}', [\App\Http\Controllers\DocumentController::class, 'show'])->name('documents.view');
 
+    // Signed Salary Deduction Form - inline view and download
+    // The download route is declared first so "download" is not swallowed by the {filename?} segment below.
+    Route::get('salary-deduction-forms/{form}/download', [\App\Http\Controllers\SalaryDeductionFormController::class, 'download'])
+        ->name('salary-deduction-forms.download');
+    Route::get('salary-deduction-forms/{form}/{filename?}', [\App\Http\Controllers\SalaryDeductionFormController::class, 'show'])
+        ->name('salary-deduction-forms.view');
+
     // ========================================================================
     // ADMIN-ONLY ROUTES (No client equivalent)
     // ========================================================================

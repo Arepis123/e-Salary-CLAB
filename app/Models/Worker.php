@@ -140,6 +140,25 @@ class Worker extends Model
     }
 
     /**
+     * Get all bank records for this worker
+     */
+    public function bankAccounts()
+    {
+        return $this->hasMany(WorkerBank::class, 'wkr_id', 'wkr_id');
+    }
+
+    /**
+     * Get the most recently added bank record for this worker.
+     * Workers can have several rows in wkr_bank; the newest one is the current
+     * account. Falls back to the highest id when created_at is null.
+     */
+    public function latestBank()
+    {
+        return $this->hasOne(WorkerBank::class, 'wkr_id', 'wkr_id')
+            ->ofMany(['created_at' => 'max', 'id' => 'max']);
+    }
+
+    /**
      * Check if worker has an active contract in the system
      */
     public function hasActiveContract(): bool

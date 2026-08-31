@@ -28,6 +28,7 @@ class PayrollSubmission extends Model
         'admin_reviewed_by',
         'admin_reviewed_at',
         'admin_final_amount',
+        'admin_breakdown',
         'admin_notes',
         'breakdown_file_path',
         'breakdown_file_name',
@@ -50,6 +51,7 @@ class PayrollSubmission extends Model
         'tax_invoice_generated_at' => 'datetime',
         'admin_reviewed_at' => 'datetime',
         'admin_final_amount' => 'decimal:2',
+        'admin_breakdown' => 'array',
         'is_legacy_submission' => 'boolean',
     ];
 
@@ -334,7 +336,7 @@ class PayrollSubmission extends Model
                 ->where('year', $year)
                 ->where('month', $month)
                 ->where('tax_invoice_number', 'LIKE', 'OR-P-'.$yearShort.$monthPadded.'%')
-                ->orderByRaw("CAST(SUBSTRING(tax_invoice_number, -4) AS UNSIGNED) DESC")
+                ->orderByRaw('CAST(SUBSTRING(tax_invoice_number, -4) AS UNSIGNED) DESC')
                 ->lockForUpdate()
                 ->first();
 
@@ -443,6 +445,77 @@ class PayrollSubmission extends Model
         }
 
         return route('payroll.breakdown.download', $this->id);
+    }
+
+    /**
+     * Whether the approved breakdown file's itemisation is stored.
+     *
+     * Only stored from the release that added admin_breakdown onward. Without
+     * it a breakdown can still be computed from the worker rows, but the
+     * figures are derived rather than taken from the file the client is billed
+     * from, so the client-facing pages fall back to a plain summary.
+     */
+    public function hasBreakdownItemisation(): bool
+    {
+        return is_array($this->admin_breakdown) && $this->admin_breakdown !== [];
+    }
+
+    /**
+     * Split admin_notes into the entries it is built from.
+     *
+     * The column is append-only: the reviewer's original note is written
+     * first, and every later edit appends a block headed
+     * "[Y-m-d H:i:s] Updated by <name>:". Splitting on that header turns the
+     * blob back into the audit trail it really is.
+     *
+     * @return array<int, array{type: 'review'|'update', at: ?\Carbon\Carbon, author: ?string, body: string}>
+     */
+    public function adminNoteEntries(): array
+    {
+        $notes = trim((string) $this->admin_notes);
+
+        if ($notes === '') {
+            return [];
+        }
+
+        $parts = preg_split(
+            '/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*Updated by\s*(.*?):\R/',
+            $notes,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE
+        );
+
+        $entries = [];
+
+        // Anything before the first header is the note left at review time.
+        $original = trim(array_shift($parts));
+
+        if ($original !== '') {
+            $entries[] = [
+                'type' => 'review',
+                'at' => $this->admin_reviewed_at,
+                'author' => $this->adminReviewer?->name,
+                'body' => $original,
+            ];
+        }
+
+        // The remainder arrives as repeating [timestamp, author, body] triples.
+        foreach (array_chunk($parts, 3) as $chunk) {
+            $body = trim($chunk[2] ?? '');
+
+            if ($body === '') {
+                continue;
+            }
+
+            $entries[] = [
+                'type' => 'update',
+                'at' => isset($chunk[0]) ? Carbon::parse($chunk[0]) : null,
+                'author' => trim($chunk[1] ?? '') ?: null,
+                'body' => $body,
+            ];
+        }
+
+        return $entries;
     }
 
     /**

@@ -76,14 +76,19 @@ class NotificationService
     }
 
     /**
-     * Send custom notification without template
+     * Send custom notification without template.
+     *
+     * $referenceType/$referenceId tag the log with whatever the message is
+     * about, so a caller can later list just its own sends.
      */
     public function sendCustom(
         User $recipient,
         string $subject,
         string $body,
         string $type = 'email',
-        ?User $sender = null
+        ?User $sender = null,
+        ?string $referenceType = null,
+        ?int $referenceId = null
     ): NotificationLog {
         $log = NotificationLog::create([
             'user_id' => $recipient->id,
@@ -92,6 +97,8 @@ class NotificationService
             'subject' => $subject,
             'body' => $body,
             'status' => 'pending',
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
             'sent_by' => $sender?->id ?? auth()->id(),
         ]);
 

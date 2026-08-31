@@ -90,14 +90,14 @@
                         @endforeach
                     </flux:select>
                 </div>
-                <div>
+                {{-- <div>
                     <flux:select wire:model.live="positionFilter" variant="listbox" placeholder="Filter by Position" size="sm">
                         <flux:select.option value="">All Positions</flux:select.option>
                         @foreach($positions as $position)
                             <flux:select.option value="{{ $position }}">{{ $position }}</flux:select.option>
                         @endforeach
                     </flux:select>
-                </div>
+                </div> --}}
                 <div>
                     <flux:select wire:model.live="statusFilter" variant="listbox" placeholder="Filter by Status" size="sm">
                         <flux:select.option value="">All Status</flux:select.option>
@@ -120,11 +120,13 @@
                     <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" wire:click="sortByColumn('name')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Name</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'passport'" :direction="$sortDirection" wire:click="sortByColumn('passport')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport Number</span></flux:table.column>
-                    <flux:table.column sortable :sorted="$sortBy === 'position'" :direction="$sortDirection" wire:click="sortByColumn('position')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Position</span></flux:table.column>
+                    {{-- <flux:table.column sortable :sorted="$sortBy === 'position'" :direction="$sortDirection" wire:click="sortByColumn('position')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Position</span></flux:table.column> --}}
                     <flux:table.column sortable :sorted="$sortBy === 'country'" :direction="$sortDirection" wire:click="sortByColumn('country')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Country</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'client'" :direction="$sortDirection" wire:click="sortByColumn('client')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400 max-md:hidden">Current Client</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'passport_expiry'" :direction="$sortDirection" wire:click="sortByColumn('passport_expiry')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport Expiry</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'permit_expiry'" :direction="$sortDirection" wire:click="sortByColumn('permit_expiry')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Permit Expiry</span></flux:table.column>
+                    <flux:table.column sortable :sorted="$sortBy === 'bank_name'" :direction="$sortDirection" wire:click="sortByColumn('bank_name')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Bank Name</span></flux:table.column>
+                    <flux:table.column sortable :sorted="$sortBy === 'account_no'" :direction="$sortDirection" wire:click="sortByColumn('account_no')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Account Number</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'status'" :direction="$sortDirection" wire:click="sortByColumn('status')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
                 </flux:table.columns>
@@ -176,8 +178,6 @@
 
                             <flux:table.cell variant="strong">{{ $worker['passport'] }}</flux:table.cell>
 
-                            <flux:table.cell variant="strong">{{ $worker['position'] }}</flux:table.cell>
-
                             <flux:table.cell variant="strong">{{ $worker['country'] }}</flux:table.cell>
 
                             <flux:table.cell variant="strong" class="max-w-xs truncate">{{ $worker['client'] }}</flux:table.cell>
@@ -193,6 +193,12 @@
                                     {{ $worker['permit_expiry'] }}
                                 </span>
                             </flux:table.cell>
+
+                            <flux:table.cell>
+                                <flux:badge :color="$worker['bank_color']" size="sm" inset="top bottom">{{ $worker['bank_name'] }}</flux:badge>
+                            </flux:table.cell>
+
+                            <flux:table.cell variant="strong">{{ $worker['account_no'] }}</flux:table.cell>
 
                             <flux:table.cell>
                                 @if($worker['status'] === 'Active')
@@ -216,7 +222,7 @@
                         </flux:table.rows>
                     @empty
                         <flux:table.rows>
-                            <flux:table.cell variant="strong" colspan="10" class="text-center">
+                            <flux:table.cell variant="strong" colspan="11" class="text-center">
                                 No workers found.
                             </flux:table.cell>
                         </flux:table.rows>

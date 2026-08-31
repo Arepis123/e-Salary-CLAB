@@ -137,13 +137,25 @@
         @endif
 
         <!-- Admin Update Notice -->
-        @if($invoice->admin_notes && str_contains($invoice->admin_notes, 'Updated by'))
+        @php
+            // The column is an append-only log; the client only needs the most
+            // recent change, not the whole audit trail.
+            $latestUpdate = collect($invoice->adminNoteEntries())
+                ->last(fn ($entry) => $entry['type'] === 'update');
+        @endphp
+
+        @if($latestUpdate)
             <flux:callout icon="exclamation-triangle" color="amber">
                 <flux:callout.heading>Invoice Updated by Admin</flux:callout.heading>
                 <flux:callout.text>
-                    <p class="mb-2">This invoice has been updated by our admin team. Please review the changes below:</p>
+                    <p class="mb-2">This invoice has been updated by our admin team. Please review the latest change:</p>
                     <div class="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700">
-                        <pre class="text-xs text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-mono">{{ $invoice->admin_notes }}</pre>
+                        @if($latestUpdate['at'] || $latestUpdate['author'])
+                            <p class="mb-1 text-xs font-medium text-amber-800 dark:text-amber-200">
+                               @if($latestUpdate['at']) {{ $latestUpdate['at']->format('d M Y, H:i') }}@endif
+                            </p>
+                        @endif
+                        <p class="whitespace-pre-line text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">{{ $latestUpdate['body'] }}</p>
                     </div>
                 </flux:callout.text>
             </flux:callout>
@@ -153,39 +165,46 @@
         <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
             <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Invoice Summary</h3>
 
-            <div class="space-y-2">
-                <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }}):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount, 2) }}</span>
-                </div>
+            {{-- Without the approved file's itemisation the detail would be
+                 derived rather than billed figures, so fall back to the plain
+                 summary. --}}
+            @if($invoice->hasBreakdownItemisation())
+                <x-payment-breakdown :submission="$invoice" />
+            @else
+                <div class="space-y-2">
+                    <div class="flex justify-between py-2 border-b border-zinc-200 dark:border-zinc-700">
+                        <span class="text-sm text-zinc-600 dark:text-zinc-400">Payroll Amount ({{ $invoice->total_workers }} {{ Str::plural('worker', $invoice->total_workers) }}):</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->admin_final_amount, 2) }}</span>
+                    </div>
 
-                <div class="flex justify-between py-1">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $invoice->billable_workers_count }} {{ Str::plural('worker', $invoice->billable_workers_count) }}):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->calculated_service_charge, 2) }}</span>
-                </div>
-
-                <div class="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-700">
-                    <span class="text-sm text-zinc-600 dark:text-zinc-400">SST (8%):</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->calculated_sst, 2) }}</span>
-                </div>
-
-                @if($invoice->has_penalty)
                     <div class="flex justify-between py-1">
-                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Subtotal:</span>
-                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->client_total, 2) }}</span>
+                        <span class="text-sm text-zinc-600 dark:text-zinc-400">Service Charge (RM 200 × {{ $invoice->billable_workers_count }} {{ Str::plural('worker', $invoice->billable_workers_count) }}):</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->calculated_service_charge, 2) }}</span>
                     </div>
 
-                    <div class="flex justify-between">
-                        <span class="text-sm text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%):</span>
-                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->has_penalty && $invoice->penalty_amount > 0 ? $invoice->penalty_amount : $invoice->calculatePenalty(), 2) }}</span>
+                    <div class="flex justify-between py-1 border-b border-zinc-200 dark:border-zinc-700">
+                        <span class="text-sm text-zinc-600 dark:text-zinc-400">SST (8%):</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->calculated_sst, 2) }}</span>
                     </div>
-                @endif
 
-                <div class="flex justify-between py-1">
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
-                    <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->total_due, 2) }}</span>
+                    @if($invoice->has_penalty)
+                        <div class="flex justify-between py-1">
+                            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Subtotal:</span>
+                            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->client_total, 2) }}</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span class="text-sm text-zinc-600 dark:text-zinc-400">Late Payment Penalty (8%):</span>
+                            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->has_penalty && $invoice->penalty_amount > 0 ? $invoice->penalty_amount : $invoice->calculatePenalty(), 2) }}</span>
+                        </div>
+                    @endif
+
+                    <div class="flex justify-between py-1">
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Total Amount Due:</span>
+                        <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($invoice->total_due, 2) }}</span>
+                    </div>
                 </div>
-            </div>
+            @endif
         </flux:card>
         
         <!-- Payment Action -->

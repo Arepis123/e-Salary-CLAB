@@ -1,22 +1,4 @@
 @php
-    use App\Services\PaymentCalculatorService;
-
-    // Calculate salary details
-    $basicSalary = $worker->basic_salary ?? 1700; // Minimum RM 1,700
-    $calculator = new PaymentCalculatorService();
-
-    // Worker deductions
-    $epfWorker = $basicSalary * 0.02; // 2% EPF
-    $socsoWorker = $calculator->calculateWorkerSocso($basicSalary);
-    $totalDeductions = $epfWorker + $socsoWorker;
-    $netSalary = $basicSalary - $totalDeductions;
-
-    // Employer contributions
-    $epfEmployer = $basicSalary * 0.02; // 2% EPF
-    $socsoEmployer = $calculator->calculateEmployerSocso($basicSalary);
-    $totalEmployerContributions = $epfEmployer + $socsoEmployer;
-    $totalPaymentToCLAB = $basicSalary + $totalEmployerContributions;
-
     // Contract information
     $contract = $worker->contract_info;
     $inactiveRecord = \App\Models\InactiveWorker::where('worker_id', $worker->wkr_id)->first();
@@ -241,218 +223,10 @@
                         @endif
                     </flux:card>
                 @endif
-
-                <!-- Salary Information -->
-                <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
-                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Current Salary Breakdown</h2>
-
-                    <!-- Worker Receives -->
-                    <div class="mb-4">
-                        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">Worker Receives</h3>
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-center py-1">
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">Basic Salary</span>
-                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($basicSalary, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1">
-                                <div>
-                                    <span class="text-sm text-zinc-600 dark:text-zinc-400">EPF Worker (2%)</span>
-                                </div>
-                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">- RM {{ number_format($epfWorker, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1 border-b border-zinc-200 dark:border-zinc-700">
-                                <div>
-                                    <span class="text-sm text-zinc-600 dark:text-zinc-400">SOCSO Worker</span>
-                                </div>
-                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">- RM {{ number_format($socsoWorker, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1">
-                                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Net Salary (Worker Receives)</span>
-                                <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($netSalary, 2) }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- System Collects -->
-                    <div class="mt-6 pt-4 border-t-2 border-zinc-300 dark:border-zinc-600">
-                        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">System Collects from Contractor</h3>
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-center py-1">
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">Basic Salary</span>
-                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($basicSalary, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1">
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">EPF Employer (2%)</span>
-                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">+ RM {{ number_format($epfEmployer, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1 border-b border-zinc-200 dark:border-zinc-700">
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">SOCSO Employer</span>
-                                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">+ RM {{ number_format($socsoEmployer, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center py-1">
-                                <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Total Payment to CLAB</span>
-                                <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($totalPaymentToCLAB, 2) }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-                        <p class="text-xs text-zinc-600 dark:text-zinc-300">
-                            <strong>Note:</strong> SOCSO rates are calculated based on salary ranges according to official SOCSO contribution table.
-                            This breakdown excludes overtime pay which is calculated monthly.
-                        </p>
-                    </div>
-                </flux:card>
-
-                <!-- Payroll History -->
-                <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
-                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Payroll History</h2>
-
-                    @if($payrollHistory->count() > 0)
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                                        <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Period</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Normal</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Rest</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Public</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Earning</th>
-                                        <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</th>
-                                        <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                                    @foreach($payrollHistory as $payroll)
-                                        <tr>
-                                            <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">
-                                                {{ $payroll->payrollSubmission->month_year }}
-                                            </td>
-                                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                                RM {{ number_format($payroll->basic_salary, 2) }}
-                                            </td>
-                                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                                @if($payroll->ot_normal_hours > 0)
-                                                    {{ number_format($payroll->ot_normal_hours, 2) }}h
-                                                @else
-                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
-                                                @endif
-                                            </td>
-                                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                                @if($payroll->ot_rest_hours > 0)
-                                                    {{ number_format($payroll->ot_rest_hours, 2) }}h
-                                                @else
-                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
-                                                @endif
-                                            </td>
-                                            <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                                @if($payroll->ot_public_hours > 0)
-                                                    {{ number_format($payroll->ot_public_hours, 2) }}h
-                                                @else
-                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
-                                                @endif
-                                            </td>
-                                            <td class="py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
-                                                @php
-                                                    // Earning = Allowances from transactions
-                                                    $totalEarning = $payroll->total_allowance;
-                                                @endphp
-                                                @if($totalEarning > 0)
-                                                    RM {{ number_format($totalEarning, 2) }}
-                                                @else
-                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
-                                                @endif
-                                            </td>
-                                            <td class="py-3 text-right text-sm font-medium text-red-600 dark:text-red-400">
-                                                @php
-                                                    // Deduction = Advance Payment + Deductions + NPL from transactions
-                                                    $totalTransactionDeductions = $payroll->total_advance_payment + $payroll->total_deduction + $payroll->total_npl;
-                                                @endphp
-                                                @if($totalTransactionDeductions > 0)
-                                                    RM {{ number_format($totalTransactionDeductions, 2) }}
-                                                @else
-                                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
-                                                @endif
-                                            </td>
-                                            <td class="py-3 text-center">
-                                                @if($payroll->payrollSubmission->status === 'paid')
-                                                    <flux:badge color="green" size="sm">Paid</flux:badge>
-                                                @elseif($payroll->payrollSubmission->status === 'pending_payment')
-                                                    <flux:badge color="yellow" size="sm">Pending</flux:badge>
-                                                @elseif($payroll->payrollSubmission->status === 'overdue')
-                                                    <flux:badge color="red" size="sm">Overdue</flux:badge>
-                                                @else
-                                                    <flux:badge color="zinc" size="sm">{{ ucfirst($payroll->payrollSubmission->status) }}</flux:badge>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="mt-4 space-y-2">
-                            <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-                                <p class="text-xs text-zinc-600 dark:text-zinc-300">
-                                    <strong>Note:</strong> Overtime and deductions are processed from the 1st to 15th of the following month. For example, October overtime is collected from November 1st to November 15th.
-                                </p>
-                            </div>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-500">
-                                Showing last 6 months of payroll records
-                            </p>
-                        </div>                                              
-                    @else
-                        <div class="text-center py-8">
-                            <flux:icon.document-text class="size-12 mx-auto text-zinc-400 dark:text-zinc-600 mb-2" />
-                            <p class="text-sm text-zinc-600 dark:text-zinc-400">No payroll history available</p>
-                            <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">Payroll records will appear here once submitted</p>
-                        </div>
-                    @endif
-                </flux:card>
             </div>
 
             <!-- Sidebar (Right - 1 column) -->
             <div class="space-y-6">
-                <!-- Quick Stats -->
-                <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
-                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Quick Stats</h2>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-2">
-                                    <flux:icon.check-circle class="size-5 text-green-600 dark:text-green-400" />
-                                </div>
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">Status</span>
-                            </div>
-                            @if($contractActive)
-                                <flux:badge color="green">Active</flux:badge>
-                            @else
-                                <flux:badge color="zinc">Inactive</flux:badge>
-                            @endif
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-2">
-                                    <flux:icon.calendar class="size-5 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">Contract Days Left</span>
-                            </div>
-                            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $daysRemaining }} days</span>
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-2">
-                                    <flux:icon.wallet class="size-5 text-purple-600 dark:text-purple-400" />
-                                </div>
-                                <span class="text-sm text-zinc-600 dark:text-zinc-400">Net Salary</span>
-                            </div>
-                            <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">RM {{ number_format($netSalary, 2) }}</span>
-                        </div>
-                    </div>
-                </flux:card>
-
                 <!-- Next of Kin Information -->
                 <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
                     <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Next of Kin</h2>
@@ -485,7 +259,151 @@
                         @endif
                     </div>
                 </flux:card>
+
+                <!-- Bank Details -->
+                <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+                    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Bank Details</h2>
+                    @php
+                        // A worker can have several rows in wkr_bank; latestBank is the current one.
+                        $bank = $worker->latestBank;
+                    @endphp
+                    <div class="space-y-3">
+                        @if($bank)
+                            <div>
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400">Bank Name</p>
+                                <div class="mt-1">
+                                    <flux:badge :color="\App\Models\WorkerBank::colorFor($bank->bank_name)" size="sm">{{ $bank->bank_name ?: '-' }}</flux:badge>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400">Account Number</p>
+                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 break-all">{{ $bank->account_no ?: '-' }}</p>
+                            </div>
+
+                            @if($bank->type)
+                                <div>
+                                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Account Type</p>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ ucfirst(str_replace('-', ' ', $bank->type)) }}</p>
+                                </div>
+                            @endif
+
+                            @if($bank->created_at)
+                                <div>
+                                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Last Updated</p>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $bank->created_at->format('F d, Y') }}</p>
+                                </div>
+                            @endif
+                        @else
+                            <div class="text-center py-4">
+                                <p class="text-sm text-zinc-600 dark:text-zinc-400">No bank details on record</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">Maintained in the worker registration system</p>
+                            </div>
+                        @endif
+                    </div>
+                </flux:card>
             </div>
         </div>
+
+        <!-- Payroll History -->
+        <flux:card class="p-6 dark:bg-zinc-900 rounded-lg">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Payroll History</h2>
+
+            @if($payrollHistory->count() > 0)
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                                <th class="pb-3 text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Period</th>
+                                <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic</th>
+                                <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Normal</th>
+                                <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Rest</th>
+                                <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Public</th>
+                                <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Earning</th>
+                                <th class="pb-3 text-right text-xs font-medium text-zinc-600 dark:text-zinc-400">Deductions</th>
+                                <th class="pb-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                            @foreach($payrollHistory as $payroll)
+                                <tr>
+                                    <td class="py-3 text-sm text-zinc-900 dark:text-zinc-100">
+                                        {{ $payroll->payrollSubmission->month_year }}
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        RM {{ number_format($payroll->basic_salary, 2) }}
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @if($payroll->ot_normal_hours > 0)
+                                            {{ number_format($payroll->ot_normal_hours, 2) }}h
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @if($payroll->ot_rest_hours > 0)
+                                            {{ number_format($payroll->ot_rest_hours, 2) }}h
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @if($payroll->ot_public_hours > 0)
+                                            {{ number_format($payroll->ot_public_hours, 2) }}h
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @php
+                                            // Earning = Allowance + Backpay + Medical Claim
+                                            $totalEarning = $payroll->total_transaction_earnings;
+                                        @endphp
+                                        @if($totalEarning > 0)
+                                            RM {{ number_format($totalEarning, 2) }}
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        @php
+                                            // Deduction = Advance Payment + Deductions + NPL + Accommodation
+                                            $totalTransactionDeductions = $payroll->total_transaction_deductions;
+                                        @endphp
+                                        @if($totalTransactionDeductions > 0)
+                                            RM {{ number_format($totalTransactionDeductions, 2) }}
+                                        @else
+                                            <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        @if($payroll->payrollSubmission->status === 'paid')
+                                            <flux:badge color="green" size="sm">Paid</flux:badge>
+                                        @elseif($payroll->payrollSubmission->status === 'pending_payment')
+                                            <flux:badge color="yellow" size="sm">Pending</flux:badge>
+                                        @elseif($payroll->payrollSubmission->status === 'overdue')
+                                            <flux:badge color="red" size="sm">Overdue</flux:badge>
+                                        @else
+                                            <flux:badge color="zinc" size="sm">{{ ucfirst($payroll->payrollSubmission->status) }}</flux:badge>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <p class="text-xs text-zinc-500 dark:text-zinc-500">
+                        Showing last 6 months of payroll records
+                    </p>
+                </div>                                              
+            @else
+                <div class="text-center py-8">
+                    <flux:icon.document-text class="size-12 mx-auto text-zinc-400 dark:text-zinc-600 mb-2" />
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">No payroll history available</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">Payroll records will appear here once submitted</p>
+                </div>
+            @endif
+        </flux:card>
     </div>
 </x-layouts.app>

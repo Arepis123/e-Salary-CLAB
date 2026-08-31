@@ -10,7 +10,7 @@ class WorkerController extends Controller
     public function show($workerId)
     {
         // Get worker from the worker_db database with all relationships
-        $worker = Worker::with(['country', 'workTrade', 'contracts.contractor', 'activeContract'])
+        $worker = Worker::with(['country', 'workTrade', 'contracts.contractor', 'activeContract', 'latestBank'])
             ->where('wkr_id', $workerId)
             ->firstOrFail();
 

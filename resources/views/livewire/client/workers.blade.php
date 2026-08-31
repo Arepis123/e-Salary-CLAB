@@ -185,8 +185,9 @@
                     <flux:table.column sortable :sorted="$sortBy === 'passport_expiry'" :direction="$sortDirection" wire:click="sortByColumn('passport_expiry')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport Expiry</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'permit_expiry'" :direction="$sortDirection" wire:click="sortByColumn('permit_expiry')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Permit Expiry</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'country'" :direction="$sortDirection" wire:click="sortByColumn('country')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Country</span></flux:table.column>
-                    <flux:table.column sortable :sorted="$sortBy === 'position'" :direction="$sortDirection" wire:click="sortByColumn('position')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Position</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'basic_salary'" :direction="$sortDirection" wire:click="sortByColumn('basic_salary')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Basic Salary</span></flux:table.column>
+                    <flux:table.column sortable :sorted="$sortBy === 'bank_name'" :direction="$sortDirection" wire:click="sortByColumn('bank_name')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Bank Name</span></flux:table.column>
+                    <flux:table.column sortable :sorted="$sortBy === 'account_no'" :direction="$sortDirection" wire:click="sortByColumn('account_no')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Account Number</span></flux:table.column>
                     <flux:table.column sortable :sorted="$sortBy === 'status'" :direction="$sortDirection" wire:click="sortByColumn('status')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
                     <flux:table.column><span id="actions-column-header" class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
                 </flux:table.columns>
@@ -241,8 +242,6 @@
 
                             <flux:table.cell variant="strong">{{ $worker->country->cty_desc ?? '-' }}</flux:table.cell>
 
-                            <flux:table.cell variant="strong">{{ $worker->workTrade->trade_desc ?? '-' }}</flux:table.cell>
-
                             <flux:table.cell variant="strong">
                                 @if($worker->basic_salary)
                                     RM {{ number_format($worker->basic_salary, 2) }}
@@ -250,6 +249,12 @@
                                     -
                                 @endif
                             </flux:table.cell>
+
+                            <flux:table.cell>
+                                <flux:badge :color="\App\Models\WorkerBank::colorFor($worker->latestBank?->bank_name)" size="sm" inset="top bottom">{{ $worker->latestBank?->bank_name ?: 'N/A' }}</flux:badge>
+                            </flux:table.cell>
+
+                            <flux:table.cell variant="strong">{{ $worker->latestBank?->account_no ?: 'N/A' }}</flux:table.cell>
 
                             <flux:table.cell>
                                 @if($worker->contract_info && $worker->contract_info->isActive() && !in_array($worker->wkr_id, $manuallyInactiveIds))
@@ -270,7 +275,7 @@
                         </flux:table.rows>
                     @empty
                         <flux:table.rows>
-                            <flux:table.cell variant="strong" colspan="10" class="text-center">
+                            <flux:table.cell variant="strong" colspan="11" class="text-center">
                                 No workers found.
                             </flux:table.cell>
                         </flux:table.rows>
