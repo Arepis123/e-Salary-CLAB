@@ -173,6 +173,9 @@ class Users extends Component
             return;
         }
 
+        // Disabling a PIC releases the contractors they manage (see User::booted)
+        $releasedContractors = $user->is_active ? $user->contractorAssignments()->count() : 0;
+
         $user->is_active = ! $user->is_active;
         $user->save();
 
@@ -182,6 +185,9 @@ class Users extends Component
             text: $user->is_active
                 ? 'User can now log in to the system.'
                 : 'User has been disabled and can no longer log in.'
+                    .($releasedContractors > 0
+                        ? ' '.$releasedContractors.' managed contractor(s) released and can now be assigned to another PIC.'
+                        : '')
         );
     }
 

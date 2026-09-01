@@ -27,7 +27,7 @@
         <!-- Report Filters -->
         <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <h2 class="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Filter Reports</h2>
-            <div class="grid gap-4 md:grid-cols-4">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <flux:field>
                     <flux:label>Report Type</flux:label>
                     <flux:select wire:model.live="reportType" variant="listbox" placeholder="Select type">
@@ -52,6 +52,23 @@
                         @endif
                         @foreach($availableMonths as $month)
                             <flux:select.option value="{{ $month['value'] }}">{{ $month['label'] }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>Filter (PIC)</flux:label>
+                    <flux:select
+                        wire:model.live="picFilter"
+                        variant="listbox"
+                        multiple
+                        searchable
+                        clearable
+                        selected-suffix="selected"
+                        placeholder="All PIC"
+                    >
+                        @foreach($allPics as $pic)
+                            <flux:select.option value="{{ $pic['id'] }}">{{ $pic['name'] }}</flux:select.option>
                         @endforeach
                     </flux:select>
                 </flux:field>

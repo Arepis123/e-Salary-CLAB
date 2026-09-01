@@ -99,6 +99,62 @@ class User extends Authenticatable
     }
 
     /**
+     * Release the contractors a user manages the moment they stop being an
+     * eligible PIC — deactivated, or moved off an admin role. Otherwise those
+     * contractors stay locked and cannot be assigned to anyone else.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (User $user) {
+            if (! $user->wasChanged(['is_active', 'role'])) {
+                return;
+            }
+
+            if (! $user->canBePersonInCharge()) {
+                $user->contractorAssignments()->delete();
+            }
+        });
+    }
+
+    /**
+     * Only active admins / super admins can hold contractor assignments
+     */
+    public function canBePersonInCharge(): bool
+    {
+        return $this->is_active && in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    /**
+     * Contractors this user is the person in charge (PIC) of
+     */
+    public function contractorAssignments()
+    {
+        return $this->hasMany(UserContractorAssignment::class, 'user_id');
+    }
+
+    /**
+     * CLAB numbers of the contractors assigned to this user
+     *
+     * @return array<string>
+     */
+    public function assignedClabNos(): array
+    {
+        return $this->contractorAssignments()
+            ->pluck('contractor_clab_no')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Admins and super admins — the users that can be assigned contractors
+     */
+    public function scopePersonsInCharge($query)
+    {
+        return $query->whereIn('role', ['admin', 'super_admin']);
+    }
+
+    /**
      * Check if user is a super admin
      */
     public function isSuperAdmin(): bool

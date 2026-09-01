@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ContractorConfigChange;
 use App\Models\ContractorWindowLog;
 use App\Models\ContractorWindowSetting;
 use App\Models\EntryUnlockLog;
@@ -27,6 +28,8 @@ class ContractorWindowService
                 ]
             );
 
+            $wasOpen = (bool) $setting->is_window_open;
+
             // Update setting
             $setting->update([
                 'is_window_open' => true,
@@ -45,6 +48,17 @@ class ContractorWindowService
                     'previous_status' => ! $setting->wasChanged('is_window_open') ? 'open' : 'closed',
                 ],
             ]);
+
+            // Mirror into the contractor configuration history
+            ContractorConfigChange::record(
+                clabNo: $clabNo,
+                setting: ContractorConfigChange::SETTING_OT_WINDOW,
+                oldValue: $this->windowLabel($wasOpen),
+                newValue: $this->windowLabel(true),
+                contractorName: $setting->contractor_name,
+                remarks: $remarks,
+                changedBy: $userId,
+            );
 
             // Unlock locked entries for this contractor
             $this->unlockEntries($clabNo, $userId);
@@ -70,6 +84,8 @@ class ContractorWindowService
                 ]
             );
 
+            $wasOpen = (bool) $setting->is_window_open;
+
             $setting->update([
                 'is_window_open' => false,
                 'window_closed_at' => now(),
@@ -87,10 +103,26 @@ class ContractorWindowService
                 ],
             ]);
 
+            // Mirror into the contractor configuration history
+            ContractorConfigChange::record(
+                clabNo: $clabNo,
+                setting: ContractorConfigChange::SETTING_OT_WINDOW,
+                oldValue: $this->windowLabel($wasOpen),
+                newValue: $this->windowLabel(false),
+                contractorName: $setting->contractor_name,
+                remarks: $remarks,
+                changedBy: $userId,
+            );
+
             Cache::forget("contractor_window:{$clabNo}");
 
             return $setting->fresh();
         });
+    }
+
+    protected function windowLabel(bool $isOpen): string
+    {
+        return $isOpen ? 'Open' : 'Closed';
     }
 
     /**
@@ -207,7 +239,6 @@ class ContractorWindowService
             'windows_open' => $openWindows,
             'windows_closed' => $closedWindows,
             'using_default' => $defaultWindows,
-            'recent_changes' => ContractorWindowLog::recent(10)->with('changedBy')->get(),
         ];
     }
 }

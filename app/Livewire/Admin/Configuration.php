@@ -19,9 +19,6 @@ class Configuration extends Component
     use WithPagination;
 
     #[Url]
-    public $search = '';
-
-    #[Url]
     public $countryFilter = '';
 
     #[Url]
@@ -45,18 +42,16 @@ class Configuration extends Component
 
     public $remarks = '';
 
-    public $perPage = 15;
-
     public $stats = [];
 
     public $showHistory = false;
 
+    public $showDeactivatedWorkers = false;
+
     // Window management properties
-    public $activeTab = 'salary';
+    public $activeTab = 'contractor-settings';
 
     public $showWindowModal = false;
-
-    public $showHistoryModal = false;
 
     public $selectedContractorClab = '';
 
@@ -66,24 +61,51 @@ class Configuration extends Component
 
     public $windowRemarks = '';
 
-    public $contractorHistory = [];
-
     public $windowStats = [];
 
-    // OT entry window filters
-    public $windowSearch = '';
-
-    public $windowContractorFilter = '';
-
+    // OT entry window filter (applies to the merged contractor settings table)
     public $windowStatusFilter = ''; // '', 'open', or 'closed'
+
+    // PIC (person in charge) assignment properties
+    public $picSearch = '';
+
+    public $picRoleFilter = '';
+
+    public $showPicAssignmentModal = false;
+
+    public $assigningUserId = null;
+
+    public $assigningUserName = '';
+
+    public $picSelectedClabs = [];
+
+    public $picContractorSearch = '';
+
+    public $picSelectAll = false;
+
+    /** contractor_clab_no => name of the PIC already managing it (excluding the one being edited) */
+    public $picTakenClabs = [];
 
     // Contractor configuration properties
     public $contractorConfigs = [];
+
+    public $showConfigHistory = false;
+
+    // Per-contractor change history (timeline modal)
+    public $showContractorHistoryModal = false;
+
+    public $historyContractorClab = '';
+
+    public $historyContractorName = '';
+
+    public $contractorChangeHistory = [];
 
     // Contractor-specific settings filters
     public $configSearch = '';
 
     public $configContractorFilter = '';
+
+    public $configOverrideFilter = ''; // '', 'with', or 'without'
 
     public $editingContractorClab = '';
 
@@ -386,19 +408,14 @@ class Configuration extends Component
         ];
     }
 
-    public function updatedSearch()
-    {
-        $this->resetPage();
-    }
-
     public function updatedCountryFilter()
     {
-        $this->resetPage();
+        $this->resetPage('workersPage');
     }
 
     public function updatedPositionFilter()
     {
-        $this->resetPage();
+        $this->resetPage('workersPage');
     }
 
     public function sortByColumn($column)
@@ -409,15 +426,7 @@ class Configuration extends Component
             $this->sortBy = $column;
             $this->sortDirection = 'asc';
         }
-        $this->resetPage();
-    }
-
-    public function clearFilters()
-    {
-        $this->search = '';
-        $this->countryFilter = '';
-        $this->positionFilter = '';
-        $this->resetPage();
+        $this->resetPage('workersPage');
     }
 
     public function openEditModal($workerId)
@@ -451,6 +460,11 @@ class Configuration extends Component
     public function toggleHistory()
     {
         $this->showHistory = ! $this->showHistory;
+    }
+
+    public function toggleDeactivatedWorkers()
+    {
+        $this->showDeactivatedWorkers = ! $this->showDeactivatedWorkers;
     }
 
     public function updateBasicSalary()
@@ -531,30 +545,6 @@ class Configuration extends Component
         $this->activeTab = $tab;
     }
 
-    // OT entry window filter methods
-    public function updatedWindowSearch()
-    {
-        $this->resetPage('windowsPage');
-    }
-
-    public function updatedWindowContractorFilter()
-    {
-        $this->resetPage('windowsPage');
-    }
-
-    public function updatedWindowStatusFilter()
-    {
-        $this->resetPage('windowsPage');
-    }
-
-    public function clearWindowFilters()
-    {
-        $this->windowSearch = '';
-        $this->windowContractorFilter = '';
-        $this->windowStatusFilter = '';
-        $this->resetPage('windowsPage');
-    }
-
     public function openWindowModal(string $clabNo, string $contractorName, string $action)
     {
         $this->selectedContractorClab = $clabNo;
@@ -617,20 +607,243 @@ class Configuration extends Component
         }
     }
 
-    public function viewContractorHistory(string $clabNo, string $contractorName)
+    // PIC (person in charge) assignment methods
+    public function updatedPicSearch()
     {
-        $this->selectedContractorClab = $clabNo;
-        $this->selectedContractorName = $contractorName;
-        $this->contractorHistory = $this->windowService->getContractorHistory($clabNo);
-        $this->showHistoryModal = true;
+        $this->resetPage('picPage');
     }
 
-    public function closeHistoryModal()
+    public function updatedPicRoleFilter()
     {
-        $this->showHistoryModal = false;
-        $this->selectedContractorClab = '';
-        $this->selectedContractorName = '';
-        $this->contractorHistory = [];
+        $this->resetPage('picPage');
+    }
+
+    public function clearPicFilters()
+    {
+        $this->picSearch = '';
+        $this->picRoleFilter = '';
+        $this->resetPage('picPage');
+    }
+
+    /**
+     * Open the contractor picker for one admin / super admin.
+     */
+    public function openPicAssignmentModal(int $userId)
+    {
+        $user = \App\Models\User::personsInCharge()->find($userId);
+
+        if (! $user) {
+            Flux::toast(variant: 'danger', text: 'User not found.');
+
+            return;
+        }
+
+        // Inactive admins release their contractors, so they cannot be given new ones
+        if (! $user->canBePersonInCharge()) {
+            Flux::toast(
+                variant: 'warning',
+                heading: 'User Inactive',
+                text: $user->name.' is inactive. Re-activate the account before assigning contractors.'
+            );
+
+            return;
+        }
+
+        $this->assigningUserId = $user->id;
+        $this->assigningUserName = $user->name;
+        $this->picSelectedClabs = $user->assignedClabNos();
+        $this->picContractorSearch = '';
+        $this->picTakenClabs = $this->loadTakenClabs($user->id);
+        $this->picSelectAll = count($this->picSelectedClabs) === count($this->availablePicClabs())
+            && ! empty($this->availablePicClabs());
+        $this->showPicAssignmentModal = true;
+    }
+
+    public function closePicAssignmentModal()
+    {
+        $this->showPicAssignmentModal = false;
+        $this->assigningUserId = null;
+        $this->assigningUserName = '';
+        $this->picSelectedClabs = [];
+        $this->picContractorSearch = '';
+        $this->picTakenClabs = [];
+        $this->picSelectAll = false;
+    }
+
+    /**
+     * Contractors already managed by a different PIC — one contractor has one PIC.
+     *
+     * @return array<string, string> clab no => PIC name
+     */
+    protected function loadTakenClabs(int $exceptUserId): array
+    {
+        return \App\Models\UserContractorAssignment::with('user')
+            ->where('user_id', '!=', $exceptUserId)
+            ->get()
+            ->mapWithKeys(fn ($assignment) => [
+                $assignment->contractor_clab_no => $assignment->user->name ?? 'another admin',
+            ])
+            ->toArray();
+    }
+
+    /**
+     * CLAB numbers the PIC being edited is allowed to tick.
+     *
+     * @return array<string>
+     */
+    protected function availablePicClabs(): array
+    {
+        return collect($this->contractorConfigs)
+            ->pluck('contractor_clab_no')
+            ->filter()
+            ->reject(fn ($clab) => isset($this->picTakenClabs[$clab]))
+            ->values()
+            ->toArray();
+    }
+
+    public function updatedPicSelectAll($value)
+    {
+        // Only contractors that are free (or already this PIC's) can be ticked
+        $this->picSelectedClabs = $value ? $this->availablePicClabs() : [];
+    }
+
+    public function updatedPicSelectedClabs()
+    {
+        // Defensive: a contractor managed by someone else can never stay ticked
+        $this->picSelectedClabs = array_values(array_filter(
+            $this->picSelectedClabs,
+            fn ($clab) => ! isset($this->picTakenClabs[$clab])
+        ));
+
+        $available = count($this->availablePicClabs());
+        $this->picSelectAll = $available > 0 && count($this->picSelectedClabs) === $available;
+    }
+
+    /**
+     * Replace the contractor list this PIC manages with the ticked selection.
+     */
+    public function savePicAssignments()
+    {
+        if (! $this->assigningUserId) {
+            return;
+        }
+
+        $user = \App\Models\User::find($this->assigningUserId);
+
+        if (! $user || ! $user->canBePersonInCharge()) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Cannot Assign',
+                text: 'Only active admins can manage contractors.'
+            );
+
+            $this->closePicAssignmentModal();
+
+            return;
+        }
+
+        try {
+            $existing = \App\Models\UserContractorAssignment::where('user_id', $this->assigningUserId)
+                ->pluck('contractor_clab_no')
+                ->all();
+
+            $selected = array_values(array_unique($this->picSelectedClabs));
+
+            // Skip anything claimed by another PIC in the meantime
+            $taken = $this->loadTakenClabs($this->assigningUserId);
+            $rejected = array_values(array_intersect($selected, array_keys($taken)));
+            $selected = array_values(array_diff($selected, $rejected));
+
+            $toRemove = array_diff($existing, $selected);
+            $toAdd = array_diff($selected, $existing);
+
+            if (! empty($toRemove)) {
+                \App\Models\UserContractorAssignment::where('user_id', $this->assigningUserId)
+                    ->whereIn('contractor_clab_no', $toRemove)
+                    ->delete();
+            }
+
+            foreach ($toAdd as $clabNo) {
+                \App\Models\UserContractorAssignment::create([
+                    'user_id' => $this->assigningUserId,
+                    'contractor_clab_no' => $clabNo,
+                    'assigned_by' => auth()->id(),
+                ]);
+            }
+
+            if (! empty($rejected)) {
+                Flux::toast(
+                    variant: 'warning',
+                    heading: 'Some Contractors Skipped',
+                    text: count($rejected).' contractor(s) are already managed by another PIC and were not assigned.'
+                );
+            }
+
+            Flux::toast(
+                variant: 'success',
+                heading: 'Contractors Assigned',
+                text: $this->assigningUserName.' now manages '.count($selected).' contractor(s).'
+            );
+
+            $this->closePicAssignmentModal();
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save assignments: '.$e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Admin / super admin rows for the PIC tab, with their assigned contractors.
+     */
+    protected function getPicData(): array
+    {
+        $contractorNames = collect($this->contractorConfigs)
+            ->pluck('contractor_name', 'contractor_clab_no');
+
+        $assignedClabs = \App\Models\UserContractorAssignment::pluck('contractor_clab_no')->unique();
+
+        $query = \App\Models\User::personsInCharge()->with('contractorAssignments');
+
+        if ($this->picSearch !== '') {
+            $term = '%'.$this->picSearch.'%';
+            $query->where(fn ($q) => $q->where('name', 'like', $term)->orWhere('email', 'like', $term));
+        }
+
+        if ($this->picRoleFilter !== '') {
+            $query->where('role', $this->picRoleFilter);
+        }
+
+        $picUsers = $query->orderBy('name')
+            ->paginate(15, ['*'], 'picPage')
+            ->through(function ($user) use ($contractorNames) {
+                $clabs = $user->contractorAssignments->pluck('contractor_clab_no');
+
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'is_active' => (bool) $user->is_active,
+                    'assigned_count' => $clabs->count(),
+                    'assigned_names' => $clabs->map(fn ($clab) => $contractorNames[$clab] ?? $clab)->sort()->values()->toArray(),
+                ];
+            });
+
+        return [
+            'picUsers' => $picUsers,
+            'picStats' => [
+                'total' => \App\Models\User::personsInCharge()->count(),
+                'assigned' => \App\Models\UserContractorAssignment::distinct('user_id')->count('user_id'),
+                'contractors' => collect($this->contractorConfigs)->count(),
+                // Contractors nobody has picked yet
+                'unassigned' => collect($this->contractorConfigs)
+                    ->reject(fn ($config) => $assignedClabs->contains($config->contractor_clab_no))
+                    ->count(),
+            ],
+        ];
     }
 
     // Contractor configuration methods
@@ -658,10 +871,117 @@ class Configuration extends Component
         $this->resetPage('configsPage');
     }
 
+    public function updatedConfigOverrideFilter()
+    {
+        $this->resetPage('configsPage');
+    }
+
+    public function updatedWindowStatusFilter()
+    {
+        $this->resetPage('configsPage');
+    }
+
+    public function toggleConfigHistory()
+    {
+        $this->showConfigHistory = ! $this->showConfigHistory;
+    }
+
+    /**
+     * Open the timeline of everything that was changed for one contractor:
+     * deductions, service charge, penalty and payment settings, plus every OT
+     * entry window open/close. Changes saved together (same second, same admin,
+     * same remarks) share a timeline entry, newest first.
+     */
+    public function openContractorHistoryModal(string $clabNo, string $contractorName)
+    {
+        $this->historyContractorClab = $clabNo;
+        $this->historyContractorName = $contractorName;
+
+        // Configuration changes. OT window rows are skipped here — the window log
+        // below is the fuller record of the same events (it keeps re-opens too).
+        $entries = \App\Models\ContractorConfigChange::with('changedBy')
+            ->forContractor($clabNo)
+            ->where('setting', '!=', \App\Models\ContractorConfigChange::SETTING_OT_WINDOW)
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(100)
+            ->get()
+            ->groupBy(fn ($change) => $change->created_at->format('Y-m-d H:i:s').'|'.$change->changed_by.'|'.$change->remarks)
+            ->map(fn ($group) => [
+                'timestamp' => $group->first()->created_at->timestamp,
+                'date' => $group->first()->created_at->format('d M Y, h:i A'),
+                'user' => $group->first()->changedBy->name ?? 'Unknown',
+                'user_color' => $this->userBadgeColor($group->first()->changed_by, $group->first()->changedBy->name ?? 'Unknown'),
+                'remarks' => $group->first()->remarks,
+                // Within one save, keep the order the changes were written in
+                'changes' => $group->sortBy('id')->map(fn ($change) => [
+                    'label' => $change->setting_label,
+                    'old' => $change->old_value ?: '-',
+                    'new' => $change->new_value ?: '-',
+                ])->values()->toArray(),
+            ])
+            ->values();
+
+        // OT entry window actions, walked oldest first so each entry knows the state it replaced
+        $windowState = 'Closed';
+        $windowEntries = collect();
+
+        foreach ($this->windowService->getContractorHistory($clabNo)->reverse() as $log) {
+            $newState = $log->action === 'opened' ? 'Open' : 'Closed';
+
+            $windowEntries->push([
+                'timestamp' => $log->created_at->timestamp,
+                'date' => $log->created_at->format('d M Y, h:i A'),
+                'user' => $log->changedBy->name ?? 'Unknown',
+                'user_color' => $this->userBadgeColor($log->changed_by, $log->changedBy->name ?? 'Unknown'),
+                'remarks' => $log->remarks,
+                'changes' => [[
+                    'label' => 'OT Entry Window',
+                    'old' => $windowState,
+                    'new' => $newState,
+                ]],
+            ]);
+
+            $windowState = $newState;
+        }
+
+        $this->contractorChangeHistory = $entries
+            ->concat($windowEntries)
+            ->sortByDesc('timestamp')
+            ->values()
+            ->take(50)
+            ->toArray();
+
+        $this->showContractorHistoryModal = true;
+    }
+
+    /**
+     * Stable badge colour per admin, so each person keeps the same colour
+     * everywhere in the timeline. Green is reserved for the "Latest" badge.
+     */
+    protected function userBadgeColor(?int $userId, string $name): string
+    {
+        $palette = ['amber', 'blue', 'purple', 'pink', 'teal', 'indigo', 'orange', 'cyan', 'violet', 'rose'];
+
+        $seed = $userId ?? crc32($name);
+
+        return $palette[abs($seed) % count($palette)];
+    }
+
+    public function closeContractorHistoryModal()
+    {
+        $this->showContractorHistoryModal = false;
+        $this->historyContractorClab = '';
+        $this->historyContractorName = '';
+        $this->contractorChangeHistory = [];
+    }
+
     public function clearConfigFilters()
     {
         $this->configSearch = '';
         $this->configContractorFilter = '';
+        $this->configOverrideFilter = '';
+        $this->windowStatusFilter = '';
         $this->resetPage('configsPage');
     }
 
@@ -1653,6 +1973,8 @@ class Configuration extends Component
         $this->workerSearch = '';
         $this->workerContractorFilter = '';
         $this->workerStatusFilter = '';
+        $this->countryFilter = '';
+        $this->positionFilter = '';
         $this->resetPage('workersPage');
     }
 
@@ -1821,6 +2143,16 @@ class Configuration extends Component
             $query->where('wkr_currentemp', $this->workerContractorFilter);
         }
 
+        // Apply country filter
+        if ($this->countryFilter) {
+            $query->where('wkr_country', $this->countryFilter);
+        }
+
+        // Apply position filter
+        if ($this->positionFilter) {
+            $query->where('wkr_wtrade', $this->positionFilter);
+        }
+
         // Apply status filter
         if ($this->workerStatusFilter === 'inactive') {
             $query->whereIn('wkr_id', $inactiveWorkerIds);
@@ -1828,16 +2160,29 @@ class Configuration extends Component
             $query->whereNotIn('wkr_id', $inactiveWorkerIds);
         }
 
-        // Order by name
-        $query->orderBy('wkr_name');
+        // Apply sorting
+        switch ($this->sortBy) {
+            case 'salary':
+                $query->orderBy('wkr_salary', $this->sortDirection);
+                break;
+            case 'country':
+                $query->orderBy('wkr_country', $this->sortDirection);
+                break;
+            default:
+                $query->orderBy('wkr_name', $this->sortDirection);
+        }
 
-        // Paginate (named page so it does not collide with the salary tab paginator)
+        // Paginate (named page so it does not collide with the other tab paginators)
         $workersList = $query->paginate($this->workersPerPage, ['*'], 'workersPage')
             ->through(function ($worker) use ($inactiveWorkerIds) {
                 return [
                     'id' => $worker->wkr_id,
                     'name' => $worker->wkr_name,
                     'passport' => $worker->wkr_passno,
+                    'country' => $worker->country?->cty_desc ?? $worker->wkr_country ?? '-',
+                    // Add spaces around & symbol for better readability
+                    'position' => preg_replace('/\s*&\s*/', ' & ', $worker->workTrade?->trade_desc ?? $worker->wkr_wtrade ?? '-'),
+                    'salary' => $worker->wkr_salary,
                     'contractor_clab' => $worker->wkr_currentemp,
                     'contractor_name' => $worker->contractor?->ctr_comp_name ?? $worker->wkr_currentemp,
                     'is_inactive' => in_array($worker->wkr_id, $inactiveWorkerIds),
@@ -1852,6 +2197,32 @@ class Configuration extends Component
             ->map(fn ($u) => ['clab_no' => $u->contractor_clab_no, 'name' => $u->name])
             ->toArray();
 
+        // Get distinct countries for filter (only from contracted workers) with their descriptions
+        $countryCodes = Worker::whereIn('wkr_id', $contractedWorkerIds)
+            ->select('wkr_country')
+            ->distinct()
+            ->whereNotNull('wkr_country')
+            ->where('wkr_country', '!=', '')
+            ->pluck('wkr_country')
+            ->unique();
+
+        $countries = \App\Models\Country::whereIn('cty_id', $countryCodes)
+            ->orderBy('cty_desc')
+            ->pluck('cty_desc', 'cty_id');
+
+        // Get distinct positions for filter (only from contracted workers) with their descriptions
+        $positionCodes = Worker::whereIn('wkr_id', $contractedWorkerIds)
+            ->select('wkr_wtrade')
+            ->distinct()
+            ->whereNotNull('wkr_wtrade')
+            ->where('wkr_wtrade', '!=', '')
+            ->pluck('wkr_wtrade')
+            ->unique();
+
+        $positions = \App\Models\WorkTrade::whereIn('trade_id', $positionCodes)
+            ->orderBy('trade_desc')
+            ->pluck('trade_desc', 'trade_id');
+
         // Stats
         $totalWorkers = Worker::whereIn('wkr_id', $contractedWorkerIds)->count();
         $inactiveCount = count($inactiveWorkerIds);
@@ -1859,11 +2230,17 @@ class Configuration extends Component
         return [
             'workersList' => $workersList,
             'workerContractors' => $workerContractors,
+            'countries' => $countries,
+            'positions' => $positions,
             'workerStats' => [
                 'total' => $totalWorkers,
                 'active' => $totalWorkers - $inactiveCount,
                 'inactive' => $inactiveCount,
             ],
+            // Salary adjustments, newest first (paginated, 15 per page)
+            'salaryHistory' => SalaryAdjustment::with('adjustedBy')
+                ->orderBy('created_at', 'desc')
+                ->paginate(15, ['*'], 'historyPage'),
             'inactiveWorkersList' => \App\Models\InactiveWorker::with('deactivatedBy')
                 ->orderBy('deactivated_at', 'desc')
                 ->paginate($this->workersPerPage, ['*'], 'inactivePage'),
@@ -1893,131 +2270,6 @@ class Configuration extends Component
 
     public function render()
     {
-        // Get worker IDs that have contracts (only show workers with contracts)
-        $contractedWorkerIds = \App\Models\ContractWorker::pluck('con_wkr_id')->unique();
-
-        // Build query for workers (only contracted workers)
-        $query = Worker::query()
-            ->with(['country', 'workTrade'])
-            ->whereIn('wkr_id', $contractedWorkerIds);
-
-        // Apply search filter
-        if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('wkr_name', 'like', '%'.$this->search.'%')
-                    ->orWhere('wkr_passno', 'like', '%'.$this->search.'%')
-                    ->orWhere('wkr_id', 'like', '%'.$this->search.'%');
-            });
-        }
-
-        // Apply country filter
-        if ($this->countryFilter) {
-            $query->where('wkr_country', $this->countryFilter);
-        }
-
-        // Apply position filter
-        if ($this->positionFilter) {
-            $query->where('wkr_wtrade', $this->positionFilter);
-        }
-
-        // Apply sorting
-        switch ($this->sortBy) {
-            case 'name':
-                $query->orderBy('wkr_name', $this->sortDirection);
-                break;
-            case 'salary':
-                $query->orderBy('wkr_salary', $this->sortDirection);
-                break;
-            case 'country':
-                $query->orderBy('wkr_nationality', $this->sortDirection);
-                break;
-            default:
-                $query->orderBy('wkr_name', $this->sortDirection);
-        }
-
-        $workers = $query->paginate($this->perPage);
-
-        // Get distinct countries for filter (only from contracted workers) with their descriptions
-        $countryCodes = Worker::whereIn('wkr_id', $contractedWorkerIds)
-            ->select('wkr_country')
-            ->distinct()
-            ->whereNotNull('wkr_country')
-            ->where('wkr_country', '!=', '')
-            ->pluck('wkr_country')
-            ->unique();
-
-        // Get country descriptions from the Country lookup table
-        $countries = \App\Models\Country::whereIn('cty_id', $countryCodes)
-            ->orderBy('cty_desc')
-            ->pluck('cty_desc', 'cty_id');
-
-        // Get distinct positions for filter (only from contracted workers) with their descriptions
-        $positionCodes = Worker::whereIn('wkr_id', $contractedWorkerIds)
-            ->select('wkr_wtrade')
-            ->distinct()
-            ->whereNotNull('wkr_wtrade')
-            ->where('wkr_wtrade', '!=', '')
-            ->pluck('wkr_wtrade')
-            ->unique();
-
-        // Get position descriptions from the WorkTrade lookup table
-        $positions = \App\Models\WorkTrade::whereIn('trade_id', $positionCodes)
-            ->orderBy('trade_desc')
-            ->pluck('trade_desc', 'trade_id');
-
-        // Get recent salary adjustments (last 50)
-        $salaryHistory = SalaryAdjustment::with('adjustedBy')
-            ->orderBy('created_at', 'desc')
-            ->limit(50)
-            ->get();
-
-        // Get contractors for window management tab
-        $contractors = [];
-        $windowContractors = []; // Options for the contractor filter dropdown
-        if ($this->activeTab === 'windows') {
-            $allWindowSettings = collect($this->windowService->getAllContractorSettings());
-
-            // Dropdown options from the full (unfiltered) list
-            $windowContractors = $allWindowSettings->map(fn ($c) => [
-                'clab_no' => $c['contractor_clab_no'],
-                'name' => $c['contractor_name'],
-            ])->values();
-
-            // Apply filters
-            $filteredWindows = $allWindowSettings;
-
-            if ($this->windowContractorFilter !== '') {
-                $filteredWindows = $filteredWindows->where('contractor_clab_no', $this->windowContractorFilter);
-            }
-
-            if ($this->windowSearch !== '') {
-                $term = mb_strtolower($this->windowSearch);
-                $filteredWindows = $filteredWindows->filter(function ($c) use ($term) {
-                    return str_contains(mb_strtolower((string) $c['contractor_name']), $term)
-                        || str_contains(mb_strtolower((string) $c['contractor_clab_no']), $term);
-                });
-            }
-
-            if ($this->windowStatusFilter !== '') {
-                $wantOpen = $this->windowStatusFilter === 'open';
-                $filteredWindows = $filteredWindows->filter(fn ($c) => (bool) $c['is_window_open'] === $wantOpen);
-            }
-
-            // Sort: contractors with an open window float to the top, then by name (ascending).
-            $filteredWindows = $filteredWindows->sort(function ($a, $b) {
-                $aOpen = $a['is_window_open'] ? 1 : 0;
-                $bOpen = $b['is_window_open'] ? 1 : 0;
-
-                if ($aOpen !== $bOpen) {
-                    return $bOpen <=> $aOpen; // open windows first
-                }
-
-                return strcasecmp((string) $a['contractor_name'], (string) $b['contractor_name']);
-            });
-
-            $contractors = $this->paginateCollection($filteredWindows->values(), 15, 'windowsPage');
-        }
-
         // Get contractor configurations if on contractor-settings tab.
         // NOTE: the paginated tables use dedicated variable names ($contractorConfigsPaginated,
         // $templatesPaginated) because $contractorConfigs and $deductionTemplates are public
@@ -2026,9 +2278,33 @@ class Configuration extends Component
         $contractorConfigsPaginated = [];
         $templatesPaginated = [];
         $allContractors = []; // For worker assignment modal and contractor assignment modal
+        $configChanges = [];
         if ($this->activeTab === 'contractor-settings') {
-            // Apply the contractor-specific settings filters before paginating
-            $filteredConfigs = collect($this->contractorConfigs);
+            // Contractor configuration change history, newest first (paginated, 15 per page)
+            $configChanges = \App\Models\ContractorConfigChange::with('changedBy')
+                ->orderBy('created_at', 'desc')
+                ->paginate(15, ['*'], 'configHistoryPage');
+
+            // OT entry window state per contractor, merged into each configuration row
+            $windowSettings = $this->windowService->getAllContractorSettings()->keyBy('contractor_clab_no');
+
+            $filteredConfigs = collect($this->contractorConfigs)->map(function ($config) use ($windowSettings) {
+                $window = $windowSettings->get($config->contractor_clab_no);
+
+                return [
+                    'id' => $config->id,
+                    'contractor_clab_no' => $config->contractor_clab_no,
+                    'contractor_name' => $config->contractor_name,
+                    'deductions' => $config->deductions->pluck('name')->values(),
+                    'service_charge_exempt' => (bool) $config->service_charge_exempt,
+                    'penalty_exempt' => (bool) $config->penalty_exempt,
+                    'payment_enabled' => (bool) $config->payment_enabled,
+                    'has_overrides' => (bool) ($config->service_charge_exempt || $config->penalty_exempt || ! $config->payment_enabled),
+                    'is_window_open' => (bool) ($window['is_window_open'] ?? false),
+                    'window_changed_at' => $window['last_changed_at'] ?? null,
+                    'window_changed_by' => $window['last_changed_by']->name ?? null,
+                ];
+            });
 
             if ($this->configContractorFilter !== '') {
                 $filteredConfigs = $filteredConfigs->where('contractor_clab_no', $this->configContractorFilter);
@@ -2037,22 +2313,32 @@ class Configuration extends Component
             if ($this->configSearch !== '') {
                 $term = mb_strtolower($this->configSearch);
                 $filteredConfigs = $filteredConfigs->filter(function ($config) use ($term) {
-                    return str_contains(mb_strtolower((string) $config->contractor_name), $term)
-                        || str_contains(mb_strtolower((string) $config->contractor_clab_no), $term);
+                    return str_contains(mb_strtolower((string) $config['contractor_name']), $term)
+                        || str_contains(mb_strtolower((string) $config['contractor_clab_no']), $term);
                 });
             }
 
-            // Sort: contractors with any active override (service charge / penalty exemption
-            // or a payment lock) float to the top, then alphabetically by company name.
-            $filteredConfigs = $filteredConfigs->sort(function ($a, $b) {
-                $aHasSettings = ($a->service_charge_exempt || $a->penalty_exempt || ! $a->payment_enabled) ? 1 : 0;
-                $bHasSettings = ($b->service_charge_exempt || $b->penalty_exempt || ! $b->payment_enabled) ? 1 : 0;
+            if ($this->windowStatusFilter !== '') {
+                $wantOpen = $this->windowStatusFilter === 'open';
+                $filteredConfigs = $filteredConfigs->filter(fn ($config) => $config['is_window_open'] === $wantOpen);
+            }
 
-                if ($aHasSettings !== $bHasSettings) {
-                    return $bHasSettings <=> $aHasSettings; // settings-on first
+            if ($this->configOverrideFilter !== '') {
+                $wantOverrides = $this->configOverrideFilter === 'with';
+                $filteredConfigs = $filteredConfigs->filter(fn ($config) => $config['has_overrides'] === $wantOverrides);
+            }
+
+            // Sort: contractors needing attention (an active override or an open OT window)
+            // float to the top, then alphabetically by company name.
+            $filteredConfigs = $filteredConfigs->sort(function ($a, $b) {
+                $aFlagged = ($a['has_overrides'] || $a['is_window_open']) ? 1 : 0;
+                $bFlagged = ($b['has_overrides'] || $b['is_window_open']) ? 1 : 0;
+
+                if ($aFlagged !== $bFlagged) {
+                    return $bFlagged <=> $aFlagged; // flagged first
                 }
 
-                return strcasecmp((string) $a->contractor_name, (string) $b->contractor_name);
+                return strcasecmp((string) $a['contractor_name'], (string) $b['contractor_name']);
             });
 
             // Paginated view of the contractor-settings table
@@ -2070,6 +2356,12 @@ class Configuration extends Component
             $workersData = $this->getWorkersData();
         }
 
+        // Admin / super admin rows for the PIC assignment tab
+        $picData = [];
+        if ($this->activeTab === 'pic') {
+            $picData = $this->getPicData();
+        }
+
         // Paginate uploaded documents for the uploads tab
         $uploadedDocumentsPaginated = [];
         if ($this->activeTab === 'uploads') {
@@ -2077,18 +2369,13 @@ class Configuration extends Component
         }
 
         return view('livewire.admin.configuration', array_merge([
-            'workers' => $workers,
-            'countries' => $countries,
-            'positions' => $positions,
             'stats' => $this->stats,
-            'salaryHistory' => $salaryHistory,
-            'contractors' => $contractors,
-            'windowContractors' => $windowContractors,
             'windowStats' => $this->windowStats,
             'contractorConfigsPaginated' => $contractorConfigsPaginated,
+            'configChanges' => $configChanges,
             'templatesPaginated' => $templatesPaginated,
             'allContractors' => $allContractors,
             'uploadedDocumentsPaginated' => $uploadedDocumentsPaginated,
-        ], $workersData))->layout('components.layouts.app', ['title' => __('Configuration')]);
+        ], $workersData, $picData))->layout('components.layouts.app', ['title' => __('Configuration')]);
     }
 }

@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('user_contractor_assignments', function (Blueprint $table) {
+            $table->id();
+            // The admin / super admin who is the person in charge (PIC) of the contractor
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->string('contractor_clab_no')->index();
+            $table->foreignId('assigned_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+
+            $table->unique(['user_id', 'contractor_clab_no']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('user_contractor_assignments');
+    }
+};

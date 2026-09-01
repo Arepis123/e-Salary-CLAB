@@ -1,3 +1,54 @@
+<!-- Window Statistics Cards -->
+<div class="grid gap-4 md:grid-cols-4 mb-6">
+    <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Contractors</p>
+                <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                    {{ $windowStats['total_contractors'] ?? 0 }}
+                </p>
+            </div>
+            <flux:icon.building-office class="size-8 text-blue-600 dark:text-blue-400" />
+        </div>
+    </flux:card>
+
+    <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">Windows Open</p>
+                <p class="text-xl font-bold text-green-600 dark:text-green-400">
+                    {{ $windowStats['windows_open'] ?? 0 }}
+                </p>
+            </div>
+            <flux:icon.lock-open class="size-8 text-green-600 dark:text-green-400" />
+        </div>
+    </flux:card>
+
+    <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">Windows Closed</p>
+                <p class="text-xl font-bold text-red-600 dark:text-red-400">
+                    {{ $windowStats['windows_closed'] ?? 0 }}
+                </p>
+            </div>
+            <flux:icon.lock-closed class="size-8 text-red-600 dark:text-red-400" />
+        </div>
+    </flux:card>
+
+    <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-zinc-600 dark:text-zinc-400">Using Default</p>
+                <p class="text-xl font-bold text-orange-600 dark:text-orange-400">
+                    {{ $windowStats['using_default'] ?? 0 }}
+                </p>
+            </div>
+            <flux:icon.calendar class="size-8 text-orange-600 dark:text-orange-400" />
+        </div>
+    </flux:card>
+</div>
+
 <!-- Deduction Templates Management -->
 <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
     <div class="mb-4 flex items-center justify-between">
@@ -205,19 +256,19 @@
     @endif
 </flux:card>
 
-<!-- Contractor-Specific Settings -->
+<!-- Contractor Settings -->
 <flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
     <div class="mb-4 flex items-center justify-between">
         <div>
-            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Contractor-Specific Settings</h2>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Contractor Settings</h2>
             <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                Configure which deduction templates apply to each contractor and manage service charge exemptions
+                Deductions, service charge and penalty exemptions, payment locks and OT entry windows per contractor
             </p>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="grid gap-4 md:grid-cols-3 mb-4">
+    <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-5 mb-4">
         <div>
             <flux:input
                 wire:model.live.debounce.300ms="configSearch"
@@ -237,8 +288,21 @@
             </flux:select>
         </div>
         <div>
-            <flux:button wire:click="clearConfigFilters" variant="filled" size="sm">
-                <flux:icon.x-mark class="size-4 inline" />
+            <flux:select wire:model.live="windowStatusFilter" variant="listbox" placeholder="Filter by OT Window" size="sm">
+                <flux:select.option value="">All Windows</flux:select.option>
+                <flux:select.option value="open">Window Open</flux:select.option>
+                <flux:select.option value="closed">Window Closed</flux:select.option>
+            </flux:select>
+        </div>
+        <div>
+            <flux:select wire:model.live="configOverrideFilter" variant="listbox" placeholder="Filter by Overrides" size="sm">
+                <flux:select.option value="">All Settings</flux:select.option>
+                <flux:select.option value="with">With Overrides</flux:select.option>
+                <flux:select.option value="without">No Overrides</flux:select.option>
+            </flux:select>
+        </div>
+        <div>
+            <flux:button wire:click="clearConfigFilters" variant="filled" size="sm" icon="x-mark" icon-variant="outline">
                 Clear Filters
             </flux:button>
         </div>
@@ -249,9 +313,6 @@
             <flux:table.columns>
                 <flux:table.column>
                     <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor</span>
-                </flux:table.column>
-                <flux:table.column>
-                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">CLAB No</span>
                 </flux:table.column>
                 <flux:table.column>
                     <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Enabled Deductions</span>
@@ -266,29 +327,31 @@
                     <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Payments</span>
                 </flux:table.column>
                 <flux:table.column>
+                    <span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">OT Entry Window</span>
+                </flux:table.column>
+                <flux:table.column>
                     <span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span>
                 </flux:table.column>
             </flux:table.columns>
 
             <flux:table.rows>
                 @forelse($contractorConfigsPaginated as $config)
-                    <flux:table.row :key="$config->id">
+                    <flux:table.row :key="$config['id']">
                         <flux:table.cell variant="strong">
-                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $config->contractor_name }}</p>
+                            <div>
+                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $config['contractor_name'] }}</p>
+                                <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $config['contractor_clab_no'] }}</p>
+                            </div>
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            {{ $config->contractor_clab_no }}
-                        </flux:table.cell>
-
-                        <flux:table.cell variant="strong">
-                            @if($config->deductions->isEmpty())
+                            @if($config['deductions']->isEmpty())
                                 <span class="text-sm text-zinc-400">None</span>
                             @else
                                 <div class="flex flex-wrap gap-1">
-                                    @foreach($config->deductions as $deduction)
+                                    @foreach($config['deductions'] as $deductionName)
                                         <flux:badge color="blue" size="sm">
-                                            {{ $deduction->name }}
+                                            {{ $deductionName }}
                                         </flux:badge>
                                     @endforeach
                                 </div>
@@ -296,20 +359,26 @@
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <flux:badge color="{{ $config->service_charge_exempt ? 'amber' : 'zinc' }}" size="sm">
-                                {{ $config->service_charge_exempt ? 'Exempt (RM 0)' : 'Standard (RM 200)' }}
+                            <flux:badge color="{{ $config['service_charge_exempt'] ? 'amber' : 'zinc' }}" size="sm">
+                                {{ $config['service_charge_exempt'] ? 'Exempt (RM 0)' : 'Standard (RM 200)' }}
                             </flux:badge>
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <flux:badge color="{{ $config->penalty_exempt ? 'amber' : 'zinc' }}" size="sm">
-                                {{ $config->penalty_exempt ? 'Exempt' : 'Standard (8%)' }}
+                            <flux:badge color="{{ $config['penalty_exempt'] ? 'amber' : 'zinc' }}" size="sm">
+                                {{ $config['penalty_exempt'] ? 'Exempt' : 'Standard (8%)' }}
                             </flux:badge>
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong">
-                            <flux:badge color="{{ $config->payment_enabled ? 'green' : 'red' }}" size="sm" :icon="$config->payment_enabled ? 'lock-open' : 'lock-closed'">
-                                {{ $config->payment_enabled ? 'Enabled' : 'Disabled' }}
+                            <flux:badge color="{{ $config['payment_enabled'] ? 'green' : 'red' }}" size="sm" :icon="$config['payment_enabled'] ? 'lock-open' : 'lock-closed'">
+                                {{ $config['payment_enabled'] ? 'Enabled' : 'Disabled' }}
+                            </flux:badge>
+                        </flux:table.cell>
+
+                        <flux:table.cell>
+                            <flux:badge color="{{ $config['is_window_open'] ? 'green' : 'red' }}" size="sm">
+                                {{ $config['is_window_open'] ? 'Open' : 'Closed' }}
                             </flux:badge>
                         </flux:table.cell>
 
@@ -321,7 +390,7 @@
                                     <flux:menu>
                                         <flux:menu.item
                                             icon="pencil"
-                                            wire:click="openContractorEditModal('{{ $config->contractor_clab_no }}')"
+                                            wire:click="openContractorEditModal('{{ $config['contractor_clab_no'] }}')"
                                         >
                                             Edit
                                         </flux:menu.item>
@@ -329,11 +398,37 @@
                                         <flux:menu.separator />
 
                                         <flux:menu.item
-                                            :variant="$config->payment_enabled ? 'danger' : 'default'"
-                                            icon="{{ $config->payment_enabled ? 'lock-closed' : 'lock-open' }}"
-                                            wire:click="openPaymentToggleModal('{{ $config->contractor_clab_no }}')"
+                                            :variant="$config['payment_enabled'] ? 'danger' : 'default'"
+                                            icon="{{ $config['payment_enabled'] ? 'lock-closed' : 'lock-open' }}"
+                                            wire:click="openPaymentToggleModal('{{ $config['contractor_clab_no'] }}')"
                                         >
-                                            {{ $config->payment_enabled ? 'Disable Pay' : 'Enable Pay' }}
+                                            {{ $config['payment_enabled'] ? 'Disable Pay' : 'Enable Pay' }}
+                                        </flux:menu.item>
+
+                                        @if($config['is_window_open'])
+                                            <flux:menu.item
+                                                variant="danger"
+                                                icon="lock-closed"
+                                                wire:click="openWindowModal('{{ $config['contractor_clab_no'] }}', '{{ addslashes($config['contractor_name']) }}', 'close')"
+                                            >
+                                                Close Window
+                                            </flux:menu.item>
+                                        @else
+                                            <flux:menu.item
+                                                icon="lock-open"
+                                                wire:click="openWindowModal('{{ $config['contractor_clab_no'] }}', '{{ addslashes($config['contractor_name']) }}', 'open')"
+                                            >
+                                                Open Window
+                                            </flux:menu.item>
+                                        @endif
+
+                                        <flux:menu.separator />
+
+                                        <flux:menu.item
+                                            icon="document-text"
+                                            wire:click="openContractorHistoryModal('{{ $config['contractor_clab_no'] }}', '{{ addslashes($config['contractor_name']) }}')"
+                                        >
+                                            View History
                                         </flux:menu.item>
                                     </flux:menu>
                                 </flux:dropdown>
@@ -347,7 +442,7 @@
                                 <flux:icon.users class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
                                 <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No Contractors Found</p>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">
-                                    @if($configSearch !== '' || $configContractorFilter !== '')
+                                    @if($configSearch !== '' || $configContractorFilter !== '' || $windowStatusFilter !== '' || $configOverrideFilter !== '')
                                         No contractors match your filters.
                                     @else
                                         Contractors will appear here automatically.
@@ -363,6 +458,170 @@
 
     <flux:pagination :paginator="$contractorConfigsPaginated" class="mt-4" />
 </flux:card>
+
+<!-- Configuration Change History -->
+<flux:card class="p-4 sm:p-6 dark:bg-zinc-900 rounded-lg mt-6">
+    <div class="mb-4 flex items-center justify-between">
+        <div>
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Configuration Change History</h2>
+            <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                {{ number_format($configChanges->total()) }} change(s) to deductions, service charge, penalty, payments and OT entry windows — newest first
+            </p>
+        </div>
+        <flux:button variant="ghost" size="sm" wire:click="toggleConfigHistory" icon="{{ $showConfigHistory ? 'chevron-up' : 'chevron-down' }}" icon-variant="outline">
+            {{ $showConfigHistory ? 'Hide' : 'Show' }} History
+        </flux:button>
+    </div>
+
+    @if($showConfigHistory)
+        <div class="overflow-x-auto" x-data x-transition>
+            <flux:table>
+                <flux:table.columns>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Date</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Setting</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Changed From</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Changed To</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Changed By</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Remarks</span></flux:table.column>
+                </flux:table.columns>
+
+                <flux:table.rows>
+                    @forelse($configChanges as $change)
+                        <flux:table.row :key="$change->id">
+                            <flux:table.cell variant="strong">
+                                <div class="text-xs">
+                                    {{ $change->created_at->format('d M Y') }}<br>
+                                    <span class="text-zinc-500 dark:text-zinc-400">{{ $change->created_at->format('H:i') }}</span>
+                                </div>
+                            </flux:table.cell>
+
+                            <flux:table.cell variant="strong">
+                                <div>
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $change->contractor_name ?: '-' }}</p>
+                                    <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $change->contractor_clab_no }}</p>
+                                </div>
+                            </flux:table.cell>
+
+                            <flux:table.cell>
+                                <flux:badge size="sm" color="{{ $change->setting_color }}">
+                                    {{ $change->setting_label }}
+                                </flux:badge>
+                            </flux:table.cell>
+
+                            <flux:table.cell>
+                                <span class="text-xs text-zinc-600 dark:text-zinc-400">{{ $change->old_value ?: '-' }}</span>
+                            </flux:table.cell>
+
+                            <flux:table.cell>
+                                <span class="text-xs font-semibold text-blue-600 dark:text-blue-400">{{ $change->new_value ?: '-' }}</span>
+                            </flux:table.cell>
+
+                            <flux:table.cell variant="strong">
+                                {{ $change->changedBy->name ?? 'Unknown' }}
+                            </flux:table.cell>
+
+                            <flux:table.cell>
+                                <span class="text-xs text-zinc-600 dark:text-zinc-400">{{ $change->remarks ?: '-' }}</span>
+                            </flux:table.cell>
+                        </flux:table.row>
+                    @empty
+                        <flux:table.row>
+                            <flux:table.cell colspan="7">
+                                <div class="py-8 text-center">
+                                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">No History Yet</p>
+                                    <p class="text-xs text-zinc-600 dark:text-zinc-400">
+                                        Contractor configuration changes will appear here once you make them.
+                                    </p>
+                                </div>
+                            </flux:table.cell>
+                        </flux:table.row>
+                    @endforelse
+                </flux:table.rows>
+            </flux:table>
+
+            <!-- Pagination -->
+            <flux:pagination :paginator="$configChanges" class="mt-4" />
+        </div>
+    @endif
+</flux:card>
+
+<!-- Per-Contractor View History (timeline) Modal -->
+<flux:modal name="contractor-change-history" class="md:w-2xl space-y-6" wire:model="showContractorHistoryModal">
+    <div>
+        <flux:heading size="lg">View History</flux:heading>
+        <flux:subheading>
+            <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $historyContractorName }}</span><br>
+            CLAB No.: {{ $historyContractorClab }}
+        </flux:subheading>
+    </div>
+
+    @if(count($contractorChangeHistory) > 0)
+        <div class="max-h-[60vh] overflow-y-auto px-1">
+            <!-- ml-3 keeps the dot's 4px ring clear of the scroll container's left edge -->
+            <div class="relative ml-3 space-y-4">
+                @foreach($contractorChangeHistory as $entry)
+                    <div class="relative pl-6">
+                        <!-- Timeline rail: each segment runs from its own dot (centre 26px = top-5 + half
+                             of size-3) down to the next one, so the colour changes exactly at the dot.
+                             The newest entry is green, older ones zinc. -->
+                        @if($loop->first)
+                            <span class="absolute -left-0.5 top-0 h-[26px] w-0.5 bg-green-500"></span>
+                        @endif
+
+                        <span class="absolute -left-0.5 top-[26px] w-0.5 {{ $loop->last ? 'h-[calc(100%_-_26px)]' : 'h-[calc(100%_+_1rem)]' }} {{ $loop->first ? 'bg-green-500' : 'bg-zinc-200 dark:bg-zinc-700' }}"></span>
+
+                        <!-- Timeline dot: green for the latest entry, zinc for older ones -->
+                        <span class="absolute -left-[7px] top-5 size-3 rounded-full ring-4 ring-white dark:ring-zinc-900 {{ $loop->first ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600' }}"></span>
+
+                        <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{{ $entry['date'] }}</p>
+                                @if($loop->first)
+                                    <flux:badge color="green" size="sm">Latest</flux:badge>
+                                @endif
+                            </div>
+
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="text-xs text-zinc-600 dark:text-zinc-400">Edited by</span>
+                                <flux:badge :color="$entry['user_color']" size="sm">{{ $entry['user'] }}</flux:badge>
+                            </div>
+
+                            <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400">Changes</p>
+                            <ul class="mt-1 list-disc ml-5 space-y-1">
+                                @foreach($entry['changes'] as $change)
+                                    <li class="text-sm text-zinc-900 dark:text-zinc-100">
+                                        <span class="font-medium">{{ $change['label'] }}:</span>
+                                        <span class="text-zinc-600 dark:text-zinc-400">{{ $change['old'] }}</span>
+                                        <span class="text-zinc-400 dark:text-zinc-500">&rarr;</span>
+                                        <span class="font-medium text-blue-600 dark:text-blue-400">{{ $change['new'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+
+                            @if($entry['remarks'])
+                                <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400">Remarks</p>
+                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $entry['remarks'] }}</p>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @else
+        <div class="py-12 text-center">
+            <flux:icon.document-text class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-4" />
+            <p class="text-md font-medium text-zinc-900 dark:text-zinc-100 mb-2">No History Yet</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+                Changes to this contractor's settings will appear here.
+            </p>
+        </div>
+    @endif
+
+    <div class="flex justify-end">
+        <flux:button variant="ghost" wire:click="closeContractorHistoryModal">Close</flux:button>
+    </div>
+</flux:modal>
 
 <!-- Edit Contractor Configuration Modal -->
 <flux:modal name="edit-contractor-config" class="md:w-2xl space-y-6">
@@ -445,7 +704,6 @@
     <div class="flex justify-end gap-2">
         <flux:button variant="ghost" wire:click="closeContractorEditModal">Cancel</flux:button>
         <flux:button variant="primary" wire:click="saveContractorConfig">
-            <flux:icon.check class="size-4" />
             Save Changes
         </flux:button>
     </div>
@@ -816,7 +1074,6 @@
     <div class="flex gap-2 justify-end">
         <flux:button variant="ghost" wire:click="closeContractorAssignmentModal">Cancel</flux:button>
         <flux:button variant="primary" wire:click="saveContractorAssignments">
-            <flux:icon.check class="size-4" />
             Save Assignments ({{ count($selectedContractorIds) }})
         </flux:button>
     </div>

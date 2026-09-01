@@ -13,32 +13,11 @@
     <div class="border-b border-zinc-200 dark:border-zinc-700">
         <nav class="flex space-x-2 sm:space-x-8">
             <button
-                wire:click="switchTab('salary')"
-                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'salary' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
-            >
-                <flux:icon.currency-dollar class="size-5 inline sm:mr-2" />
-                <span class="hidden sm:inline">Basic Salary</span>
-            </button>
-            <button
-                wire:click="switchTab('windows')"
-                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'windows' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
-            >
-                <flux:icon.clock class="size-5 inline sm:mr-2" />
-                <span class="hidden sm:inline">OT Entry Windows</span>
-            </button>
-            <button
                 wire:click="switchTab('contractor-settings')"
                 class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'contractor-settings' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
             >
-                <flux:icon.cog class="size-5 inline sm:mr-2" />
-                <span class="hidden sm:inline">Contractor Settings</span>
-            </button>
-            <button
-                wire:click="switchTab('payments')"
-                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'payments' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
-            >
-                <flux:icon.credit-card class="size-5 inline sm:mr-2" />
-                <span class="hidden sm:inline">Payments</span>
+                <flux:icon.building-office class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Contractors</span>
             </button>
             <button
                 wire:click="switchTab('workers')"
@@ -46,6 +25,20 @@
             >
                 <flux:icon.users class="size-5 inline sm:mr-2" />
                 <span class="hidden sm:inline">Workers</span>
+            </button>
+            <button
+                wire:click="switchTab('pic')"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'pic' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+            >
+                <flux:icon.user-group class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">PIC Assignment</span>
+            </button>
+            <button
+                wire:click="switchTab('payments')"
+                class="py-4 px-2 sm:px-1 border-b-2 font-medium text-sm {{ $activeTab === 'payments' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-300' }}"
+            >
+                <flux:icon.credit-card class="size-5 inline sm:mr-2" />
+                <span class="hidden sm:inline">Payments</span>
             </button>
             <button
                 wire:click="switchTab('uploads')"
@@ -58,24 +51,20 @@
     </div>
 
     <!-- Tab Content -->
-    @if($activeTab === 'salary')
-        @include('livewire.admin.configuration-salary')
-    @endif
-
-    @if($activeTab === 'windows')
-        @include('livewire.admin.configuration-windows')
-    @endif
-
     @if($activeTab === 'contractor-settings')
         @include('livewire.admin.configuration-contractor-settings')
     @endif
 
-    @if($activeTab === 'payments')
-        @include('livewire.admin.configuration-payments')
+    @if($activeTab === 'pic')
+        @include('livewire.admin.configuration-pic')
     @endif
 
     @if($activeTab === 'workers')
         @include('livewire.admin.configuration-workers')
+    @endif
+
+    @if($activeTab === 'payments')
+        @include('livewire.admin.configuration-payments')
     @endif
 
     @if($activeTab === 'uploads')
@@ -141,59 +130,4 @@
         </div>
     </flux:modal>
 
-    <!-- History Modal -->
-    <flux:modal name="window-history" class="md:w-2xl space-y-6" wire:model="showHistoryModal">
-        <div>
-            <flux:heading size="lg">Window Change History</flux:heading>
-            <flux:subheading>
-                {{ $selectedContractorName }} ({{ $selectedContractorClab }})
-            </flux:subheading>
-        </div>
-
-        <div class="max-h-96 overflow-y-auto">
-            <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700">
-                <thead class="bg-zinc-50 dark:bg-zinc-800">
-                    <tr>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">Date</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">Action</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">Changed By</th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase">Remarks</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-zinc-900 divide-y divide-zinc-200 dark:divide-zinc-800">
-                    @forelse($contractorHistory as $log)
-                        <tr>
-                            <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {{ $log->created_at->format('d M Y H:i') }}
-                            </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
-                                <flux:badge
-                                    size="sm"
-                                    color="{{ $log->action === 'opened' ? 'green' : 'red' }}"
-                                >
-                                    {{ ucfirst($log->action) }}
-                                </flux:badge>
-                            </td>
-                            <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900 dark:text-zinc-100">
-                                {{ $log->changedBy->name ?? 'Unknown User' }}
-                            </td>
-                            <td class="px-4 py-4 text-sm text-zinc-900 dark:text-zinc-100">
-                                {{ $log->remarks ?: '-' }}
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="4" class="px-4 py-8 text-center">
-                                <p class="text-sm text-zinc-600">No history yet</p>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div class="flex justify-end">
-            <flux:button variant="ghost" wire:click="closeHistoryModal">Close</flux:button>
-        </div>
-    </flux:modal>
 </div>

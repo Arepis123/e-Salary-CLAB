@@ -22,6 +22,9 @@ class Report extends Component
 
     public $clientFilter = '';
 
+    /** Selected PIC (admin) user ids — empty means every PIC */
+    public $picFilter = [];
+
     public $selectedMonth;
 
     public $selectedYear;
@@ -74,6 +77,27 @@ class Report extends Component
     public function updatedSelectedInvoices()
     {
         $this->selectAll = count($this->selectedInvoices) === count($this->taxInvoices);
+    }
+
+    public function updatedPicFilter()
+    {
+        // Drop a client that the newly selected PIC(s) do not manage
+        if (filled($this->clientFilter) && ! empty($this->picFilter)) {
+            $picClabs = \App\Models\UserContractorAssignment::clabNosForUsers(
+                array_map('intval', $this->picFilter)
+            );
+
+            $stillVisible = \App\Models\User::where('role', 'client')
+                ->whereIn('contractor_clab_no', $picClabs)
+                ->get()
+                ->contains(fn ($u) => ($u->company_name ?: $u->name) === $this->clientFilter);
+
+            if (! $stillVisible) {
+                $this->clientFilter = '';
+            }
+        }
+
+        $this->reportGenerated = false;
     }
 
     public function updatedReportType()
@@ -195,17 +219,37 @@ class Report extends Component
      */
     protected function filteredClabNos(): ?array
     {
-        if (blank($this->clientFilter)) {
-            return null;
+        $clientClabs = null;
+
+        if (filled($this->clientFilter)) {
+            $clientClabs = \App\Models\User::where('role', 'client')
+                ->get()
+                ->filter(fn ($u) => ($u->company_name ?: $u->name) === $this->clientFilter)
+                ->pluck('contractor_clab_no')
+                ->filter()
+                ->values()
+                ->all();
         }
 
-        return \App\Models\User::where('role', 'client')
-            ->get()
-            ->filter(fn ($u) => ($u->company_name ?: $u->name) === $this->clientFilter)
-            ->pluck('contractor_clab_no')
-            ->filter()
-            ->values()
-            ->all();
+        // Contractors managed by the selected PIC(s)
+        $picClabs = null;
+
+        if (! empty($this->picFilter)) {
+            $picClabs = \App\Models\UserContractorAssignment::clabNosForUsers(
+                array_map('intval', $this->picFilter)
+            );
+        }
+
+        if ($clientClabs === null) {
+            return $picClabs;
+        }
+
+        if ($picClabs === null) {
+            return $clientClabs;
+        }
+
+        // Both filters set: only contractors that satisfy each of them
+        return array_values(array_intersect($clientClabs, $picClabs));
     }
 
     protected function loadStats()
@@ -1721,8 +1765,18 @@ class Report extends Component
         // Full list of client names for the Client filter dropdown, shown regardless of
         // whether a report has been generated yet. Uses company name (falling back to the
         // account name) to match the labels used in the generated report rows.
-        $allClients = \App\Models\User::where('role', 'client')
-            ->get()
+        $clients = \App\Models\User::where('role', 'client')->get();
+
+        // When PICs are selected, the client list narrows to the contractors they manage
+        if (! empty($this->picFilter)) {
+            $picClabs = \App\Models\UserContractorAssignment::clabNosForUsers(
+                array_map('intval', $this->picFilter)
+            );
+
+            $clients = $clients->whereIn('contractor_clab_no', $picClabs);
+        }
+
+        $allClients = $clients
             ->map(fn ($u) => $u->company_name ?: $u->name)
             ->filter()
             ->unique()
@@ -1730,8 +1784,16 @@ class Report extends Component
             ->values()
             ->toArray();
 
+        // Admins / super admins that can be picked as PIC
+        $allPics = \App\Models\User::personsInCharge()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            ->toArray();
+
         return view('livewire.admin.report', [
             'allClients' => $allClients,
+            'allPics' => $allPics,
         ]);
     }
 }

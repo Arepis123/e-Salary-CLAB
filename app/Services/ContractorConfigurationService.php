@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ContractorConfigChange;
 use App\Models\ContractorConfiguration;
 use App\Models\DeductionTemplate;
 use App\Models\User;
@@ -53,12 +54,39 @@ class ContractorConfigurationService
     ): ContractorConfiguration {
         $config = $this->getContractorConfiguration($clabNo);
 
+        $before = [
+            'service_charge_exempt' => (bool) $config->service_charge_exempt,
+            'penalty_exempt' => (bool) $config->penalty_exempt,
+            'payment_enabled' => (bool) $config->payment_enabled,
+        ];
+
         $config->update([
             'service_charge_exempt' => $serviceChargeExempt,
             'penalty_exempt' => $penaltyExempt,
             'payment_enabled' => $paymentEnabled,
             'updated_by' => auth()->id(),
         ]);
+
+        $this->recordChange(
+            $config,
+            ContractorConfigChange::SETTING_SERVICE_CHARGE,
+            $this->exemptLabel($before['service_charge_exempt']),
+            $this->exemptLabel($serviceChargeExempt)
+        );
+
+        $this->recordChange(
+            $config,
+            ContractorConfigChange::SETTING_PENALTY,
+            $this->exemptLabel($before['penalty_exempt']),
+            $this->exemptLabel($penaltyExempt)
+        );
+
+        $this->recordChange(
+            $config,
+            ContractorConfigChange::SETTING_PAYMENT,
+            $this->paymentLabel($before['payment_enabled']),
+            $this->paymentLabel($paymentEnabled)
+        );
 
         return $config->fresh(['deductions']);
     }
@@ -70,11 +98,19 @@ class ContractorConfigurationService
     public function setPaymentEnabled(string $clabNo, bool $enabled): ContractorConfiguration
     {
         $config = $this->getContractorConfiguration($clabNo);
+        $wasEnabled = (bool) $config->payment_enabled;
 
         $config->update([
             'payment_enabled' => $enabled,
             'updated_by' => auth()->id(),
         ]);
+
+        $this->recordChange(
+            $config,
+            ContractorConfigChange::SETTING_PAYMENT,
+            $this->paymentLabel($wasEnabled),
+            $this->paymentLabel($enabled)
+        );
 
         return $config->fresh(['deductions']);
     }
@@ -85,6 +121,7 @@ class ContractorConfigurationService
     public function enableDeductions(string $clabNo, array $deductionTemplateIds): void
     {
         $config = $this->getContractorConfiguration($clabNo);
+        $before = $this->deductionNames($config);
 
         // Sync deductions (will remove unchecked ones and add new ones)
         $syncData = [];
@@ -96,6 +133,13 @@ class ContractorConfigurationService
         }
 
         $config->deductions()->sync($syncData);
+
+        $this->recordChange(
+            $config,
+            ContractorConfigChange::SETTING_DEDUCTIONS,
+            $before,
+            $this->deductionNames($config->fresh(['deductions']))
+        );
     }
 
     /**
@@ -103,14 +147,23 @@ class ContractorConfigurationService
      */
     public function enableDeductionForContractor(int $contractorConfigId, int $deductionTemplateId): void
     {
-        $config = ContractorConfiguration::findOrFail($contractorConfigId);
+        $config = ContractorConfiguration::with('deductions')->findOrFail($contractorConfigId);
 
         // Attach if not already attached
         if (! $config->deductions()->where('deduction_template_id', $deductionTemplateId)->exists()) {
+            $before = $this->deductionNames($config);
+
             $config->deductions()->attach($deductionTemplateId, [
                 'enabled_by' => auth()->id(),
                 'enabled_at' => now(),
             ]);
+
+            $this->recordChange(
+                $config,
+                ContractorConfigChange::SETTING_DEDUCTIONS,
+                $before,
+                $this->deductionNames($config->fresh(['deductions']))
+            );
         }
     }
 
@@ -119,8 +172,17 @@ class ContractorConfigurationService
      */
     public function disableDeductionForContractor(int $contractorConfigId, int $deductionTemplateId): void
     {
-        $config = ContractorConfiguration::findOrFail($contractorConfigId);
+        $config = ContractorConfiguration::with('deductions')->findOrFail($contractorConfigId);
+        $before = $this->deductionNames($config);
+
         $config->deductions()->detach($deductionTemplateId);
+
+        $this->recordChange(
+            $config,
+            ContractorConfigChange::SETTING_DEDUCTIONS,
+            $before,
+            $this->deductionNames($config->fresh(['deductions']))
+        );
     }
 
     /**
@@ -172,6 +234,47 @@ class ContractorConfigurationService
         $config = $this->getContractorConfiguration($clabNo);
 
         return $config->payment_enabled ?? true;
+    }
+
+    // === Change history ===
+
+    /**
+     * Write one entry to the contractor configuration history.
+     * Skipped automatically when the value did not actually change.
+     */
+    protected function recordChange(
+        ContractorConfiguration $config,
+        string $setting,
+        ?string $oldValue,
+        ?string $newValue
+    ): void {
+        ContractorConfigChange::record(
+            clabNo: $config->contractor_clab_no,
+            setting: $setting,
+            oldValue: $oldValue,
+            newValue: $newValue,
+            contractorName: $config->contractor_name,
+        );
+    }
+
+    /**
+     * Comma separated list of the contractor's enabled deduction templates.
+     */
+    protected function deductionNames(ContractorConfiguration $config): string
+    {
+        $names = $config->deductions->pluck('name')->sort()->values();
+
+        return $names->isEmpty() ? 'None' : $names->implode(', ');
+    }
+
+    protected function exemptLabel(bool $exempt): string
+    {
+        return $exempt ? 'Exempt' : 'Not Exempt';
+    }
+
+    protected function paymentLabel(bool $enabled): string
+    {
+        return $enabled ? 'Enabled' : 'Disabled';
     }
 
     /**
