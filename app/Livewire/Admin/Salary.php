@@ -278,6 +278,10 @@ class Salary extends Component
             $query->whereNull('payslip_file_path');
         }
 
+        // Needs attention first: submissions waiting on payment float to the top,
+        // then the chosen column sort applies within each group.
+        $query->orderByRaw("CASE WHEN status IN ('approved', 'pending_payment') THEN 0 ELSE 1 END");
+
         // Apply sorting
         $query->orderBy($this->sortBy, $this->sortDirection);
 

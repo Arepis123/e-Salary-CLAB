@@ -26,7 +26,7 @@
         <flux:card class="space-y-2 p-4 sm:p-6 dark:bg-zinc-900 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Grand Total (incl. Service & SST)</p>
+                    <p class="text-sm text-zinc-600 dark:text-zinc-400">Grand Total</p>
                     @if($isLoadingStats)
                         <flux:skeleton animate="shimmer" class="h-8 w-24 rounded mt-1" />
                     @else
@@ -44,7 +44,7 @@
                     @if($isLoadingStats)
                         <flux:skeleton animate="shimmer" class="h-8 w-16 rounded mt-1" />
                     @else
-                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $stats['completed'] ?? 0 }}</p>
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['completed'] ?? 0 }}</p>
                     @endif
                 </div>
                 <flux:icon.check-circle class="size-8 text-green-600 dark:text-green-400" />
@@ -58,7 +58,7 @@
                     @if($isLoadingStats)
                         <flux:skeleton animate="shimmer" class="h-8 w-16 rounded mt-1" />
                     @else
-                        <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ $stats['pending'] ?? 0 }}</p>
+                        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['pending'] ?? 0 }}</p>
                     @endif
                 </div>
                 <flux:icon.clock class="size-8 text-orange-600 dark:text-orange-400" />
