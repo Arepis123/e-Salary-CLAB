@@ -168,6 +168,7 @@
                             <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rest Day OT<br>(Hours)</span></flux:table.column>
                             <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Public Holiday OT<br>(Hours)</span></flux:table.column>
                             <flux:table.column><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span></flux:table.column>
+                            <flux:table.column align="center"><span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span></flux:table.column>
                         </flux:table.columns>
                         <flux:table.rows>
                             <flux:skeleton.group>
@@ -181,6 +182,7 @@
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
                                     <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
+                                    <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-7 w-16 rounded mx-auto" /></flux:table.cell>
                                 </flux:table.rows>
                                 @endfor
                             </flux:skeleton.group>
@@ -222,6 +224,9 @@
                             </flux:table.column>
                             <flux:table.column>
                                 <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Transactions</span>
+                            </flux:table.column>
+                            <flux:table.column align="center">
+                                <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Actions</span>
                             </flux:table.column>
                         </flux:table.columns>
 
@@ -318,6 +323,21 @@
                                             </div>
                                         @else
                                             <span class="text-sm text-zinc-400 dark:text-zinc-600">-</span>
+                                        @endif
+                                    </flux:table.cell>
+
+                                    <!-- Actions -->
+                                    <flux:table.cell align="center">
+                                        @if(!$entry['is_locked'] && $isWithinWindow)
+                                            <flux:button
+                                                wire:click="openTransactionModal({{ $index }})"
+                                                variant="filled"
+                                                size="sm"
+                                            >
+                                                Manage
+                                            </flux:button>
+                                        @else
+                                            <span class="text-xs text-zinc-400 dark:text-zinc-600">Locked</span>
                                         @endif
                                     </flux:table.cell>
                                 </flux:table.rows>

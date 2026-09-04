@@ -325,7 +325,7 @@ const tutorialConfigs = {
                 element: 'body',
                 popover: {
                     title: 'OT & Transaction Entry Tutorial',
-                    description: 'Learn how to add overtime hours and transactions for your workers. Everything is saved automatically — no manual submit needed!',
+                    description: 'This page has three parts: enter overtime hours, record deductions and earnings for each worker, and upload the signed Salary Deduction Form. Your OT and transaction data saves automatically — no submit button needed.',
                     side: 'center',
                     align: 'center'
                 }
@@ -334,7 +334,7 @@ const tutorialConfigs = {
                 element: '#entry-window-status',
                 popover: {
                     title: 'Entry Window Status',
-                    description: 'OT entries can only be made between the 1st and 15th of each month. This card shows whether the window is open and how many days you have left to enter your data.',
+                    description: 'Everything on this page is only editable between the 1st and 15th of each month, and it covers the <strong>previous</strong> month. This card shows whether the window is open and how many days you have left.',
                     side: 'bottom'
                 }
             },
@@ -350,7 +350,7 @@ const tutorialConfigs = {
                 element: '#import-file-btn',
                 popover: {
                     title: 'Import from File',
-                    description: 'Upload a filled Excel or CSV template to bulk-import OT hours and transactions for all workers at once. The system supports .xlsx, .xls, and .csv files up to 2MB. All imported data is saved automatically.',
+                    description: 'Upload a filled Excel or CSV template to bulk-import OT hours and transactions for all workers at once. Supports .xlsx, .xls, and .csv files up to 2MB. All imported data is saved automatically.',
                     side: 'bottom'
                 }
             },
@@ -365,8 +365,8 @@ const tutorialConfigs = {
             {
                 element: '#ot-entry-table',
                 popover: {
-                    title: 'Transaction Management',
-                    description: 'Click the "Manage" button on any worker\'s row to add transactions such as advances, deductions, allowances, or no-pay leave (NPL). Transactions are saved to the database immediately when you click "Save Transactions".',
+                    title: 'Manage Deductions & Earnings',
+                    description: 'Click the <strong>Manage</strong> button in the Actions column of any worker row to record their transactions. <strong>Deductions:</strong> Accommodation, Advance Payment, No-Pay Leave (NPL). <strong>Earnings:</strong> Allowance, Backpay, Medical Claim. Click "Save Transactions" to store them — the Transactions column then shows a summary for that worker.',
                     side: 'top'
                 }
             },
@@ -379,10 +379,34 @@ const tutorialConfigs = {
                 }
             },
             {
+                element: '#salary-deduction-form',
+                popover: {
+                    title: 'Salary Deduction Form',
+                    description: 'Any deduction you record must be backed by a signed declaration. This section builds that form for you — the badge shows how many workers have deductions this period. It is a two-step process: download and sign, then upload the signed copy back here.',
+                    side: 'top'
+                }
+            },
+            {
+                element: '#download-deduction-form-btn',
+                popover: {
+                    title: 'Step 1 — Download & Sign',
+                    description: 'Downloads a single PDF containing one pre-filled signature page per worker with deductions. Print it, then collect <strong>both</strong> signatures: your officer and the worker. If no deductions were recorded this period, this button stays disabled — nothing to sign.',
+                    side: 'top'
+                }
+            },
+            {
+                element: '#salary-deduction-form',
+                popover: {
+                    title: 'Step 2 — Upload Signed Copy',
+                    description: 'Drop the signed form into the upload box on the right (PDF, JPG or PNG up to 10 MB), then click "Upload Signed Form". Once uploaded you can <strong>View Uploaded</strong> to check it, or <strong>Replace</strong> it while the window is still open. After the 15th the upload box closes for that period.',
+                    side: 'top'
+                }
+            },
+            {
                 element: '#ot-entry-table',
                 popover: {
                     title: '⚠️ Auto-Submit on the 16th',
-                    description: 'On the 16th of each month, the system automatically submits and locks all draft OT entries. You do NOT need to do anything — just make sure your data is entered before the 15th ends.',
+                    description: 'On the 16th of each month, the system automatically submits and locks all draft OT entries and transactions. You do NOT need to do anything — just make sure your data is entered and the signed deduction form is uploaded before the 15th ends.',
                     side: 'top'
                 }
             },
@@ -390,7 +414,7 @@ const tutorialConfigs = {
                 element: '#tutorial-button',
                 popover: {
                     title: 'Quick Workflow Recap',
-                    description: '1) Enter OT hours manually OR import from file, 2) Add transactions via the "Manage" button, 3) All changes are saved automatically — done! The system auto-submits everything on the 16th. Click the tutorial button anytime to replay.',
+                    description: '1) Enter OT hours manually OR import from file. 2) Click <strong>Manage</strong> on each worker to add deductions and earnings. 3) Download the Salary Deduction Form, collect both signatures, and upload the signed copy. 4) Everything saves automatically and locks on the 16th. Click the tutorial button anytime to replay.',
                     side: 'bottom'
                 }
             }
