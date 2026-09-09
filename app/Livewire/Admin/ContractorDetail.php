@@ -8,23 +8,19 @@ use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
 use App\Models\Worker;
-use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class ContractorDetail extends Component
 {
+    use WithPagination;
+
     public $contractorClabNo;
 
     // Tabs
     public $activeTab = 'workers';
 
     // Pagination
-    #[Url]
-    public $workersPage = 1;
-
-    #[Url]
-    public $payrollPage = 1;
-
     public $workersPerPage = 10;
 
     public $payrollPerPage = 10;
@@ -106,7 +102,7 @@ class ContractorDetail extends Component
         })->sortBy('worker_name')->values();
 
         $perPage = $this->workersPerPage;
-        $currentPage = $this->workersPage;
+        $currentPage = $this->getPage('workersPage');
         $offset = ($currentPage - 1) * $perPage;
 
         return new \Illuminate\Pagination\LengthAwarePaginator(
@@ -124,7 +120,7 @@ class ContractorDetail extends Component
             ->with(['payment'])
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
-            ->paginate($this->payrollPerPage, ['*'], 'payrollPage', $this->payrollPage);
+            ->paginate($this->payrollPerPage, ['*'], 'payrollPage', $this->getPage('payrollPage'));
     }
 
     public function getStatsProperty()

@@ -4,19 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PayrollSubmission;
-use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
 {
-    /**
-     * Display all invoices (Admin can view all invoices from all contractors)
-     */
-    public function index(Request $request)
-    {
-        // Use a wrapper view that loads the Livewire component
-        return view('admin.invoices-wrapper');
-    }
-
     /**
      * Show individual invoice details (Admin can view any invoice)
      */
