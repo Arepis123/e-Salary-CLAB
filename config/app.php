@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Client Prototype Access Key
+    |--------------------------------------------------------------------------
+    |
+    | Unlocks the read-only client portal prototype at /prototype/client-portal.
+    | The route 404s unless this is set and the ?key= query string matches, so
+    | leaving it empty disables the prototype entirely.
+    |
+    */
+
+    'prototype_key' => env('PROTOTYPE_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

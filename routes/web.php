@@ -18,6 +18,40 @@ Route::get('csrf-token', function () {
     return response()->json(['token' => csrf_token()]);
 })->middleware('web');
 
+// Read-only client portal prototype (a single self-contained HTML file shown to
+// prospective contractors). The file lives under storage/, never public/, so it
+// is only reachable through this route and only with the matching key.
+Route::get('prototype/client-portal', function () {
+    $key = (string) config('app.prototype_key');
+
+    abort_if($key === '', 404);
+    abort_unless(hash_equals($key, (string) request()->query('key')), 404);
+
+    $path = storage_path('app/prototype/client-portal.html');
+    abort_unless(is_file($path), 404);
+
+    // Keep the debug bar out of a page a client is looking at, even with APP_DEBUG on.
+    if (app()->bound('debugbar')) {
+        app('debugbar')->disable();
+    }
+
+    // The file is authored as a page fragment (it starts at <title>), so wrap it
+    // in the document skeleton it needs when served directly: a charset, a mobile
+    // viewport, and the [hidden] reset the in-page toast relies on.
+    $body = file_get_contents($path);
+    $title = preg_match('/<title>(.*?)<\/title>/is', $body, $m)
+        ? trim($m[1])
+        : 'CLAB e-Salary Client Portal';
+
+    $html = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        .'<meta name="viewport" content="width=device-width, initial-scale=1">'
+        .'<title>'.e($title).'</title>'
+        .'<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
+        .'</head><body>'.$body.'</body></html>';
+
+    return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+})->name('prototype.client-portal');
+
 // Preview of the Cloudflare-style "payments disabled" block page (local only).
 // Visit /preview/payment-blocked in the browser to see exactly what a blocked
 // client sees. Not registered in production.
