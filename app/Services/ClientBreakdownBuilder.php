@@ -98,12 +98,15 @@ class ClientBreakdownBuilder
         $otherDeductions = (float) $transactions->where('type', 'deduction')->sum('amount');
         $accommodation = (float) $transactions->where('type', 'accommodation')->sum('amount');
 
-        // Unpaid leave is charged on the real number of days in the payroll
-        // month. Transactions carrying their own month breakdown are already
-        // costed that way; the rest would otherwise fall back to the legacy
-        // 26-day divisor, which overstates a 31-day month and understates
-        // February.
-        $daysInMonth = Carbon::create($submission->year, $submission->month, 1)->daysInMonth;
+        // Unpaid leave is charged on the real number of days in the month the
+        // leave was taken. Transactions carrying their own month breakdown are
+        // already costed that way. The rest belong to the OT entry month —
+        // payroll month M pays for leave recorded in M-1 — so September's
+        // payroll charges August's leave at salary / 31, not / 30. The daily
+        // rate is rounded to sen first, as NplCalculatorService does and as
+        // the certified payroll does.
+        $nplCalculator = new NplCalculatorService;
+        $leaveMonth = Carbon::create($submission->year, $submission->month, 1)->subMonth();
 
         $npl = 0.0;
         $nplPerWorker = [];
@@ -115,7 +118,7 @@ class ClientBreakdownBuilder
             foreach (($worker->transactions ?? collect())->where('type', 'npl') as $transaction) {
                 $workerNpl += $transaction->nplDetails->isNotEmpty()
                     ? (float) $transaction->nplDetails->sum('amount')
-                    : round((float) $transaction->amount * ($basic / $daysInMonth), 2);
+                    : $nplCalculator->calculateMonth($basic, $leaveMonth->year, $leaveMonth->month, (float) $transaction->amount)['amount'];
             }
 
             $nplPerWorker[$worker->id] = $workerNpl;
@@ -160,15 +163,17 @@ class ClientBreakdownBuilder
 
             // Allowances, backpay and claims are wages for both EPF and SOCSO.
             // Overtime is wages for SOCSO only — EPF ignores it. Unpaid leave
-            // reduces the EPF base but does not move the SOCSO bracket.
+            // is wages not paid, so it comes off both bases and can drop the
+            // worker into a lower SOCSO bracket.
             $additional = $additionalPerWorker[$worker->id] ?? 0.0;
-            $gross = $basic + $additional + ($overtimePerWorker[$worker->id] ?? 0.0);
-            $epfBase = max(0, $basic + $additional - ($nplPerWorker[$worker->id] ?? 0.0));
+            $workerNpl = $nplPerWorker[$worker->id] ?? 0.0;
+            $socsoBase = max(0, $basic + $additional + ($overtimePerWorker[$worker->id] ?? 0.0) - $workerNpl);
+            $epfBase = max(0, $basic + $additional - $workerNpl);
 
             $workerEpf += $calculator->calculateWorkerEPF($epfBase);
-            $workerSocso += $calculator->calculateWorkerSOCSO($gross);
+            $workerSocso += $calculator->calculateWorkerSOCSO($socsoBase);
             $employerEpf += $calculator->calculateEmployerEPF($epfBase);
-            $employerSocso += $calculator->calculateEmployerSOCSO($gross);
+            $employerSocso += $calculator->calculateEmployerSOCSO($socsoBase);
             $statutoryDerived = true;
         }
 
