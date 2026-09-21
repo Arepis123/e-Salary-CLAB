@@ -137,6 +137,14 @@ class SalaryDetail extends Component
         $this->submission = PayrollSubmission::with(['user', 'payment', 'workers.worker'])
             ->findOrFail($id);
 
+        // Livewire memoises a computed property for the whole request. The
+        // save paths read the breakdown before they write — the variance
+        // guard needs the contractor's figure — and then re-mount to pick the
+        // new data up, so without this the page rendered straight after a save
+        // is the one built before it. Dropping the memo here covers every
+        // caller that refreshes this way.
+        unset($this->clientBreakdown);
+
         $this->loadWorkers();
         $this->calculateStats();
         $this->loadPreviousMonthOT();
