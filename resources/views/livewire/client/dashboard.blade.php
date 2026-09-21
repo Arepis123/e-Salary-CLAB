@@ -330,7 +330,7 @@
                                             </p>
                                             @if($worker->contract_info)
                                                 <p class="text-xs text-zinc-500 dark:text-zinc-500">
-                                                    Contract: {{ $worker->contract_info->con_start->format('M d, Y') }} - {{ $worker->contract_info->con_end->format('M d, Y') }}
+                                                    Contract: {{ $worker->contract_info->con_start?->format('M d, Y') ?? '-' }} - {{ $worker->contract_info->effective_end?->format('M d, Y') ?? '-' }}
                                                 </p>
                                             @endif
                                         </div>

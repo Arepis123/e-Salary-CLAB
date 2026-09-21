@@ -201,11 +201,18 @@ class Timesheet extends Component
         if ($this->targetMonth && $this->targetYear) {
             // Get workers who had active contracts during the target month
             $targetDate = \Carbon\Carbon::create($this->targetYear, $this->targetMonth, 1);
+            $monthStart = $targetDate->copy()->startOfMonth();
+            $monthEnd = $targetDate->copy()->endOfMonth();
             $activeWorkers = $this->contractWorkerService->getContractedWorkers($clabNo)
-                ->filter(function ($worker) use ($targetDate) {
+                ->filter(function ($worker) use ($clabNo, $monthStart, $monthEnd) {
+                    // Scope to this contractor's own contract and use the
+                    // effective end date, so a worker transferred to another
+                    // contractor stops appearing here once their contract with
+                    // this contractor has been terminated early (con_end_new).
                     $contract = $worker->contracts()
-                        ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
-                        ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
+                        ->where('con_ctr_clab_no', $clabNo)
+                        ->endsOnOrAfter($monthStart)
+                        ->where('con_start', '<=', $monthEnd->toDateString())
                         ->first();
 
                     return $contract !== null;
@@ -313,7 +320,7 @@ class Timesheet extends Component
             // Use the payroll period date, not today's date
             $payrollPeriodDate = \Carbon\Carbon::create($currentYear, $currentMonth, 1);
             $hasActiveContract = $worker->contract_info &&
-                                 $worker->contract_info->con_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
+                                 $worker->contract_info->effective_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
                                  $worker->contract_info->con_start <= $payrollPeriodDate->endOfMonth()->toDateString();
 
             // Calculate pro-rated basic salary based on contract dates
@@ -327,7 +334,7 @@ class Timesheet extends Component
                 $proratingService = app(\App\Services\SalaryProratingService::class);
                 $proratingResult = $proratingService->calculateProratedSalary(
                     $worker->contract_info->con_start,
-                    $worker->contract_info->con_end,
+                    $worker->contract_info->effective_end,
                     $currentMonth,
                     $currentYear,
                     $worker->basic_salary ?? 1700

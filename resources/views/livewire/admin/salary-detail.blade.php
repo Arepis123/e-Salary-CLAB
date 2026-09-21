@@ -547,11 +547,11 @@
                             </flux:table.cell>
 
                             <flux:table.cell variant="strong">
-                                {{ $worker->worker?->wkr_sosco_id ?? '-' }}
+                                {{ filled($worker->worker?->wkr_sosco_id) ? $worker->worker->wkr_sosco_id : '-' }}
                             </flux:table.cell>
 
                             <flux:table.cell variant="strong">
-                                {{ $worker->worker?->wkr_kwsp ?? '-' }}
+                                {{ filled($worker->worker?->wkr_kwsp) ? $worker->worker->wkr_kwsp : '-' }}
                             </flux:table.cell>
 
                             <flux:table.cell align="end" variant="strong">

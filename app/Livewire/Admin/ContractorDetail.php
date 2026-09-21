@@ -95,7 +95,7 @@ class ContractorDetail extends Component
                 'country' => $country,
                 'position' => $position,
                 'contract_start' => $contract->con_start,
-                'contract_end' => $contract->con_end,
+                'contract_end' => $contract->effective_end,
                 'latest_submission_id' => $latestPayrollWorker?->payroll_submission_id,
                 'total_submissions' => $totalSubmissions,
             ];

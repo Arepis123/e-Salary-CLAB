@@ -85,7 +85,7 @@ class OutstandingPayrollService
             $year = $checkDate->year;
 
             $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', $checkDate->copy()->startOfMonth()->toDateString())
+                ->endsOnOrAfter($checkDate->copy()->startOfMonth()->toDateString())
                 ->where('con_start', '<=', $checkDate->copy()->endOfMonth()->toDateString())
                 ->get(['con_wkr_id', 'con_start'])
                 // Waive a worker's contract-start month when it starts on/after the

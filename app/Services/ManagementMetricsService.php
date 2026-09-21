@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ContractorConfiguration;
+use App\Models\ContractWorker;
 use App\Models\PayrollSubmission;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -403,13 +404,14 @@ class ManagementMetricsService
             return [];
         }
 
-        // MAX(con_end) matches the model's orderBy('con_end', 'desc')->first().
+        // MAX of the effective end date matches PayrollWorker::hasContractEnded(),
+        // which reads the latest contract by effective end date.
         $contractEnds = DB::connection('worker_db')
             ->table('contract_worker')
             ->whereIn('con_wkr_id', $zeroSalary->pluck('worker_id')->filter()->unique()->all())
             ->whereIn('con_ctr_clab_no', $clabNos->all())
             ->groupBy('con_wkr_id', 'con_ctr_clab_no')
-            ->selectRaw('con_wkr_id, con_ctr_clab_no, MAX(con_end) as con_end')
+            ->selectRaw('con_wkr_id, con_ctr_clab_no, MAX('.ContractWorker::effectiveEndSql().') as effective_end')
             ->get()
             ->keyBy(fn ($row) => $row->con_wkr_id.'|'.$row->con_ctr_clab_no);
 
@@ -430,11 +432,11 @@ class ManagementMetricsService
 
             $contract = $contractEnds->get($worker->worker_id.'|'.$clabNo);
 
-            if (! $contract || ! $contract->con_end) {
+            if (! $contract || ! $contract->effective_end) {
                 continue;
             }
 
-            if (CarbonImmutable::parse($contract->con_end)->isBefore($periodStart)) {
+            if (CarbonImmutable::parse($contract->effective_end)->isBefore($periodStart)) {
                 $excluded[$worker->payroll_submission_id] = ($excluded[$worker->payroll_submission_id] ?? 0) + 1;
             }
         }

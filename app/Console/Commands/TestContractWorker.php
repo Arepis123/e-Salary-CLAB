@@ -50,7 +50,8 @@ class TestContractWorker extends Command
                         ['Worker Passport', $contract->con_wkr_passno],
                         ['Period (months)', $contract->con_period],
                         ['Start Date', $contract->con_start],
-                        ['End Date', $contract->con_end],
+                        ['End Date', $contract->effective_end],
+                        ['Ended Early', $contract->endedEarly() ? 'Yes (original: '.$contract->con_end.')' : 'No'],
                         ['Is Active?', $contract->isActive() ? 'Yes' : 'No'],
                         ['Days Remaining', $contract->daysRemaining()],
                     ]
@@ -115,7 +116,7 @@ class TestContractWorker extends Command
                             $w->name,
                             $w->ic_number,
                             $w->contract_info->con_start ?? 'N/A',
-                            $w->contract_info->con_end ?? 'N/A',
+                            $w->contract_info->effective_end ?? 'N/A',
                             $w->contract_info ? $w->contract_info->daysRemaining() : 'N/A',
                         ])
                     );

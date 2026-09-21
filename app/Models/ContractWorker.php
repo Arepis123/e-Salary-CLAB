@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SafeDate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,6 +14,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Do not create, update, or delete records through this model.
  *
  * Purpose: Defines which contractor-worker pairs are active in the payroll system
+ *
+ * Contract end dates: `con_end` is the originally agreed end date. When a
+ * contract is terminated early — typically a legal local transfer of the
+ * worker to another contractor — the managing system writes the real end date
+ * to `con_end_new`. Always decide eligibility, billing and proration from the
+ * effective end date — `$contract->effective_end` in PHP, the endsOnOrAfter() /
+ * endsOnOrBefore() / active() scopes or effectiveEndSql() in queries — never
+ * from `con_end` alone, or the previous contractor keeps being billed after the
+ * worker has left.
  */
 class ContractWorker extends Model
 {
@@ -42,6 +52,7 @@ class ContractWorker extends Model
         'con_period',
         'con_start',
         'con_end',
+        'con_end_new',
         'con_created_by',
     ];
 
@@ -49,9 +60,10 @@ class ContractWorker extends Model
      * The attributes that should be cast.
      */
     protected $casts = [
-        'con_start' => 'date',
-        'con_end' => 'date',
-        'con_created_at' => 'datetime',
+        'con_start' => SafeDate::class,
+        'con_end' => SafeDate::class,
+        'con_end_new' => SafeDate::class,
+        'con_created_at' => SafeDate::class.':Y-m-d H:i:s',
     ];
 
     /**
@@ -78,12 +90,51 @@ class ContractWorker extends Model
     }
 
     /**
+     * SQL expression for the contract's effective end date.
+     *
+     * Use this in raw query fragments (whereRaw/orderByRaw/selectRaw) so the
+     * database applies the same early-termination rule as effectiveEnd().
+     * Pass $table to qualify the columns when the query joins another table.
+     */
+    public static function effectiveEndSql(?string $table = null): string
+    {
+        $prefix = $table ? $table.'.' : '';
+
+        return "COALESCE({$prefix}con_end_new, {$prefix}con_end)";
+    }
+
+    /**
+     * The date this contract actually ends: the early-termination date when the
+     * contract was cut short, otherwise its original end date.
+     */
+    public function getEffectiveEndAttribute()
+    {
+        return $this->con_end_new ?? $this->con_end;
+    }
+
+    /**
+     * Whether this contract was terminated before its original end date.
+     */
+    public function endedEarly(): bool
+    {
+        return $this->con_end_new !== null;
+    }
+
+    /**
+     * Normalise a date argument for the raw effective-end comparisons.
+     */
+    protected static function asDateString($date): string
+    {
+        return $date instanceof \DateTimeInterface ? $date->format('Y-m-d') : (string) $date;
+    }
+
+    /**
      * Scope a query to only include active contracts.
-     * Active = contract end date is in the future or today
+     * Active = effective end date is in the future or today
      */
     public function scopeActive($query)
     {
-        return $query->where('con_end', '>=', now()->toDateString());
+        return $query->endsOnOrAfter(now()->toDateString());
     }
 
     /**
@@ -91,7 +142,31 @@ class ContractWorker extends Model
      */
     public function scopeExpired($query)
     {
-        return $query->where('con_end', '<', now()->toDateString());
+        return $query->whereRaw(static::effectiveEndSql().' < ?', [now()->toDateString()]);
+    }
+
+    /**
+     * Scope a query to contracts still running on or after the given date.
+     */
+    public function scopeEndsOnOrAfter($query, $date)
+    {
+        return $query->whereRaw(static::effectiveEndSql().' >= ?', [static::asDateString($date)]);
+    }
+
+    /**
+     * Scope a query to contracts that have ended on or before the given date.
+     */
+    public function scopeEndsOnOrBefore($query, $date)
+    {
+        return $query->whereRaw(static::effectiveEndSql().' <= ?', [static::asDateString($date)]);
+    }
+
+    /**
+     * Order a query by the effective end date.
+     */
+    public function scopeOrderByEffectiveEnd($query, string $direction = 'asc')
+    {
+        return $query->orderByRaw(static::effectiveEndSql().' '.(strtolower($direction) === 'desc' ? 'desc' : 'asc'));
     }
 
     /**
@@ -115,11 +190,13 @@ class ContractWorker extends Model
      */
     public function isActive(): bool
     {
-        if (! $this->con_end) {
+        $end = $this->effective_end;
+
+        if (! $end) {
             return false;
         }
 
-        return $this->con_end->isFuture() || $this->con_end->isToday();
+        return $end->isFuture() || $end->isToday();
     }
 
     /**
@@ -127,7 +204,9 @@ class ContractWorker extends Model
      */
     public function isExpired(): bool
     {
-        return $this->con_end && $this->con_end->isPast() && ! $this->con_end->isToday();
+        $end = $this->effective_end;
+
+        return $end && $end->isPast() && ! $end->isToday();
     }
 
     /**
@@ -139,7 +218,7 @@ class ContractWorker extends Model
             return 0;
         }
 
-        return now()->diffInDays($this->con_end, false);
+        return now()->diffInDays($this->effective_end, false);
     }
 
     /**
@@ -175,11 +254,12 @@ class ContractWorker extends Model
     }
 
     /**
-     * Accessor for end date
+     * Accessor for end date (the effective one, so callers cannot miss an
+     * early termination)
      */
     public function getEndDateAttribute()
     {
-        return $this->con_end;
+        return $this->effective_end;
     }
 
     /**

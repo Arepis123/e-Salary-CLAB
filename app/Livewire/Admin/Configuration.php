@@ -1597,16 +1597,16 @@ class Configuration extends Component
                 text: 'Generated: '.implode(', ', $messages)
             );
         } catch (\Exception $e) {
+            \Log::error('Failed to fix missing receipts', [
+                'error' => $e->getMessage(),
+                'fixed_by' => auth()->user()->name,
+            ]);
+
             Flux::toast(
                 variant: 'danger',
                 heading: 'Fix Failed',
                 text: 'Failed to fix missing data: '.$e->getMessage()
             );
-
-            \Log::error('Failed to fix missing receipts', [
-                'error' => $e->getMessage(),
-                'fixed_by' => auth()->user()->name,
-            ]);
         }
     }
 
@@ -1777,16 +1777,16 @@ class Configuration extends Component
             // Auto-fix any missing receipts, paid dates, or transaction IDs on paid submissions
             $this->fixMissingReceipts();
         } catch (\Exception $e) {
+            \Log::error('Bulk payment sync failed', [
+                'error' => $e->getMessage(),
+                'synced_by' => auth()->user()->name,
+            ]);
+
             Flux::toast(
                 variant: 'danger',
                 heading: 'Sync Failed',
                 text: 'Failed to sync payments: '.$e->getMessage()
             );
-
-            \Log::error('Bulk payment sync failed', [
-                'error' => $e->getMessage(),
-                'synced_by' => auth()->user()->name,
-            ]);
         } finally {
             $this->isSyncingPayments = false;
         }
@@ -1935,18 +1935,18 @@ class Configuration extends Component
                 text: "Checked {$totalCancelled} cancelled payments for {$periodStart->format('F Y')}: {$updated} found paid, {$stillUnpaid} confirmed unpaid, {$failed} failed"
             );
         } catch (\Exception $e) {
-            Flux::toast(
-                variant: 'danger',
-                heading: 'Sync Failed',
-                text: 'Failed to sync cancelled payments: '.$e->getMessage()
-            );
-
             \Log::error('Cancelled payment sync failed', [
                 'error' => $e->getMessage(),
                 'month' => $this->cancelledSyncMonth,
                 'year' => $this->cancelledSyncYear,
                 'synced_by' => auth()->user()->name,
             ]);
+
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Sync Failed',
+                text: 'Failed to sync cancelled payments: '.$e->getMessage()
+            );
         } finally {
             $this->isSyncingCancelledPayments = false;
         }

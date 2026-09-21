@@ -11,6 +11,7 @@ use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
 use App\Services\PayrollService;
+use App\Services\SalaryProratingService;
 use App\Services\TimesheetDriftService;
 use Flux\Flux;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -49,6 +50,8 @@ class MissingSubmissions extends Component
     public $resyncContractor = null;
 
     protected $activeWorkerSubquery = null;
+
+    protected SalaryProratingService $proratingService;
 
     public $showRemindModal = false;
 
@@ -91,6 +94,11 @@ class MissingSubmissions extends Component
     protected string $missingPageName = 'contractorsPage';
 
     protected string $historicalPageName = 'historyPage';
+
+    public function boot(SalaryProratingService $proratingService): void
+    {
+        $this->proratingService = $proratingService;
+    }
 
     public function mount()
     {
@@ -295,6 +303,7 @@ class MissingSubmissions extends Component
 
         if ($this->bulkSubmitContractor) {
             $periodLabel = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, 1)->format('F Y');
+            $cutOffDay = SalaryProratingService::FIRST_MONTH_CUTOFF_DAY;
             $existingSubmission = \App\Models\PayrollSubmission::where('contractor_clab_no', $clabNo)
                 ->where('month', $this->selectedMonth)
                 ->where('year', $this->selectedYear)
@@ -304,9 +313,9 @@ class MissingSubmissions extends Component
                 $statusNote = $existingSubmission->status === 'approved'
                     ? '<br><br><strong>Note:</strong> This submission is currently <strong>Approved</strong>. Adding new workers will revert its status to <strong>Under Review</strong> so the Final Amount can be re-confirmed by admin.'
                     : '';
-                $this->bulkSubmitMessage = "A submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for <strong>{$periodLabel}</strong> already exists. The newly added workers that are not yet included will be <strong>appended</strong> to the existing submission with basic salary and zero overtime.{$statusNote}<br><br>Are you sure you want to proceed?";
+                $this->bulkSubmitMessage = "A submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for <strong>{$periodLabel}</strong> already exists. The newly added workers that are not yet included will be <strong>appended</strong> to the existing submission, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it.{$statusNote}<br><br>Are you sure you want to proceed?";
             } else {
-                $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for the period of <strong>{$periodLabel}</strong>.<br><br>This will include all their active workers with basic salary and zero overtime. This action is final for this submission period and will move directly to the approval stage.<br><br>Are you sure you want to proceed?";
+                $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for the period of <strong>{$periodLabel}</strong>.<br><br>This will include all their active workers, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it. Workers whose contract starts on or after the {$cutOffDay}th are left for next month's payroll. This action is final for this submission period and will move directly to the approval stage.<br><br>Are you sure you want to proceed?";
             }
             $this->showBulkSubmitModal = true;
         }
@@ -317,6 +326,42 @@ class MissingSubmissions extends Component
         $this->showBulkSubmitModal = false;
         $this->bulkSubmitContractor = null;
         $this->bulkSubmitMessage = '';
+    }
+
+    /**
+     * Build the payroll row for one contracted worker when an admin submits on
+     * a contractor's behalf.
+     *
+     * The basic salary is pro-rated over the days the contract actually covers
+     * in the payroll month, using the contract's effective end date so a worker
+     * transferred to another contractor is only billed up to their last day
+     * with this one.
+     */
+    protected function buildOnBehalfWorkerAttributes(ContractWorker $contractWorker, int $month, int $year, ?MonthlyOTEntry $otEntry): array
+    {
+        $worker = $contractWorker->worker;
+
+        $prorating = $this->proratingService->calculateProratedSalary(
+            $contractWorker->con_start,
+            $contractWorker->effective_end,
+            $month,
+            $year,
+            $worker->wkr_salary ?? 1700
+        );
+
+        return [
+            'worker_id' => $worker->wkr_id,
+            'worker_name' => $worker->wkr_name,
+            'worker_passport' => $worker->wkr_passno,
+            'basic_salary' => $prorating['pro_rated_salary'],
+            'is_pro_rated' => $prorating['is_pro_rated'],
+            'days_worked' => $prorating['days_worked'],
+            'total_days_in_month' => $prorating['total_days'],
+            'prorating_notes' => $prorating['notes'],
+            'ot_normal_hours' => $otEntry ? $otEntry->ot_normal_hours : 0,
+            'ot_rest_hours' => $otEntry ? $otEntry->ot_rest_hours : 0,
+            'ot_public_hours' => $otEntry ? $otEntry->ot_public_hours : 0,
+        ];
     }
 
     public function performBulkSubmission()
@@ -334,14 +379,37 @@ class MissingSubmissions extends Component
                 $targetDate = \Carbon\Carbon::create($year, $month, 1);
                 $activeContractWorkers = ContractWorker::with('worker')
                     ->where('con_ctr_clab_no', $clabNo)
-                    ->where('con_end', '>=', $targetDate->startOfMonth()->toDateString())
-                    ->where('con_start', '<=', $targetDate->endOfMonth()->toDateString())
+                    ->endsOnOrAfter($targetDate->copy()->startOfMonth())
+                    ->where('con_start', '<=', $targetDate->copy()->endOfMonth()->toDateString())
                     ->whereRaw($this->getActiveWorkerIds())
                     ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
                     ->get();
 
+                // Apply the same contract rules the client timesheet and the
+                // auto-submit scheduler use, so submitting on behalf produces the
+                // same figures: a worker whose contract starts on/after the
+                // monthly cut-off has that partial first month waived, and the
+                // rest are pro-rated over the days their contract actually
+                // covers in this month (honouring an early termination).
+                $waivedCount = 0;
+                $activeContractWorkers = $activeContractWorkers->filter(function ($contractWorker) use ($month, $year, &$waivedCount) {
+                    if (! $contractWorker->worker || ! $contractWorker->con_start) {
+                        return false;
+                    }
+
+                    if ($this->proratingService->isFirstMonthWaived($contractWorker->con_start, $month, $year)) {
+                        $waivedCount++;
+
+                        return false;
+                    }
+
+                    return true;
+                })->values();
+
                 if ($activeContractWorkers->isEmpty()) {
-                    throw new \Exception('No active workers found for this contractor for the selected period.');
+                    throw new \Exception($waivedCount > 0
+                        ? "All {$waivedCount} worker(s) started on or after the ".SalaryProratingService::FIRST_MONTH_CUTOFF_DAY."th of this month, so their partial first month is paid with next month's payroll. Nothing to submit for this period."
+                        : 'No active workers found for this contractor for the selected period.');
                 }
 
                 // Load submitted OT entries for this payroll period.
@@ -383,15 +451,9 @@ class MissingSubmissions extends Component
                     foreach ($newContractWorkers as $contractWorker) {
                         $worker = $contractWorker->worker;
                         $otEntry = $otEntries->get($worker->wkr_id);
-                        $payrollWorker = new PayrollWorker([
-                            'worker_id' => $worker->wkr_id,
-                            'worker_name' => $worker->wkr_name,
-                            'worker_passport' => $worker->wkr_passno,
-                            'basic_salary' => $worker->wkr_salary ?? 1700,
-                            'ot_normal_hours' => $otEntry ? $otEntry->ot_normal_hours : 0,
-                            'ot_rest_hours' => $otEntry ? $otEntry->ot_rest_hours : 0,
-                            'ot_public_hours' => $otEntry ? $otEntry->ot_public_hours : 0,
-                        ]);
+                        $payrollWorker = new PayrollWorker(
+                            $this->buildOnBehalfWorkerAttributes($contractWorker, $month, $year, $otEntry)
+                        );
                         $payrollWorker->payroll_submission_id = $existingSubmission->id;
                         $payrollWorker->calculateSalary(0);
                         $payrollWorker->save();
@@ -420,9 +482,11 @@ class MissingSubmissions extends Component
                         'sst' => $newSst,
                     ];
 
-                    // Revert approved submissions back to under_review so admin re-confirms the new amount
+                    // Revert approved submissions back to the review queue so admin re-confirms the new amount
                     if ($existingSubmission->status === 'approved') {
-                        $updateData['status'] = 'under_review';
+                        $updateData['status'] = 'submitted';
+                        $updateData['admin_reviewed_by'] = null;
+                        $updateData['admin_reviewed_at'] = null;
                     }
 
                     $existingSubmission->update($updateData);
@@ -476,15 +540,9 @@ class MissingSubmissions extends Component
                     }
 
                     $otEntry = $otEntries->get($worker->wkr_id);
-                    $payrollWorker = new PayrollWorker([
-                        'worker_id' => $worker->wkr_id,
-                        'worker_name' => $worker->wkr_name,
-                        'worker_passport' => $worker->wkr_passno,
-                        'basic_salary' => $worker->wkr_salary ?? 1700,
-                        'ot_normal_hours' => $otEntry ? $otEntry->ot_normal_hours : 0,
-                        'ot_rest_hours' => $otEntry ? $otEntry->ot_rest_hours : 0,
-                        'ot_public_hours' => $otEntry ? $otEntry->ot_public_hours : 0,
-                    ]);
+                    $payrollWorker = new PayrollWorker(
+                        $this->buildOnBehalfWorkerAttributes($contractWorker, $month, $year, $otEntry)
+                    );
                     $payrollWorker->payroll_submission_id = $submission->id;
                     $payrollWorker->calculateSalary(0);
                     $payrollWorker->save();
@@ -520,8 +578,18 @@ class MissingSubmissions extends Component
             $this->closeBulkSubmitModal();
             $this->loadMissingContractors();
         } catch (\Exception $e) {
-            Flux::toast(variant: 'danger', heading: 'Error', text: 'Failed to create draft submission: '.$e->getMessage());
-            \Log::error('Bulk submission failed: '.$e->getMessage());
+            // Log before the toast. Flux::toast() needs a Livewire request
+            // context and throws without one (e.g. when this runs from the
+            // console or a test), which would otherwise discard the reason the
+            // submission failed.
+            \Log::error('Bulk submission failed', [
+                'contractor_clab_no' => $clabNo,
+                'month' => $month,
+                'year' => $year,
+                'exception' => $e,
+            ]);
+
+            Flux::toast(variant: 'danger', heading: 'Error', text: 'Failed to submit on behalf: '.$e->getMessage());
             $this->closeBulkSubmitModal();
         }
     }
@@ -781,7 +849,7 @@ class MissingSubmissions extends Component
         $periodEnd = $periodStart->copy()->endOfMonth();
         $activeWorkers = ContractWorker::where('con_ctr_clab_no', $clabNo)
             ->where('con_start', '<=', $periodEnd->toDateString())
-            ->where('con_end', '>=', $periodStart->toDateString())
+            ->endsOnOrAfter($periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
             ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
             ->with('worker')
@@ -976,7 +1044,7 @@ class MissingSubmissions extends Component
 
         // Get all contractors with workers who had active contracts during this period
         $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->where('con_end', '>=', $periodStart->toDateString())
+            ->endsOnOrAfter($periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
             ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
             ->distinct()
@@ -985,7 +1053,7 @@ class MissingSubmissions extends Component
 
         // Count total active workers per contractor for this period
         $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->where('con_end', '>=', $periodStart->toDateString())
+            ->endsOnOrAfter($periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
             ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
             ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
@@ -1012,7 +1080,7 @@ class MissingSubmissions extends Component
 
         // Count workers by issue type per contractor
         $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->where('con_end', '>=', $periodStart->toDateString())
+            ->endsOnOrAfter($periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
             ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
             ->select('con_ctr_clab_no')
@@ -1027,7 +1095,7 @@ class MissingSubmissions extends Component
             // Get all worker IDs with active contracts during this period
             $activeWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                 ->where('con_start', '<=', $periodEnd->toDateString())
-                ->where('con_end', '>=', $periodStart->toDateString())
+                ->endsOnOrAfter($periodStart->toDateString())
                 ->whereRaw($this->getActiveWorkerIds())
                 ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
                 ->pluck('con_wkr_id');
@@ -1130,7 +1198,7 @@ class MissingSubmissions extends Component
         $periodEnd = $endDate->copy()->endOfMonth();
 
         $allContractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->where('con_end', '>=', $periodStart->toDateString())
+            ->endsOnOrAfter($periodStart->toDateString())
             ->distinct()
             ->pluck('con_ctr_clab_no')
             ->unique();
@@ -1175,7 +1243,7 @@ class MissingSubmissions extends Component
 
                 $periodWorkerIds = ContractWorker::where('con_ctr_clab_no', $clabNo)
                     ->where('con_start', '<=', $periodEnd->toDateString())
-                    ->where('con_end', '>=', $periodStart->toDateString())
+                    ->endsOnOrAfter($periodStart->toDateString())
                     ->whereRaw($this->getActiveWorkerIds())
                     ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
                     ->pluck('con_wkr_id');
@@ -1378,8 +1446,8 @@ class MissingSubmissions extends Component
                 );
             }
         } catch (\Exception $e) {
-            Flux::toast(variant: 'danger', heading: 'Re-sync failed', text: $e->getMessage());
             \Log::error('Timesheet re-sync failed: '.$e->getMessage());
+            Flux::toast(variant: 'danger', heading: 'Re-sync failed', text: $e->getMessage());
         }
 
         $this->closeResyncModal();

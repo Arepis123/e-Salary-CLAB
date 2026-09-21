@@ -260,7 +260,7 @@ class Worker extends Component
                 'bank_color' => \App\Models\WorkerBank::colorFor($worker?->latestBank?->bank_name),
                 'account_no' => $worker?->latestBank?->account_no ?: 'N/A',
                 'contract_start' => $contractWorker->con_start ? $contractWorker->con_start->format('d/m/Y') : 'N/A',
-                'contract_end' => $contractWorker->con_end ? $contractWorker->con_end->format('d/m/Y') : 'N/A',
+                'contract_end' => $contractWorker->effective_end ? $contractWorker->effective_end->format('d/m/Y') : 'N/A',
             ];
         });
 

@@ -81,7 +81,7 @@ class ContractWorkerService
                         // Attach contract info to each worker (most recent contract)
                         $contract = ContractWorker::where('con_wkr_id', $worker->wkr_id)
                             ->where('con_ctr_clab_no', $clabNo)
-                            ->orderBy('con_end', 'desc')
+                            ->orderByEffectiveEnd('desc')
                             ->first();
 
                         $worker->contract_info = $contract;
@@ -182,10 +182,10 @@ class ContractWorkerService
             function () use ($days) {
                 $endDate = now()->addDays($days)->toDateString();
 
-                return ContractWorker::where('con_end', '>=', now()->toDateString())
-                    ->where('con_end', '<=', $endDate)
+                return ContractWorker::active()
+                    ->endsOnOrBefore($endDate)
                     ->with(['contractor', 'worker'])
-                    ->orderBy('con_end')
+                    ->orderByEffectiveEnd()
                     ->get();
             }
         );
@@ -204,7 +204,7 @@ class ContractWorkerService
                 $active = ContractWorker::active()->count();
                 $expired = ContractWorker::expired()->count();
                 $expiringIn30Days = ContractWorker::active()
-                    ->where('con_end', '<=', now()->addDays(30)->toDateString())
+                    ->endsOnOrBefore(now()->addDays(30)->toDateString())
                     ->count();
 
                 $contractorCount = ContractWorker::active()
@@ -367,7 +367,7 @@ class ContractWorkerService
                 // Attach contract info (most recent contract with this contractor)
                 $contract = ContractWorker::where('con_wkr_id', $worker->wkr_id)
                     ->where('con_ctr_clab_no', $clabNo)
-                    ->orderBy('con_end', 'desc')
+                    ->orderByEffectiveEnd('desc')
                     ->first();
 
                 $worker->contract_info = $contract;
@@ -377,14 +377,14 @@ class ContractWorkerService
             ->filter(function ($worker) use ($otMonthStart, $otMonthEnd) {
                 $contract = $worker->contract_info;
 
-                if ($contract === null || ! $contract->con_end || ! $contract->con_start) {
+                if ($contract === null || ! $contract->effective_end || ! $contract->con_start) {
                     return false;
                 }
 
                 // The contract must have been running during the OT month itself.
                 // This carries unpaid OT exactly one month past contract end,
                 // rather than trailing the worker forever.
-                return $contract->con_end->greaterThanOrEqualTo($otMonthStart)
+                return $contract->effective_end->greaterThanOrEqualTo($otMonthStart)
                     && $contract->con_start->lessThanOrEqualTo($otMonthEnd);
             })
             ->values();

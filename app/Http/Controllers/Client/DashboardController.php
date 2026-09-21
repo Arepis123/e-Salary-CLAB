@@ -183,7 +183,7 @@ class DashboardController extends Controller
         return $drafts->map(function ($draft) use ($clabNo) {
             // Get total active workers for that period
             $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', \Carbon\Carbon::create($draft->year, $draft->month, 1)->startOfMonth()->toDateString())
+                ->endsOnOrAfter(\Carbon\Carbon::create($draft->year, $draft->month, 1)->startOfMonth()->toDateString())
                 ->where('con_start', '<=', \Carbon\Carbon::create($draft->year, $draft->month, 1)->endOfMonth()->toDateString())
                 ->pluck('con_wkr_id')
                 ->unique();
@@ -249,7 +249,7 @@ class DashboardController extends Controller
 
             // Get active workers for that month
             $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', $checkDate->startOfMonth()->toDateString())
+                ->endsOnOrAfter($checkDate->startOfMonth()->toDateString())
                 ->where('con_start', '<=', $checkDate->endOfMonth()->toDateString())
                 ->pluck('con_wkr_id')
                 ->unique();

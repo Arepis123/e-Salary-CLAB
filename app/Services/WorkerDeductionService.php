@@ -228,7 +228,7 @@ class WorkerDeductionService
                 'basic_salary' => $worker->wkr_salary,
                 'position' => $worker->position ?? '-',
                 'contract_start' => $contract->con_start,
-                'contract_end' => $contract->con_end,
+                'contract_end' => $contract->effective_end,
             ]);
         }
 

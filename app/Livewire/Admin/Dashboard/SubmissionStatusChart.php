@@ -69,7 +69,7 @@ class SubmissionStatusChart extends Component
      *
      * A contractor is only "expected" if it had at least one worker whose
      * contract overlaps the selected month (con_start <= period end AND
-     * con_end >= period start). Using the current `active()` scope instead
+     * effective end >= period start). Using the current `active()` scope instead
      * would wrongly count companies that registered/started after a past
      * period as "Not Submitted" for payrolls that never should have existed.
      */
@@ -78,7 +78,7 @@ class SubmissionStatusChart extends Component
         $periodStart = \Carbon\Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
         $periodEnd = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
 
-        return ContractWorker::where('con_end', '>=', $periodStart)
+        return ContractWorker::endsOnOrAfter($periodStart)
             ->where('con_start', '<=', $periodEnd)
             ->distinct('con_ctr_clab_no')
             ->pluck('con_ctr_clab_no')

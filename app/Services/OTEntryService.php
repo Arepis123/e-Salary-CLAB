@@ -114,7 +114,8 @@ class OTEntryService
 
     /**
      * Get or create OT entries for a contractor for the current entry period.
-     * Only returns entries for workers with active contracts (con_end >= today).
+     * Only returns entries for workers with active contracts (effective end
+     * date >= today, so early-terminated contracts are excluded).
      */
     public function getOrCreateEntriesForContractor(string $clabNo): Collection
     {
@@ -124,7 +125,7 @@ class OTEntryService
         $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
 
         $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-            ->where('con_end', '>=', now()->toDateString())
+            ->active()
             ->whereNotIn('con_wkr_id', $manuallyInactiveIds)
             ->pluck('con_wkr_id')
             ->unique()
@@ -182,7 +183,7 @@ class OTEntryService
     {
         // Get active workers through contract_workers relationship
         $workers = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-            ->where('con_end', '>=', now()->toDateString())
+            ->active()
             ->with('worker')
             ->get()
             ->pluck('worker')
@@ -288,14 +289,39 @@ class OTEntryService
             ->drafts()
             ->get();
 
+        if ($entries->isEmpty()) {
+            return 0;
+        }
+
+        // Only submit entries for workers whose contract with this contractor
+        // was still running during the OT month itself. A contract terminated
+        // early (con_end_new — typically a transfer to another contractor)
+        // stops here, so the previous contractor is never billed for OT covering
+        // a period after the worker left.
+        $entryMonthStart = Carbon::create($entryYear, $entryMonth, 1)->startOfMonth();
+        $eligibleWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
+            ->whereIn('con_wkr_id', $entries->pluck('worker_id')->unique()->all())
+            ->endsOnOrAfter($entryMonthStart)
+            ->where('con_start', '<=', $entryMonthStart->copy()->endOfMonth()->toDateString())
+            ->pluck('con_wkr_id')
+            ->all();
+
+        $submitted = 0;
+
         foreach ($entries as $entry) {
+            if (! in_array($entry->worker_id, $eligibleWorkerIds)) {
+                continue;
+            }
+
             $entry->update([
                 'status' => 'submitted',
                 'submitted_at' => now(),
             ]);
+
+            $submitted++;
         }
 
-        return $entries->count();
+        return $submitted;
     }
 
     /**

@@ -678,17 +678,17 @@ class SalaryDetail extends Component
                 text: 'Bank transfer of RM '.number_format((float) $this->manualPaymentAmount, 2).' recorded. The official receipt is now available.'
             );
         } catch (\Exception $e) {
-            Flux::toast(
-                variant: 'danger',
-                heading: 'Failed to Record Payment',
-                text: 'Could not record the payment: '.$e->getMessage()
-            );
-
             \Log::error('Manual payment recording failed', [
                 'submission_id' => $this->submission->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Failed to Record Payment',
+                text: 'Could not record the payment: '.$e->getMessage()
+            );
         } finally {
             $this->isRecordingPayment = false;
         }
@@ -1115,17 +1115,17 @@ class SalaryDetail extends Component
             $this->breakdownFile = null;
             $this->calculatedBreakdown = null;
         } catch (\Exception $e) {
-            Flux::toast(
-                variant: 'danger',
-                heading: 'Excel Parsing Failed',
-                text: 'Unable to read Excel file: '.$e->getMessage()
-            );
-
             \Log::error('Excel parsing failed during review', [
                 'submission_id' => $this->submission->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Excel Parsing Failed',
+                text: 'Unable to read Excel file: '.$e->getMessage()
+            );
 
             $this->breakdownFile = null;
             $this->calculatedBreakdown = null;
@@ -1336,18 +1336,18 @@ class SalaryDetail extends Component
 
             return response()->download($filePath, $this->submission->breakdown_file_name);
         } catch (\Exception $e) {
-            Flux::toast(
-                variant: 'danger',
-                heading: 'Download Failed',
-                text: 'Unable to download the file: '.$e->getMessage()
-            );
-
             \Log::error('Breakdown file download failed', [
                 'submission_id' => $this->submission->id,
                 'file_path' => $filePath,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Download Failed',
+                text: 'Unable to download the file: '.$e->getMessage()
+            );
 
             return;
         }
@@ -1398,16 +1398,16 @@ class SalaryDetail extends Component
             // Refresh submission to reflect changes
             $this->submission->refresh();
         } catch (\Exception $e) {
+            \Log::error('Payslip upload failed', [
+                'submission_id' => $this->submission->id,
+                'error' => $e->getMessage(),
+            ]);
+
             Flux::toast(
                 variant: 'danger',
                 heading: 'Upload Failed',
                 text: 'Failed to upload payslip file: '.$e->getMessage()
             );
-
-            \Log::error('Payslip upload failed', [
-                'submission_id' => $this->submission->id,
-                'error' => $e->getMessage(),
-            ]);
         }
     }
 
@@ -1648,17 +1648,17 @@ class SalaryDetail extends Component
             $this->newBreakdownFile = null;
             $this->calculatedBreakdown = null;
         } catch (\Exception $e) {
-            Flux::toast(
-                variant: 'danger',
-                heading: 'Excel Parsing Failed',
-                text: 'Unable to read Excel file: '.$e->getMessage()
-            );
-
             \Log::error('Excel parsing failed during edit', [
                 'submission_id' => $this->submission->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Excel Parsing Failed',
+                text: 'Unable to read Excel file: '.$e->getMessage()
+            );
 
             $this->newBreakdownFile = null;
             $this->calculatedBreakdown = null;
@@ -1864,17 +1864,17 @@ class SalaryDetail extends Component
             }
 
         } catch (\Exception $e) {
-            Flux::toast(
-                variant: 'danger',
-                heading: 'Update Failed',
-                text: 'Failed to update submission: '.$e->getMessage()
-            );
-
             \Log::error('Payroll submission update failed', [
                 'submission_id' => $this->submission->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Update Failed',
+                text: 'Failed to update submission: '.$e->getMessage()
+            );
         } finally {
             $this->isUpdatingAmount = false;
         }

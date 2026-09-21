@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SafeDate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -67,10 +68,10 @@ class Contractor extends Model
      * The attributes that should be cast.
      */
     protected $casts = [
-        'ctr_datereg' => 'date',
-        'ctr_validdate' => 'date',
-        'ctr_clabexp_date' => 'date',
-        'ctr_cidbexp_date' => 'date',
+        'ctr_datereg' => SafeDate::class,
+        'ctr_validdate' => SafeDate::class,
+        'ctr_clabexp_date' => SafeDate::class,
+        'ctr_cidbexp_date' => SafeDate::class,
     ];
 
     /**
@@ -135,7 +136,7 @@ class Contractor extends Model
             'wkr_id',
             'ctr_clab_no',
             'con_wkr_id'
-        )->whereDate('con_end', '>=', now());
+        )->whereRaw(ContractWorker::effectiveEndSql('contract_worker').' >= ?', [now()->toDateString()]);
     }
 
     /**

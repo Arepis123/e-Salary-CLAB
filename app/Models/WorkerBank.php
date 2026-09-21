@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SafeDate;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -33,7 +34,7 @@ class WorkerBank extends Model
      * The attributes that should be cast.
      */
     protected $casts = [
-        'created_at' => 'datetime',
+        'created_at' => SafeDate::class.':Y-m-d H:i:s',
     ];
 
     /**

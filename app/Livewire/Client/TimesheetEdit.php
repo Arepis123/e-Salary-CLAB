@@ -136,13 +136,13 @@ class TimesheetEdit extends Component
             $worker = \App\Models\Worker::find($draftWorker->worker_id);
             $contract = \App\Models\ContractWorker::where('con_wkr_id', $draftWorker->worker_id)
                 ->where('con_ctr_clab_no', $clabNo)
-                ->orderBy('con_end', 'desc')
+                ->orderByEffectiveEnd('desc')
                 ->first();
 
             // Check if contract was active during the DRAFT SUBMISSION'S period (not today)
             $payrollPeriodDate = \Carbon\Carbon::create($submission->year, $submission->month, 1);
             $hasActiveContract = $contract &&
-                                 $contract->con_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
+                                 $contract->effective_end >= $payrollPeriodDate->startOfMonth()->toDateString() &&
                                  $contract->con_start <= $payrollPeriodDate->endOfMonth()->toDateString();
 
             // Get previous month's OT
@@ -331,7 +331,8 @@ class TimesheetEdit extends Component
 
             if ($existingAccommodation + floatval($validated['newTransactionAmount']) > 100) {
                 $remaining = max(0, 100 - $existingAccommodation);
-                $this->addError('newTransactionAmount', "Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM " . number_format($remaining, 2));
+                $this->addError('newTransactionAmount', 'Accommodation cannot exceed RM 100.00 per month. Remaining limit: RM '.number_format($remaining, 2));
+
                 return;
             }
         }

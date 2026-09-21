@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SafeDate;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -63,13 +64,13 @@ class Worker extends Model
      */
     protected $casts = [
         'wkr_salary' => 'decimal:2',
-        'wkr_dob' => 'date',
-        'wkr_passexp' => 'date',
-        'wkr_permitexp' => 'date',
-        'wkr_contractexp' => 'date',
-        'wkr_entrydate' => 'date',
-        'wkr_createddate' => 'datetime',
-        'wkr_modifieddate' => 'datetime',
+        'wkr_dob' => SafeDate::class,
+        'wkr_passexp' => SafeDate::class,
+        'wkr_permitexp' => SafeDate::class,
+        'wkr_contractexp' => SafeDate::class,
+        'wkr_entrydate' => SafeDate::class,
+        'wkr_createddate' => SafeDate::class.':Y-m-d H:i:s',
+        'wkr_modifieddate' => SafeDate::class.':Y-m-d H:i:s',
     ];
 
     /**
@@ -135,7 +136,7 @@ class Worker extends Model
     public function activeContract()
     {
         return $this->hasOne(ContractWorker::class, 'con_wkr_id', 'wkr_id')
-            ->whereDate('con_end', '>=', now()->toDateString())
+            ->endsOnOrAfter(now()->toDateString())
             ->latest('con_start');
     }
 

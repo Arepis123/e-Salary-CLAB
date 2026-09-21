@@ -196,7 +196,7 @@ class WorkerDetailsSheet implements FromCollection, WithColumnWidths, WithHeadin
             $clabId,
             $contractorName,
             $contract ? $this->date($contract->con_start) : '-',
-            $contract ? $this->date($contract->con_end) : '-',
+            $contract ? $this->date($contract->effective_end) : '-',
             $contract && $contract->isActive() ? $contract->daysRemaining() : '-',
             $contractActive ? 'Active' : 'Inactive',
             $inactiveRecord ? $this->date($inactiveRecord->deactivated_at) : '-',

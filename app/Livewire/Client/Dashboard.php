@@ -13,6 +13,7 @@ class Dashboard extends Component
 {
     // Loading states
     public bool $isLoadingStats = true;
+
     public bool $isLoadingContent = true;
 
     // Stats
@@ -34,10 +35,15 @@ class Dashboard extends Component
 
     // Content
     public $recentWorkers;
+
     public $recentPayments;
+
     public $overduePayments;
+
     public $draftSubmissions;
+
     public $newsItems;
+
     public $expiringContracts;
 
     public function mount()
@@ -57,6 +63,7 @@ class Dashboard extends Component
 
         if (! $clabNo) {
             $this->isLoadingStats = false;
+
             return;
         }
 
@@ -141,6 +148,7 @@ class Dashboard extends Component
 
         if (! $clabNo) {
             $this->isLoadingContent = false;
+
             return;
         }
 
@@ -184,7 +192,7 @@ class Dashboard extends Component
 
         return $drafts->map(function ($draft) use ($clabNo) {
             $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_end', '>=', \Carbon\Carbon::create($draft->year, $draft->month, 1)->startOfMonth()->toDateString())
+                ->endsOnOrAfter(\Carbon\Carbon::create($draft->year, $draft->month, 1)->startOfMonth()->toDateString())
                 ->where('con_start', '<=', \Carbon\Carbon::create($draft->year, $draft->month, 1)->endOfMonth()->toDateString())
                 ->pluck('con_wkr_id')
                 ->unique();

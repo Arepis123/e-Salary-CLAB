@@ -61,7 +61,7 @@
                                 })->pluck('worker_id')->unique()->all();
 
                                 $missingCount = \App\Models\ContractWorker::where('con_start', '<=', $periodEnd)
-                                    ->where('con_end', '>=', $periodStart)
+                                    ->endsOnOrAfter($periodStart)
                                     ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
                                     ->whereNotIn('con_wkr_id', $submittedWorkerIds)
                                     ->distinct()

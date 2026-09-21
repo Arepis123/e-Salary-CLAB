@@ -190,9 +190,12 @@ class AutoSubmitTimesheets extends Command
             ->filter(function ($worker) use ($clabNo, $targetDate, $month, $year) {
                 // Scope to this contractor's contracts only to handle workers with
                 // overlapping contracts under different contractors
+                // The effective end date honours contracts terminated early
+                // (con_end_new), so a worker transferred to another contractor
+                // drops out of the previous contractor's payroll.
                 $contract = $worker->contracts()
                     ->where('con_ctr_clab_no', $clabNo)
-                    ->where('con_end', '>=', $targetDate->copy()->startOfMonth()->toDateString())
+                    ->endsOnOrAfter($targetDate->copy()->startOfMonth())
                     ->where('con_start', '<=', $targetDate->copy()->endOfMonth()->toDateString())
                     ->first();
 
@@ -273,7 +276,7 @@ class AutoSubmitTimesheets extends Command
         $workersData = $remainingWorkers->map(function ($worker) use ($month, $year, $monthlyOTEntries) {
             $payrollPeriodDate = Carbon::create($year, $month, 1);
             $hasActiveContract = $worker->contract_info &&
-                $worker->contract_info->con_end >= $payrollPeriodDate->copy()->startOfMonth()->toDateString() &&
+                $worker->contract_info->effective_end >= $payrollPeriodDate->copy()->startOfMonth()->toDateString() &&
                 $worker->contract_info->con_start <= $payrollPeriodDate->copy()->endOfMonth()->toDateString();
 
             // Calculate pro-rated basic salary
@@ -286,7 +289,7 @@ class AutoSubmitTimesheets extends Command
             if ($hasActiveContract && $worker->contract_info) {
                 $proratingResult = $this->proratingService->calculateProratedSalary(
                     $worker->contract_info->con_start,
-                    $worker->contract_info->con_end,
+                    $worker->contract_info->effective_end,
                     $month,
                     $year,
                     $worker->basic_salary ?? 1700

@@ -130,11 +130,11 @@
                         </div>
                         <div>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400">SOCSO Number</p>
-                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->wkr_sosco_id ?? '-' }}</p>
+                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ filled($worker->wkr_sosco_id) ? $worker->wkr_sosco_id : '-' }}</p>
                         </div>
                         <div>
                             <p class="text-sm text-zinc-600 dark:text-zinc-400">KWSP Number</p>
-                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $worker->wkr_kwsp ?? '-' }}</p>
+                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ filled($worker->wkr_kwsp) ? $worker->wkr_kwsp : '-' }}</p>
                         </div>
                     </div>
                 </flux:card>
@@ -146,11 +146,14 @@
                         <div class="grid gap-4 md:grid-cols-2">
                             <div>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Contract Start Date</p>
-                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $contract->con_start->format('F d, Y') }}</p>
+                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $contract->con_start?->format('F d, Y') ?? '-' }}</p>
                             </div>
                             <div>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Contract End Date</p>
-                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $contract->con_end->format('F d, Y') }}</p>
+                                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $contract->effective_end?->format('F d, Y') ?? '-' }}</p>
+                                @if($contract->endedEarly())
+                                    <p class="text-xs text-orange-600 dark:text-orange-400">Ended early &mdash; originally {{ $contract->con_end?->format('F d, Y') ?? '-' }}</p>
+                                @endif
                             </div>
                             <div>
                                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Contract Period</p>

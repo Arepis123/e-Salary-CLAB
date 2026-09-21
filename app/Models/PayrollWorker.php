@@ -350,7 +350,9 @@ class PayrollWorker extends Model
 
     /**
      * Check if the worker's contract has ended for the payroll submission period
-     * Contract is considered ended if con_end date is before the payroll submission month
+     * Contract is considered ended if its effective end date (con_end_new when
+     * the contract was terminated early, otherwise con_end) is before the
+     * payroll submission month
      */
     public function hasContractEnded(): bool
     {
@@ -359,10 +361,11 @@ class PayrollWorker extends Model
             ->table('contract_worker')
             ->where('con_wkr_id', $this->worker_id)
             ->where('con_ctr_clab_no', $this->payrollSubmission->contractor_clab_no)
-            ->orderBy('con_end', 'desc')
+            ->selectRaw('*, '.ContractWorker::effectiveEndSql().' as effective_end')
+            ->orderByRaw(ContractWorker::effectiveEndSql().' desc')
             ->first();
 
-        if (! $contract || ! $contract->con_end) {
+        if (! $contract || ! $contract->effective_end) {
             return false;
         }
 
@@ -370,8 +373,9 @@ class PayrollWorker extends Model
         $submission = $this->payrollSubmission;
         $payrollPeriodStart = \Carbon\Carbon::create($submission->year, $submission->month, 1)->startOfMonth();
 
-        // Contract has ended if con_end is before the start of the payroll period
-        $contractEndDate = \Carbon\Carbon::parse($contract->con_end);
+        // Contract has ended if the effective end date is before the start of
+        // the payroll period
+        $contractEndDate = \Carbon\Carbon::parse($contract->effective_end);
 
         return $contractEndDate->isBefore($payrollPeriodStart);
     }
