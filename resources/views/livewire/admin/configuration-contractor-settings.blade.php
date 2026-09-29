@@ -16,7 +16,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Windows Open</p>
-                <p class="text-xl font-bold text-green-600 dark:text-green-400">
+                <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                     {{ $windowStats['windows_open'] ?? 0 }}
                 </p>
             </div>
@@ -28,7 +28,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Windows Closed</p>
-                <p class="text-xl font-bold text-red-600 dark:text-red-400">
+                <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                     {{ $windowStats['windows_closed'] ?? 0 }}
                 </p>
             </div>
@@ -40,7 +40,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm text-zinc-600 dark:text-zinc-400">Using Default</p>
-                <p class="text-xl font-bold text-orange-600 dark:text-orange-400">
+                <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                     {{ $windowStats['using_default'] ?? 0 }}
                 </p>
             </div>

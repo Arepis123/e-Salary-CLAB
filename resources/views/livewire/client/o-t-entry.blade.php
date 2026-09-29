@@ -131,6 +131,20 @@
         </flux:card>
 
         <!-- Submission Status -->
+        @if(!$isLoading && $this->exceptedWorkers->isNotEmpty())
+            <flux:callout icon="pause-circle" color="amber">
+                <flux:callout.heading>Payroll Exception ({{ $this->exceptedWorkers->count() }} {{ Str::plural('worker', $this->exceptedWorkers->count()) }})</flux:callout.heading>
+                <flux:callout.text>
+                    The following workers are excluded from the {{ $period['submission_month_name'] ?? '' }} payroll by the administrator, so OT and transactions cannot be entered for them this period.
+                </flux:callout.text>
+                <div class="mt-2 flex flex-wrap gap-2">
+                    @foreach($this->exceptedWorkers as $excepted)
+                        <flux:badge color="amber" size="sm" icon="pause-circle">{{ $excepted->worker_name }} ({{ $excepted->worker_passport }})</flux:badge>
+                    @endforeach
+                </div>
+            </flux:callout>
+        @endif
+
         @if(!$isLoading && $hasSubmitted && !$isManuallyOpened)
             <flux:callout icon="check-circle" color="emerald">
                 <flux:callout.heading>Entries Submitted</flux:callout.heading>

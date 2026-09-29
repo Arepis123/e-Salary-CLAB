@@ -220,6 +220,19 @@ class Configuration extends Component
 
     public $payrollSubmissionToRemove = null;  // ['id', 'month_year', 'status']
 
+    // Payroll exception (pause worker from payroll for up to 3 months)
+    public $showPayrollExceptionModal = false;
+
+    public $exceptionWorker = [];  // ['id', 'name', 'passport', 'contractor_clab']
+
+    public $exceptionMonths = [];  // selected 'Y-m' keys
+
+    public $exceptionRemarks = '';
+
+    public $exceptionBlockedMonths = [];  // 'Y-m' keys where client already entered OT/transactions
+
+    public $exceptionConflictMonths = [];  // saved exception months that nevertheless have OT/transactions
+
     // Uploads (document management) properties
     public $uploadedDocuments = [];
 
@@ -2116,6 +2129,220 @@ class Configuration extends Component
         }
     }
 
+    /**
+     * Payroll months the admin can pick for an exception: current month + next 5
+     */
+    public function getExceptionMonthOptions(): array
+    {
+        $options = [];
+        $start = now()->startOfMonth();
+
+        for ($i = 0; $i < 6; $i++) {
+            $date = $start->copy()->addMonths($i);
+            $options[$date->format('Y-m')] = $date->format('M Y');
+        }
+
+        return $options;
+    }
+
+    public function openPayrollExceptionModal(string $workerId, string $workerName, string $passport, string $contractorClab)
+    {
+        $this->resetErrorBag();
+        $this->exceptionWorker = [
+            'id' => $workerId,
+            'name' => $workerName,
+            'passport' => $passport,
+            'contractor_clab' => $contractorClab,
+        ];
+
+        $existing = \App\Models\PayrollException::where('worker_id', $workerId)
+            ->upcoming()
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get();
+
+        $this->exceptionMonths = $existing
+            ->toBase()
+            ->map(fn ($e) => sprintf('%04d-%02d', $e->year, $e->month))
+            ->intersect(array_keys($this->getExceptionMonthOptions()))
+            ->values()
+            ->all();
+        $this->exceptionRemarks = $existing->last()?->remarks ?? '';
+        $this->exceptionBlockedMonths = \App\Models\PayrollException::monthsWithOTData($workerId);
+        $this->exceptionConflictMonths = array_values(array_intersect($this->exceptionMonths, $this->exceptionBlockedMonths));
+        $this->showPayrollExceptionModal = true;
+    }
+
+    public function toggleExceptionMonth(string $key)
+    {
+        if (in_array($key, $this->exceptionMonths)) {
+            $this->exceptionMonths = array_values(array_diff($this->exceptionMonths, [$key]));
+            $this->resetErrorBag('exceptionMonths');
+
+            return;
+        }
+
+        // Conflict months were already excepted, so re-selecting one after unticking is allowed
+        if (in_array($key, $this->exceptionBlockedMonths) && ! in_array($key, $this->exceptionConflictMonths)) {
+            $this->addError('exceptionMonths', 'The client has already entered OT or transactions for this payroll month.');
+
+            return;
+        }
+
+        $max = \App\Models\PayrollException::MAX_MONTHS;
+        if (count($this->exceptionMonths) >= $max) {
+            $this->addError('exceptionMonths', "You can select up to {$max} months only.");
+
+            return;
+        }
+
+        $this->resetErrorBag('exceptionMonths');
+        $this->exceptionMonths[] = $key;
+        sort($this->exceptionMonths);
+    }
+
+    public function closePayrollExceptionModal()
+    {
+        $this->showPayrollExceptionModal = false;
+        $this->exceptionWorker = [];
+        $this->exceptionMonths = [];
+        $this->exceptionRemarks = '';
+        $this->exceptionBlockedMonths = [];
+        $this->exceptionConflictMonths = [];
+        $this->resetErrorBag();
+    }
+
+    public function savePayrollException()
+    {
+        $options = $this->getExceptionMonthOptions();
+        $selected = array_values(array_intersect($this->exceptionMonths, array_keys($options)));
+        $max = \App\Models\PayrollException::MAX_MONTHS;
+
+        $existingCount = \App\Models\PayrollException::where('worker_id', $this->exceptionWorker['id'] ?? '')
+            ->upcoming()
+            ->count();
+
+        if (empty($selected) && $existingCount === 0) {
+            $this->addError('exceptionMonths', 'Please select at least one payroll month.');
+
+            return;
+        }
+
+        if (count($selected) > $max) {
+            $this->addError('exceptionMonths', "You can select up to {$max} months only.");
+
+            return;
+        }
+
+        // Months the client already filled OT/transactions for can't be newly excepted
+        $alreadyExcepted = \App\Models\PayrollException::where('worker_id', $this->exceptionWorker['id'] ?? '')
+            ->upcoming()
+            ->get()
+            ->map(fn ($e) => sprintf('%04d-%02d', $e->year, $e->month))
+            ->all();
+        $blocked = array_diff(
+            array_intersect($selected, \App\Models\PayrollException::monthsWithOTData($this->exceptionWorker['id'] ?? '')),
+            $alreadyExcepted
+        );
+        if (! empty($blocked)) {
+            $this->addError('exceptionMonths', 'The client has already entered OT or transactions for '.collect($blocked)->map(fn ($k) => $options[$k])->join(', ').'.');
+
+            return;
+        }
+
+        if (! empty($selected)) {
+            $this->validate(
+                ['exceptionRemarks' => 'required|string|max:1000'],
+                ['exceptionRemarks.required' => 'Please enter remarks for this exception.']
+            );
+        }
+
+        try {
+            DB::transaction(function () use ($options, $selected) {
+                // Remove exceptions for offered months that were unselected
+                foreach (array_diff(array_keys($options), $selected) as $key) {
+                    [$year, $month] = array_map('intval', explode('-', $key));
+                    \App\Models\PayrollException::where('worker_id', $this->exceptionWorker['id'])
+                        ->where('month', $month)
+                        ->where('year', $year)
+                        ->delete();
+                }
+
+                foreach ($selected as $key) {
+                    [$year, $month] = array_map('intval', explode('-', $key));
+                    \App\Models\PayrollException::updateOrCreate(
+                        ['worker_id' => $this->exceptionWorker['id'], 'month' => $month, 'year' => $year],
+                        [
+                            'worker_name' => $this->exceptionWorker['name'],
+                            'worker_passport' => $this->exceptionWorker['passport'],
+                            'contractor_clab_no' => $this->exceptionWorker['contractor_clab'],
+                            'remarks' => trim($this->exceptionRemarks),
+                            'created_by' => auth()->id(),
+                        ]
+                    );
+
+                    // Drop the empty draft OT row auto-created for this worker, so it
+                    // doesn't linger in OT reports (rows with data are blocked above)
+                    \App\Models\MonthlyOTEntry::where('worker_id', $this->exceptionWorker['id'])
+                        ->where('submission_month', $month)
+                        ->where('submission_year', $year)
+                        ->where('ot_normal_hours', 0)
+                        ->where('ot_rest_hours', 0)
+                        ->where('ot_public_hours', 0)
+                        ->whereDoesntHave('transactions')
+                        ->delete();
+                }
+            });
+
+            $workerName = $this->exceptionWorker['name'];
+            $workerId = $this->exceptionWorker['id'];
+
+            Flux::toast(
+                variant: 'success',
+                heading: empty($selected) ? 'Payroll Exception Removed' : 'Payroll Exception Saved',
+                text: empty($selected)
+                    ? "{$workerName} will be included in payroll as usual."
+                    : "{$workerName} is excluded from payroll for ".collect($selected)->map(fn ($k) => $options[$k])->join(', ').'.'
+            );
+
+            $this->closePayrollExceptionModal();
+
+            // If the worker is already in an unpaid submission for an excepted month, offer to remove them
+            if (! empty($selected)) {
+                $payrollWorker = \App\Models\PayrollWorker::where('worker_id', $workerId)
+                    ->whereHas('payrollSubmission', function ($q) use ($selected) {
+                        $q->where('status', '!=', 'paid')
+                            ->where(function ($q) use ($selected) {
+                                foreach ($selected as $key) {
+                                    [$year, $month] = array_map('intval', explode('-', $key));
+                                    $q->orWhere(fn ($q) => $q->where('month', $month)->where('year', $year));
+                                }
+                            });
+                    })
+                    ->with('payrollSubmission')
+                    ->first();
+
+                if ($payrollWorker) {
+                    $submission = $payrollWorker->payrollSubmission;
+                    $this->deactivatingWorkerId = $workerId;
+                    $this->deactivatingWorkerName = $workerName;
+                    $this->payrollSubmissionToRemove = [
+                        'id' => $submission->id,
+                        'month_year' => \Carbon\Carbon::createFromDate($submission->year, $submission->month, 1)->format('F Y'),
+                        'status' => $submission->status,
+                    ];
+                    $this->showRemoveFromPayrollModal = true;
+                }
+            }
+        } catch (\Exception $e) {
+            Flux::toast(
+                variant: 'danger',
+                heading: 'Error',
+                text: 'Failed to save payroll exception: '.$e->getMessage()
+            );
+        }
+    }
+
     protected function getWorkersData(): array
     {
         // Get inactive worker IDs
@@ -2173,8 +2400,12 @@ class Configuration extends Component
         }
 
         // Paginate (named page so it does not collide with the other tab paginators)
+        // Upcoming payroll exceptions keyed by worker, e.g. ['123' => ['Oct 2026', 'Nov 2026']]
+        $exceptionMonthsByWorker = \App\Models\PayrollException::upcomingMonthsByWorker();
+        $exceptionConflictsByWorker = \App\Models\PayrollException::upcomingConflictsByWorker();
+
         $workersList = $query->paginate($this->workersPerPage, ['*'], 'workersPage')
-            ->through(function ($worker) use ($inactiveWorkerIds) {
+            ->through(function ($worker) use ($inactiveWorkerIds, $exceptionMonthsByWorker, $exceptionConflictsByWorker) {
                 return [
                     'id' => $worker->wkr_id,
                     'name' => $worker->wkr_name,
@@ -2186,6 +2417,8 @@ class Configuration extends Component
                     'contractor_clab' => $worker->wkr_currentemp,
                     'contractor_name' => $worker->contractor?->ctr_comp_name ?? $worker->wkr_currentemp,
                     'is_inactive' => in_array($worker->wkr_id, $inactiveWorkerIds),
+                    'exception_months' => $exceptionMonthsByWorker[$worker->wkr_id] ?? [],
+                    'exception_conflicts' => $exceptionConflictsByWorker[$worker->wkr_id] ?? [],
                 ];
             });
 

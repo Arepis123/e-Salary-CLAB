@@ -634,6 +634,32 @@
                     </p>
                 </div>
 
+                @if(!empty($bulkWaivedWorkers))
+                    <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+                        <p class="mb-3 text-sm font-medium text-amber-900 dark:text-amber-100">
+                            Late-start workers (first month waived)
+                        </p>
+                        <div class="space-y-2">
+                            @foreach($bulkWaivedWorkers as $waived)
+                                <flux:checkbox
+                                    wire:model.live="bulkIncludeWaived"
+                                    wire:key="waived-{{ $waived['id'] }}"
+                                    value="{{ $waived['id'] }}"
+                                    label="{{ $waived['name'] }} ({{ $waived['passport'] }})"
+                                    description="Contract starts {{ $waived['start'] }} — include in this month anyway"
+                                />
+                            @endforeach
+                        </div>
+                        @if(!empty($bulkIncludeWaived))
+                            <p class="mt-3 text-xs text-amber-800 dark:text-amber-200">
+                                The client must <strong>not</strong> add a backpay for these days next month, or the worker will be paid twice.
+                            </p>
+                        @endif
+                    </div>
+                @endif
+
+                <p class="text-sm text-zinc-700 dark:text-zinc-300">Are you sure you want to proceed?</p>
+
                 <!-- Actions -->
                 <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
                     <flux:button wire:click="closeBulkSubmitModal" variant="ghost" class="w-full sm:w-auto">Cancel</flux:button>

@@ -7,7 +7,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Admin Users</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['total'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['total'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3">
                     <flux:icon.user-group class="size-6 text-blue-600 dark:text-blue-400" />
@@ -19,7 +19,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">With Assignments</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['assigned'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['assigned'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
                     <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400" />
@@ -31,7 +31,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Contractors Available</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['contractors'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['contractors'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-3">
                     <flux:icon.building-office class="size-6 text-purple-600 dark:text-purple-400" />
@@ -43,7 +43,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Unassigned Contractors</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['unassigned'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $picStats['unassigned'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-amber-100 dark:bg-amber-900/30 p-3">
                     <flux:icon.exclamation-triangle class="size-6 text-amber-600 dark:text-amber-400" />

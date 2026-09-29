@@ -19,6 +19,10 @@ class Salary extends Component
     #[Url(except: '')]
     public $contractor = '';
 
+    /** PIC (admin) user id — narrows to the contractors they manage */
+    #[Url(except: '')]
+    public $picFilter = '';
+
     #[Url(except: '')]
     public $statusFilter = '';
 
@@ -35,6 +39,8 @@ class Salary extends Component
     public $monthFilter = '';
 
     public $contractors = [];
+
+    public $pics = [];
 
     public $perPage = 10;
 
@@ -71,6 +77,12 @@ class Salary extends Component
 
         // Load contractors immediately (now fast since it queries Users table directly)
         $this->loadContractors();
+
+        $this->pics = \App\Models\User::personsInCharge()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->toArray();
     }
 
     /**
@@ -122,6 +134,7 @@ class Salary extends Component
         $filters = [
             'search' => $this->search,
             'contractor' => $this->contractor ? ($this->contractors[$this->contractor] ?? $this->contractor) : null,
+            'pic' => $this->picFilter ? ($this->pics[$this->picFilter] ?? null) : null,
             'status' => $this->statusFilter,
             'payslip' => $this->payslipFilter,
         ];
@@ -157,6 +170,33 @@ class Salary extends Component
         $this->resetPage();
     }
 
+    public function updatingPicFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPicFilter()
+    {
+        // Drop a contractor that the newly selected PIC does not manage
+        if ($this->contractor && ! array_key_exists($this->contractor, $this->getContractorOptions())) {
+            $this->contractor = '';
+        }
+    }
+
+    /**
+     * Contractor dropdown options, narrowed to the selected PIC's contractors
+     */
+    protected function getContractorOptions(): array
+    {
+        if (! $this->picFilter) {
+            return $this->contractors;
+        }
+
+        $picClabs = \App\Models\UserContractorAssignment::clabNosForUsers([(int) $this->picFilter]);
+
+        return array_intersect_key($this->contractors, array_flip($picClabs));
+    }
+
     public function updatingStatusFilter()
     {
         $this->resetPage();
@@ -180,6 +220,7 @@ class Salary extends Component
     public function clearFilters()
     {
         $this->contractor = '';
+        $this->picFilter = '';
         $this->statusFilter = '';
         $this->payslipFilter = '';
         $this->search = '';
@@ -256,6 +297,14 @@ class Salary extends Component
             $query->where('contractor_clab_no', $this->contractor);
         }
 
+        // Apply PIC filter (contractors assigned to the PIC)
+        if ($this->picFilter) {
+            $query->whereIn(
+                'contractor_clab_no',
+                \App\Models\UserContractorAssignment::clabNosForUsers([(int) $this->picFilter])
+            );
+        }
+
         // Apply year filter
         if ($this->yearFilter) {
             $query->where('year', $this->yearFilter);
@@ -300,6 +349,7 @@ class Salary extends Component
     {
         return view('livewire.admin.salary', [
             'submissions' => $this->getSubmissionsQuery()->paginate($this->perPage),
+            'contractorOptions' => $this->getContractorOptions(),
         ]);
     }
 }

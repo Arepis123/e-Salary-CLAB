@@ -338,6 +338,7 @@ class Workers extends Component
             'countries' => $countries,
             'positions' => $positions,
             'manuallyInactiveIds' => $manuallyInactiveIds,
+            'exceptionMonthsByWorker' => \App\Models\PayrollException::upcomingMonthsByWorker($clabNo),
         ])->layout('components.layouts.app', ['title' => __('My Workers')]);
     }
 }

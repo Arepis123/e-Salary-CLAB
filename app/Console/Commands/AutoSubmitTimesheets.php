@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\InactiveWorker;
 use App\Models\MonthlyOTEntry;
+use App\Models\PayrollException;
 use App\Models\PayrollSubmission;
 use App\Models\User;
 use App\Services\ContractWorkerService;
@@ -230,6 +231,12 @@ class AutoSubmitTimesheets extends Command
         $inactiveWorkerIds = InactiveWorker::where('contractor_clab_no', $clabNo)
             ->pluck('worker_id')
             ->all();
+
+        // Also skip workers paused from this payroll month (Payroll Exception)
+        $inactiveWorkerIds = array_merge(
+            $inactiveWorkerIds,
+            PayrollException::getExceptedWorkerIds($month, $year, $clabNo)
+        );
 
         if (! empty($inactiveWorkerIds)) {
             $activeWorkers = $activeWorkers->filter(

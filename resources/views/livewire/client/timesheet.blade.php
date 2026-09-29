@@ -21,6 +21,21 @@
         </flux:callout>
     @endif
 
+    <!-- Payroll Exception Notice -->
+    @if(!$isLoading && $this->exceptedWorkers->isNotEmpty())
+        <flux:callout icon="pause-circle" color="amber">
+            <flux:callout.heading>Payroll Exception ({{ $this->exceptedWorkers->count() }} {{ \Str::plural('worker', $this->exceptedWorkers->count()) }})</flux:callout.heading>
+            <flux:callout.text>
+                The following workers are excluded from this payroll month by the administrator and will not be included in the submission.
+            </flux:callout.text>
+            <div class="mt-2 flex flex-wrap gap-2">
+                @foreach($this->exceptedWorkers as $excepted)
+                    <flux:badge color="amber" size="sm" icon="pause-circle">{{ $excepted->worker_name }} ({{ $excepted->worker_passport }})</flux:badge>
+                @endforeach
+            </div>
+        </flux:callout>
+    @endif
+
     <!-- Period & Schedule -->
     @if(!$targetMonth && !$targetYear && ($isLoading || (!$errorMessage && !$isBlocked)))
     @php

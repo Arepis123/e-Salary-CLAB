@@ -68,6 +68,12 @@ class MissingSubmissions extends Component
 
     public $bulkSubmitMessage = '';
 
+    /** Late-start (first-month waived) workers offered in the bulk submit dialog */
+    public $bulkWaivedWorkers = [];
+
+    /** Worker IDs from $bulkWaivedWorkers the admin chose to include anyway */
+    public $bulkIncludeWaived = [];
+
     // Filter properties
     public $selectedMonth;
 
@@ -297,28 +303,103 @@ class MissingSubmissions extends Component
         $this->pastReminders = collect();
     }
 
+    /**
+     * Work out which workers a "Submit on Behalf" would cover for a period.
+     *
+     * Uses every submission already made for the period (a contractor can have
+     * more than one), so workers in any of them are skipped. Workers whose
+     * contract starts on/after the monthly cut-off are returned separately as
+     * "waived" so the admin can choose to include them anyway.
+     *
+     * The target is the period's open submission (draft / submitted / approved)
+     * if there is one; once every submission is locked for payment (pending
+     * payment, paid or overdue) the remaining workers go into a NEW submission
+     * rather than altering one the client may already have paid.
+     *
+     * @return array{payable: \Illuminate\Support\Collection, waived: \Illuminate\Support\Collection, openSubmission: ?PayrollSubmission, hasLockedSubmission: bool}
+     */
+    protected function getBulkSubmitCandidates(string $clabNo, int $month, int $year): array
+    {
+        $targetDate = \Carbon\Carbon::create($year, $month, 1);
+
+        $contractWorkers = ContractWorker::with('worker')
+            ->where('con_ctr_clab_no', $clabNo)
+            ->endsOnOrAfter($targetDate->copy()->startOfMonth())
+            ->where('con_start', '<=', $targetDate->copy()->endOfMonth()->toDateString())
+            ->whereRaw($this->getActiveWorkerIds())
+            ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds($month, $year))
+            ->get()
+            ->filter(fn ($cw) => $cw->worker && $cw->con_start)
+            ->unique('con_wkr_id')
+            ->values();
+
+        $submissions = PayrollSubmission::where('contractor_clab_no', $clabNo)
+            ->where('month', $month)
+            ->where('year', $year)
+            ->orderBy('id')
+            ->get();
+
+        $submittedWorkerIds = PayrollWorker::whereIn('payroll_submission_id', $submissions->pluck('id'))
+            ->pluck('worker_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        $remaining = $contractWorkers
+            ->reject(fn ($cw) => in_array((string) $cw->worker->wkr_id, $submittedWorkerIds, true))
+            ->values();
+
+        [$waived, $payable] = $remaining->partition(
+            fn ($cw) => $this->proratingService->isFirstMonthWaived($cw->con_start, $month, $year)
+        );
+
+        return [
+            'payable' => $payable->values(),
+            'waived' => $waived->values(),
+            'openSubmission' => $submissions->first(fn ($s) => in_array($s->status, ['draft', 'submitted', 'approved'], true)),
+            'hasLockedSubmission' => $submissions->isNotEmpty(),
+        ];
+    }
+
     public function openBulkSubmitModal($clabNo)
     {
         $this->bulkSubmitContractor = collect($this->missingContractors)->firstWhere('clab_no', $clabNo);
 
-        if ($this->bulkSubmitContractor) {
-            $periodLabel = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, 1)->format('F Y');
-            $cutOffDay = SalaryProratingService::FIRST_MONTH_CUTOFF_DAY;
-            $existingSubmission = \App\Models\PayrollSubmission::where('contractor_clab_no', $clabNo)
-                ->where('month', $this->selectedMonth)
-                ->where('year', $this->selectedYear)
-                ->first();
-
-            if ($existingSubmission) {
-                $statusNote = $existingSubmission->status === 'approved'
-                    ? '<br><br><strong>Note:</strong> This submission is currently <strong>Approved</strong>. Adding new workers will revert its status to <strong>Under Review</strong> so the Final Amount can be re-confirmed by admin.'
-                    : '';
-                $this->bulkSubmitMessage = "A submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for <strong>{$periodLabel}</strong> already exists. The newly added workers that are not yet included will be <strong>appended</strong> to the existing submission, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it.{$statusNote}<br><br>Are you sure you want to proceed?";
-            } else {
-                $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$this->bulkSubmitContractor['name']}</strong> for the period of <strong>{$periodLabel}</strong>.<br><br>This will include all their active workers, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it. Workers whose contract starts on or after the {$cutOffDay}th are left for next month's payroll. This action is final for this submission period and will move directly to the approval stage.<br><br>Are you sure you want to proceed?";
-            }
-            $this->showBulkSubmitModal = true;
+        if (! $this->bulkSubmitContractor) {
+            return;
         }
+
+        $periodLabel = \Carbon\Carbon::create($this->selectedYear, $this->selectedMonth, 1)->format('F Y');
+        $cutOffDay = SalaryProratingService::FIRST_MONTH_CUTOFF_DAY;
+        $candidates = $this->getBulkSubmitCandidates($clabNo, (int) $this->selectedMonth, (int) $this->selectedYear);
+        $openSubmission = $candidates['openSubmission'];
+        $name = e($this->bulkSubmitContractor['name']);
+        $payableCount = $candidates['payable']->count();
+        $payableText = $payableCount.' '.\Str::plural('worker', $payableCount);
+
+        $this->bulkWaivedWorkers = $candidates['waived']->map(fn ($cw) => [
+            'id' => (string) $cw->worker->wkr_id,
+            'name' => $cw->worker->wkr_name,
+            'passport' => $cw->worker->wkr_passno,
+            'start' => \Carbon\Carbon::parse($cw->con_start)->format('d/m/Y'),
+        ])->all();
+        $this->bulkIncludeWaived = [];
+
+        if ($openSubmission) {
+            $statusNote = $openSubmission->status === 'approved'
+                ? '<br><br><strong>Note:</strong> This submission is currently <strong>Approved</strong>. Adding new workers will revert its status to <strong>Under Review</strong> so the Final Amount can be re-confirmed by admin.'
+                : '';
+            $this->bulkSubmitMessage = "A submission for <strong>{$name}</strong> for <strong>{$periodLabel}</strong> already exists (#{$openSubmission->id}). <strong>{$payableText}</strong> not yet included will be <strong>appended</strong> to it, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it.{$statusNote}";
+        } elseif ($candidates['hasLockedSubmission']) {
+            $this->bulkSubmitMessage = "The existing <strong>{$periodLabel}</strong> payroll for <strong>{$name}</strong> is already locked for payment, so it will not be changed. A <strong>new, separate submission</strong> will be created for <strong>{$payableText}</strong> not yet included, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it.";
+        } else {
+            $this->bulkSubmitMessage = "You are about to create and <strong>submit</strong> a payroll submission for <strong>{$name}</strong> for the period of <strong>{$periodLabel}</strong> covering <strong>{$payableText}</strong>, with basic salary pro-rated to the days each contract covers in this period plus any overtime already submitted for it. This will move directly to the approval stage.";
+        }
+
+        if (! empty($this->bulkWaivedWorkers)) {
+            $this->bulkSubmitMessage .= "<br><br>Workers whose contract starts on or after the {$cutOffDay}th are normally left for next month's payroll (the client backpays those days). Tick any below to include them in <strong>{$periodLabel}</strong> instead.";
+        }
+
+        $this->showBulkSubmitModal = true;
     }
 
     public function closeBulkSubmitModal()
@@ -326,6 +407,8 @@ class MissingSubmissions extends Component
         $this->showBulkSubmitModal = false;
         $this->bulkSubmitContractor = null;
         $this->bulkSubmitMessage = '';
+        $this->bulkWaivedWorkers = [];
+        $this->bulkIncludeWaived = [];
     }
 
     /**
@@ -364,6 +447,39 @@ class MissingSubmissions extends Component
         ];
     }
 
+    /**
+     * Create the payroll rows (plus their OT-entry transactions) for the given
+     * contract workers under a submission. Returns the summed total payment.
+     */
+    protected function addOnBehalfWorkers(PayrollSubmission $submission, $contractWorkers, $otEntries, int $month, int $year): float
+    {
+        $total = 0;
+
+        foreach ($contractWorkers as $contractWorker) {
+            $otEntry = $otEntries->get($contractWorker->worker->wkr_id);
+            $payrollWorker = new PayrollWorker(
+                $this->buildOnBehalfWorkerAttributes($contractWorker, $month, $year, $otEntry)
+            );
+            $payrollWorker->payroll_submission_id = $submission->id;
+            $payrollWorker->calculateSalary(0);
+            $payrollWorker->save();
+
+            if ($otEntry && $otEntry->transactions) {
+                foreach ($otEntry->transactions as $txn) {
+                    $payrollWorker->transactions()->create([
+                        'type' => $txn->type,
+                        'amount' => $txn->amount,
+                        'remarks' => $txn->remarks,
+                    ]);
+                }
+            }
+
+            $total += $payrollWorker->total_payment;
+        }
+
+        return $total;
+    }
+
     public function performBulkSubmission()
     {
         if (! $this->bulkSubmitContractor) {
@@ -371,45 +487,26 @@ class MissingSubmissions extends Component
         }
 
         $clabNo = $this->bulkSubmitContractor['clab_no'];
-        $month = $this->selectedMonth;
-        $year = $this->selectedYear;
+        $month = (int) $this->selectedMonth;
+        $year = (int) $this->selectedYear;
+        $resultMessage = '';
 
         try {
-            DB::transaction(function () use ($clabNo, $month, $year) {
+            DB::transaction(function () use ($clabNo, $month, $year, &$resultMessage) {
                 $targetDate = \Carbon\Carbon::create($year, $month, 1);
-                $activeContractWorkers = ContractWorker::with('worker')
-                    ->where('con_ctr_clab_no', $clabNo)
-                    ->endsOnOrAfter($targetDate->copy()->startOfMonth())
-                    ->where('con_start', '<=', $targetDate->copy()->endOfMonth()->toDateString())
-                    ->whereRaw($this->getActiveWorkerIds())
-                    ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
-                    ->get();
+                $candidates = $this->getBulkSubmitCandidates($clabNo, $month, $year);
 
-                // Apply the same contract rules the client timesheet and the
-                // auto-submit scheduler use, so submitting on behalf produces the
-                // same figures: a worker whose contract starts on/after the
-                // monthly cut-off has that partial first month waived, and the
-                // rest are pro-rated over the days their contract actually
-                // covers in this month (honouring an early termination).
-                $waivedCount = 0;
-                $activeContractWorkers = $activeContractWorkers->filter(function ($contractWorker) use ($month, $year, &$waivedCount) {
-                    if (! $contractWorker->worker || ! $contractWorker->con_start) {
-                        return false;
-                    }
+                // Waived (late-start) workers are only included when the admin ticked them
+                $includeIds = array_map('strval', $this->bulkIncludeWaived);
+                $workersToAdd = $candidates['payable']
+                    ->merge($candidates['waived']->filter(fn ($cw) => in_array((string) $cw->worker->wkr_id, $includeIds, true)))
+                    ->values();
 
-                    if ($this->proratingService->isFirstMonthWaived($contractWorker->con_start, $month, $year)) {
-                        $waivedCount++;
-
-                        return false;
-                    }
-
-                    return true;
-                })->values();
-
-                if ($activeContractWorkers->isEmpty()) {
+                if ($workersToAdd->isEmpty()) {
+                    $waivedCount = $candidates['waived']->count();
                     throw new \Exception($waivedCount > 0
-                        ? "All {$waivedCount} worker(s) started on or after the ".SalaryProratingService::FIRST_MONTH_CUTOFF_DAY."th of this month, so their partial first month is paid with next month's payroll. Nothing to submit for this period."
-                        : 'No active workers found for this contractor for the selected period.');
+                        ? "The only remaining {$waivedCount} worker(s) started on or after the ".SalaryProratingService::FIRST_MONTH_CUTOFF_DAY.'th of this month, so their partial first month is normally paid with next month\'s payroll. Tick them in the dialog to include them in this month instead.'
+                        : 'All active workers are already included in a submission for this period.');
                 }
 
                 // Load submitted OT entries for this payroll period.
@@ -428,76 +525,40 @@ class MissingSubmissions extends Component
                     ->get()
                     ->keyBy('worker_id');
 
-                $existingSubmission = PayrollSubmission::where('contractor_clab_no', $clabNo)
-                    ->where('month', $month)
-                    ->where('year', $year)
-                    ->first();
+                $openSubmission = $candidates['openSubmission'];
 
-                if ($existingSubmission) {
-                    // Submission already exists — add only workers not yet in it
-                    $alreadySubmittedWorkerIds = PayrollWorker::where('payroll_submission_id', $existingSubmission->id)
-                        ->pluck('worker_id')
-                        ->toArray();
+                if ($openSubmission) {
+                    // Append to the period's open submission
+                    $addedAmount = $this->addOnBehalfWorkers($openSubmission, $workersToAdd, $otEntries, $month, $year);
 
-                    $newContractWorkers = $activeContractWorkers->filter(function ($contractWorker) use ($alreadySubmittedWorkerIds) {
-                        return $contractWorker->worker && ! in_array($contractWorker->worker->wkr_id, $alreadySubmittedWorkerIds);
-                    });
-
-                    if ($newContractWorkers->isEmpty()) {
-                        throw new \Exception('All active workers are already included in the existing submission for this period.');
-                    }
-
-                    $addedAmount = 0;
-                    foreach ($newContractWorkers as $contractWorker) {
-                        $worker = $contractWorker->worker;
-                        $otEntry = $otEntries->get($worker->wkr_id);
-                        $payrollWorker = new PayrollWorker(
-                            $this->buildOnBehalfWorkerAttributes($contractWorker, $month, $year, $otEntry)
-                        );
-                        $payrollWorker->payroll_submission_id = $existingSubmission->id;
-                        $payrollWorker->calculateSalary(0);
-                        $payrollWorker->save();
-
-                        if ($otEntry && $otEntry->transactions) {
-                            foreach ($otEntry->transactions as $txn) {
-                                $payrollWorker->transactions()->create([
-                                    'type' => $txn->type,
-                                    'amount' => $txn->amount,
-                                    'remarks' => $txn->remarks,
-                                ]);
-                            }
-                        }
-
-                        $addedAmount += $payrollWorker->total_payment;
-                    }
-
-                    $newTotalWorkers = $existingSubmission->total_workers + $newContractWorkers->count();
+                    $newTotalWorkers = $openSubmission->total_workers + $workersToAdd->count();
                     $newServiceCharge = $newTotalWorkers * 200;
-                    $newSst = $newServiceCharge * 0.08;
 
                     $updateData = [
                         'total_workers' => $newTotalWorkers,
-                        'admin_final_amount' => ($existingSubmission->admin_final_amount ?? 0) + $addedAmount,
+                        'admin_final_amount' => ($openSubmission->admin_final_amount ?? 0) + $addedAmount,
                         'service_charge' => $newServiceCharge,
-                        'sst' => $newSst,
+                        'sst' => $newServiceCharge * 0.08,
                     ];
 
                     // Revert approved submissions back to the review queue so admin re-confirms the new amount
-                    if ($existingSubmission->status === 'approved') {
+                    if ($openSubmission->status === 'approved') {
                         $updateData['status'] = 'submitted';
                         $updateData['admin_reviewed_by'] = null;
                         $updateData['admin_reviewed_at'] = null;
                     }
 
-                    $existingSubmission->update($updateData);
+                    $openSubmission->update($updateData);
 
                     // Apply configured deduction templates to newly added workers
-                    app(PayrollService::class)->applyConfiguredDeductions($existingSubmission);
+                    app(PayrollService::class)->applyConfiguredDeductions($openSubmission);
+
+                    $resultMessage = "{$workersToAdd->count()} worker(s) added to submission #{$openSubmission->id}";
 
                     return;
                 }
 
-                // No existing submission — find or create the client user
+                // No open submission — find or create the client user
                 $user = User::where('contractor_clab_no', $clabNo)
                     ->where('role', 'client')
                     ->first();
@@ -520,7 +581,9 @@ class MissingSubmissions extends Component
                     ]);
                 }
 
-                // Create Submission: user_id = Client, submitted_by = Admin
+                // Create Submission: user_id = Client, submitted_by = Admin.
+                // When the period's earlier submission is locked for payment this
+                // is a second, separate submission for the same month.
                 $submission = PayrollSubmission::create([
                     'contractor_clab_no' => $clabNo,
                     'user_id' => $user->id,
@@ -532,49 +595,23 @@ class MissingSubmissions extends Component
                     'payment_deadline' => $targetDate->copy()->endOfMonth(),
                 ]);
 
-                $totalAmount = 0;
-                foreach ($activeContractWorkers as $contractWorker) {
-                    $worker = $contractWorker->worker;
-                    if (! $worker) {
-                        continue;
-                    }
-
-                    $otEntry = $otEntries->get($worker->wkr_id);
-                    $payrollWorker = new PayrollWorker(
-                        $this->buildOnBehalfWorkerAttributes($contractWorker, $month, $year, $otEntry)
-                    );
-                    $payrollWorker->payroll_submission_id = $submission->id;
-                    $payrollWorker->calculateSalary(0);
-                    $payrollWorker->save();
-
-                    if ($otEntry && $otEntry->transactions) {
-                        foreach ($otEntry->transactions as $txn) {
-                            $payrollWorker->transactions()->create([
-                                'type' => $txn->type,
-                                'amount' => $txn->amount,
-                                'remarks' => $txn->remarks,
-                            ]);
-                        }
-                    }
-
-                    $totalAmount += $payrollWorker->total_payment;
-                }
-
-                $serviceCharge = $activeContractWorkers->count() * 200;
-                $sst = $serviceCharge * 0.08;
+                $totalAmount = $this->addOnBehalfWorkers($submission, $workersToAdd, $otEntries, $month, $year);
+                $serviceCharge = $workersToAdd->count() * 200;
 
                 $submission->update([
-                    'total_workers' => $activeContractWorkers->count(),
+                    'total_workers' => $workersToAdd->count(),
                     'admin_final_amount' => $totalAmount,
                     'service_charge' => $serviceCharge,
-                    'sst' => $sst,
+                    'sst' => $serviceCharge * 0.08,
                 ]);
 
                 // Apply configured deduction templates to all workers
                 app(PayrollService::class)->applyConfiguredDeductions($submission);
+
+                $resultMessage = "Submission #{$submission->id} created with {$workersToAdd->count()} worker(s)";
             });
 
-            Flux::toast(variant: 'success', heading: 'Submission Updated', text: 'Payroll for '.\Carbon\Carbon::create($year, $month, 1)->format('F Y')." updated successfully on behalf of {$this->bulkSubmitContractor['name']}.");
+            Flux::toast(variant: 'success', heading: 'Submission Updated', text: \Carbon\Carbon::create($year, $month, 1)->format('F Y')." payroll on behalf of {$this->bulkSubmitContractor['name']}: {$resultMessage}.");
             $this->closeBulkSubmitModal();
             $this->loadMissingContractors();
         } catch (\Exception $e) {
@@ -851,7 +888,7 @@ class MissingSubmissions extends Component
             ->where('con_start', '<=', $periodEnd->toDateString())
             ->endsOnOrAfter($periodStart->toDateString())
             ->whereRaw($this->getActiveWorkerIds())
-            ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
+            ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds($month, $year))
             ->with('worker')
             ->get();
 
@@ -1021,14 +1058,29 @@ class MissingSubmissions extends Component
         return $this->activeWorkerSubquery;
     }
 
-    protected function getInactiveWorkerIds(): array
+    /**
+     * Worker IDs to leave out of a payroll period: manually deactivated workers
+     * plus workers with a payroll exception for that month (defaults to the
+     * selected period).
+     */
+    protected function getInactiveWorkerIds(?int $month = null, ?int $year = null): array
     {
-        static $ids = null;
-        if ($ids === null) {
-            $ids = \DB::table('inactive_workers')->pluck('worker_id')->all();
+        static $inactiveIds = null;
+        static $exceptedIds = [];
+
+        $month ??= (int) $this->selectedMonth;
+        $year ??= (int) $this->selectedYear;
+
+        if ($inactiveIds === null) {
+            $inactiveIds = \DB::table('inactive_workers')->pluck('worker_id')->all();
         }
 
-        return $ids;
+        $key = "{$year}-{$month}";
+        if (! isset($exceptedIds[$key])) {
+            $exceptedIds[$key] = \App\Models\PayrollException::getExceptedWorkerIds($month, $year);
+        }
+
+        return array_values(array_unique(array_merge($inactiveIds, $exceptedIds[$key])));
     }
 
     protected function loadMissingContractors()
@@ -1245,7 +1297,7 @@ class MissingSubmissions extends Component
                     ->where('con_start', '<=', $periodEnd->toDateString())
                     ->endsOnOrAfter($periodStart->toDateString())
                     ->whereRaw($this->getActiveWorkerIds())
-                    ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds())
+                    ->whereNotIn('con_wkr_id', $this->getInactiveWorkerIds($month, $year))
                     ->pluck('con_wkr_id');
 
                 if ($periodWorkerIds->isNotEmpty()) {

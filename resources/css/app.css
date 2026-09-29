@@ -46,15 +46,33 @@
         border-color: var(--color-gray-200, currentColor);
     }
 
-    /* Hide scrollbar for Chrome, Safari and Opera */
-    *::-webkit-scrollbar {
-        display: none;
+    /* Thin, visible scrollbars (horizontal and vertical) that follow light/dark mode */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-zinc-300) transparent;
     }
 
-    /* Hide scrollbar for IE, Edge and Firefox */
-    * {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
+    .dark * {
+        scrollbar-color: var(--color-zinc-600) transparent;
+    }
+
+    /* Fallback for older WebKit browsers without scrollbar-color support */
+    *::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background-color: var(--color-zinc-300);
+        border-radius: 9999px;
+    }
+
+    .dark *::-webkit-scrollbar-thumb {
+        background-color: var(--color-zinc-600);
     }
 }
 

@@ -83,8 +83,8 @@
         <!-- Filters and Search -->
         @if($showFilters)
         <div class="mb-6" x-data x-transition>
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-                <div>
+            <div class="flex flex-wrap items-center gap-4">
+                <div class="w-full sm:w-64">
                     <flux:input
                         wire:model.live="search"
                         placeholder="Search by ID or contractor..."
@@ -92,15 +92,23 @@
                         size="sm"
                     />
                 </div>
-                <div>
+                <div class="w-full sm:w-44">
+                    <flux:select wire:model.live="picFilter" variant="listbox" searchable placeholder="Filter by PIC" size="sm">
+                        <flux:select.option value="">All PIC</flux:select.option>
+                        @foreach($pics as $picId => $picName)
+                            <flux:select.option value="{{ $picId }}">{{ $picName }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+                <div class="w-full sm:w-56">
                     <flux:select wire:model.live="contractor" variant="listbox" searchable placeholder="Filter by Contractor" size="sm">
                         <flux:select.option value="">All Contractors</flux:select.option>
-                        @foreach($contractors as $clabNo => $name)
+                        @foreach($contractorOptions as $clabNo => $name)
                             <flux:select.option value="{{ $clabNo }}">{{ $name }}</flux:select.option>
                         @endforeach
                     </flux:select>
                 </div>
-                <div>
+                <div class="w-full sm:w-32">
                     <flux:select wire:model.live="yearFilter" variant="listbox" placeholder="Filter by Year" size="sm">
                         <flux:select.option value="">All Years</flux:select.option>
                         @for($y = now()->year; $y >= 2024; $y--)
@@ -108,7 +116,7 @@
                         @endfor
                     </flux:select>
                 </div>
-                <div>
+                <div class="w-full sm:w-36">
                     <flux:select wire:model.live="monthFilter" variant="listbox" placeholder="Filter by Month" size="sm">
                         <flux:select.option value="">All Months</flux:select.option>
                         @foreach(range(1, 12) as $m)
@@ -116,7 +124,7 @@
                         @endforeach
                     </flux:select>
                 </div>
-                <div>
+                <div class="w-full sm:w-44">
                     <flux:select wire:model.live="statusFilter" variant="listbox" placeholder="Filter by Status" size="sm">
                         <flux:select.option value="">All Statuses</flux:select.option>
                         <flux:select.option value="submitted">Submitted</flux:select.option>
@@ -125,7 +133,7 @@
                         <flux:select.option value="paid">Paid</flux:select.option>                        
                     </flux:select>
                 </div>
-                <div>
+                <div class="w-full sm:w-44">
                     <flux:select wire:model.live="payslipFilter" variant="listbox" placeholder="Filter by Pay Slip" size="sm">
                         <flux:select.option value="">All Pay Slips</flux:select.option>
                         <flux:select.option value="yes">Uploaded</flux:select.option>

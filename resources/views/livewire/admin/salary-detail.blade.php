@@ -507,6 +507,9 @@
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Passport</span>
                     </flux:table.column>
                     <flux:table.column>
+                        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">Country</span>
+                    </flux:table.column>
+                    <flux:table.column>
                         <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">SOCSO No.</span>
                     </flux:table.column>
                     <flux:table.column>
@@ -544,6 +547,10 @@
 
                             <flux:table.cell variant="strong">
                                 {{ $worker->worker_passport }}
+                            </flux:table.cell>
+
+                            <flux:table.cell variant="strong">
+                                {{ $worker->worker?->country?->cty_desc ?? ($worker->worker?->wkr_country ?: '-') }}
                             </flux:table.cell>
 
                             <flux:table.cell variant="strong">
@@ -635,7 +642,7 @@
 
                     <!-- Summary Row -->
                     <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 hidden">
-                        <flux:table.cell colspan="7" variant="strong" class="font-bold">
+                        <flux:table.cell colspan="8" variant="strong" class="font-bold">
                             <span class="flex justify-center">TOTALS (Reference Only)</span>
                         </flux:table.cell>
                         <!-- Weekday OT Total -->

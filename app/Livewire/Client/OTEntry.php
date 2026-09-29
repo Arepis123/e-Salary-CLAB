@@ -241,6 +241,22 @@ class OTEntry extends Component
      * loadEntries(), so a cached count would go stale and the form panel would
      * not react to what was just keyed in.
      */
+    /**
+     * Workers the admin has paused from this submission month's payroll
+     * (Payroll Exception). They are hidden from the OT table, so list them.
+     */
+    public function getExceptedWorkersProperty(): \Illuminate\Support\Collection
+    {
+        $clabNo = auth()->user()->contractor_clab_no;
+        $period = $this->otEntryService->getEntryPeriod();
+
+        return \App\Models\PayrollException::where('contractor_clab_no', $clabNo)
+            ->where('month', $period['submission_month'])
+            ->where('year', $period['submission_year'])
+            ->orderBy('worker_name')
+            ->get(['worker_id', 'worker_name', 'worker_passport']);
+    }
+
     public function getDeductionWorkersCountProperty(): int
     {
         return $this->deductionFormService->countWorkersWithDeductions($this->entries);

@@ -243,7 +243,11 @@ class Timesheet extends Component
         }
 
         // Exclude workers manually deactivated by admin
-        $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+        $manuallyInactiveIds = array_merge(
+            \App\Models\InactiveWorker::getInactiveWorkerIds(),
+            // Workers paused from this payroll month by admin (Payroll Exception)
+            \App\Models\PayrollException::getExceptedWorkerIds($currentMonth, $currentYear, $clabNo)
+        );
         $activeWorkers = $activeWorkers->filter(fn ($worker) => ! in_array($worker->wkr_id, $manuallyInactiveIds))->values();
 
         // Get ALL submissions for this month to find all submitted workers
@@ -1214,6 +1218,23 @@ class Timesheet extends Component
             // If both have same status, sort by name alphabetically
             return strcmp($a['name'], $b['name']);
         });
+    }
+
+    /**
+     * Workers the admin has paused from this payroll month (Payroll Exception).
+     * They are left out of the timesheet, so list them for the client.
+     */
+    public function getExceptedWorkersProperty(): \Illuminate\Support\Collection
+    {
+        if (! isset($this->period['month'], $this->period['year'])) {
+            return collect();
+        }
+
+        return \App\Models\PayrollException::where('contractor_clab_no', auth()->user()->contractor_clab_no)
+            ->where('month', $this->period['month'])
+            ->where('year', $this->period['year'])
+            ->orderBy('worker_name')
+            ->get(['worker_id', 'worker_name', 'worker_passport']);
     }
 
     public function render()

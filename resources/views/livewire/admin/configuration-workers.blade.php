@@ -7,7 +7,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Workers</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $workerStats['total'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $workerStats['total'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-3">
                     <flux:icon.users class="size-6 text-blue-600 dark:text-blue-400" />
@@ -19,7 +19,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Active Workers</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ $workerStats['active'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $workerStats['active'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
                     <flux:icon.check-circle class="size-6 text-green-600 dark:text-green-400" />
@@ -31,7 +31,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Inactive Workers</p>
-                    <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ $workerStats['inactive'] ?? 0 }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{{ $workerStats['inactive'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-full bg-red-100 dark:bg-red-900/30 p-3">
                     <flux:icon.x-circle class="size-6 text-red-600 dark:text-red-400" />
@@ -43,7 +43,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Average Salary</p>
-                    <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">RM {{ number_format($stats['avg_salary'] ?? 0, 2) }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['avg_salary'] ?? 0, 2) }}</p>
                 </div>
                 <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3">
                     <flux:icon.currency-dollar class="size-6 text-orange-600 dark:text-orange-400" />
@@ -55,7 +55,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Total Salary Cost</p>
-                    <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">RM {{ number_format($stats['total_salary_cost'] ?? 0, 2) }}</p>
+                    <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100">RM {{ number_format($stats['total_salary_cost'] ?? 0, 2) }}</p>
                 </div>
                 <div class="rounded-full bg-purple-100 dark:bg-purple-900/30 p-3">
                     <flux:icon.banknotes class="size-6 text-purple-600 dark:text-purple-400" />
@@ -190,6 +190,15 @@
                                     <flux:badge color="red" size="sm">Inactive</flux:badge>
                                 @else
                                     <flux:badge color="green" size="sm">Active</flux:badge>
+                                    @if(!empty($worker['exception_conflicts']))
+                                        <flux:tooltip content="Excluded from payroll: {{ implode(', ', $worker['exception_months']) }} — but client has OT / transactions for {{ implode(', ', $worker['exception_conflicts']) }}">
+                                            <flux:badge color="red" size="sm" icon="exclamation-triangle" class="mt-1">Exception</flux:badge>
+                                        </flux:tooltip>
+                                    @elseif(!empty($worker['exception_months']))
+                                        <flux:tooltip content="Excluded from payroll: {{ implode(', ', $worker['exception_months']) }}">
+                                            <flux:badge color="amber" size="sm" icon="pause-circle" class="mt-1">Exception</flux:badge>
+                                        </flux:tooltip>
+                                    @endif
                                 @endif
                             </flux:table.cell>
 
@@ -205,6 +214,15 @@
                                             >
                                                 Edit Salary
                                             </flux:menu.item>
+
+                                            @unless($worker['is_inactive'])
+                                                <flux:menu.item
+                                                    icon="pause-circle"
+                                                    wire:click="openPayrollExceptionModal('{{ $worker['id'] }}', '{{ addslashes($worker['name']) }}', '{{ $worker['passport'] }}', '{{ $worker['contractor_clab'] }}')"
+                                                >
+                                                    Payroll Exception
+                                                </flux:menu.item>
+                                            @endunless
 
                                             <flux:menu.separator />
 
@@ -449,6 +467,92 @@
         <flux:button variant="ghost" wire:click="skipRemoveFromPayroll">No, Keep in Payroll</flux:button>
         <flux:button variant="danger" wire:click="confirmRemoveFromPayroll">
             Yes, Remove from Payroll
+        </flux:button>
+    </div>
+</flux:modal>
+
+<!-- Payroll Exception Modal -->
+<flux:modal name="payroll-exception" class="md:w-[28rem] space-y-6" wire:model="showPayrollExceptionModal" @close="closePayrollExceptionModal">
+    <div>
+        <flux:heading size="lg">Payroll Exception</flux:heading>
+        <flux:subheading>{{ $exceptionWorker['name'] ?? '' }} &middot; {{ $exceptionWorker['passport'] ?? '' }}</flux:subheading>
+    </div>
+
+    <div class="rounded-lg bg-amber-50 dark:bg-amber-950 p-4 border border-amber-200 dark:border-amber-800">
+        <div class="flex gap-3">
+            <flux:icon.information-circle class="size-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div class="text-sm text-amber-900 dark:text-amber-100">
+                The worker stays active but is excluded from payroll submissions and OT / transaction entry
+                for the selected months. They return to payroll automatically afterwards.
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="flex items-center justify-between mb-2">
+            <flux:label>Payroll Months</flux:label>
+            <span class="text-xs text-zinc-500">{{ count($exceptionMonths) }} / {{ \App\Models\PayrollException::MAX_MONTHS }} selected</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+            @foreach($this->getExceptionMonthOptions() as $key => $label)
+                @php
+                    $isSelected = in_array($key, $exceptionMonths);
+                    $isConflict = in_array($key, $exceptionConflictMonths);
+                    $isBlocked = !$isSelected && !$isConflict && in_array($key, $exceptionBlockedMonths);
+                @endphp
+                <button
+                    type="button"
+                    wire:click="toggleExceptionMonth('{{ $key }}')"
+                    wire:key="exception-month-{{ $key }}"
+                    @disabled($isBlocked)
+                    @if($isBlocked) title="Client already entered OT / transactions for this payroll month" @endif
+                    @if($isConflict) title="Excepted, but client has OT / transactions for this payroll month" @endif
+                    @class([
+                        'rounded-lg border px-3 py-2 text-sm font-medium transition',
+                        'border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100' => $isSelected && !$isConflict,
+                        'border-red-500 bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200' => $isSelected && $isConflict,
+                        'border-dashed border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950' => !$isSelected && $isConflict,
+                        'cursor-not-allowed border-dashed border-zinc-200 text-zinc-400 line-through dark:border-zinc-700 dark:text-zinc-600' => $isBlocked,
+                        'border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800' => !$isSelected && !$isBlocked && !$isConflict,
+                    ])
+                >
+                    @if($isConflict)
+                        <flux:icon.exclamation-triangle variant="micro" class="inline size-4 -mt-0.5" />
+                    @endif
+                    {{ $label }}
+                </button>
+            @endforeach
+        </div>
+        <flux:error name="exceptionMonths" />
+        @if(!empty(array_diff($exceptionBlockedMonths, $exceptionMonths, $exceptionConflictMonths)))
+            <p class="mt-2 text-xs text-zinc-500">Crossed-out months can't be selected because the client already entered OT or transactions for them.</p>
+        @endif
+    </div>
+
+    @if(!empty($exceptionConflictMonths))
+        <div class="rounded-lg bg-red-50 dark:bg-red-950 p-4 border border-red-200 dark:border-red-800">
+            <div class="flex gap-3">
+                <flux:icon.exclamation-triangle class="size-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div class="text-sm text-red-900 dark:text-red-100">
+                    <strong>OT / transactions found in excepted {{ count($exceptionConflictMonths) > 1 ? 'months' : 'month' }}:</strong>
+                    {{ collect($exceptionConflictMonths)->map(fn ($k) => $this->getExceptionMonthOptions()[$k] ?? $k)->join(', ') }}
+                    <p class="mt-1">The client entered OT or transactions for this worker even though they are excluded from that payroll. These amounts will not be paid while the exception stays. Untick the month to include the worker (and their OT) in payroll, or ask the client to clear the entries.</p>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <flux:textarea
+        wire:model="exceptionRemarks"
+        label="Remarks"
+        rows="3"
+        placeholder="e.g. Worker on home leave, returning in December"
+    />
+
+    <div class="flex gap-2 justify-end">
+        <flux:button variant="ghost" wire:click="closePayrollExceptionModal">Cancel</flux:button>
+        <flux:button variant="primary" wire:click="savePayrollException">
+            Save Exception
         </flux:button>
     </div>
 </flux:modal>

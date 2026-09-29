@@ -420,7 +420,7 @@ class SalaryDetail extends Component
         // fact, silently removing their salary from the client breakdown of an
         // already-approved month.
         $this->workers = $this->submission->workers()
-            ->with(['worker', 'transactions.nplDetails'])
+            ->with(['worker.country', 'transactions.nplDetails'])
             ->get();
     }
 

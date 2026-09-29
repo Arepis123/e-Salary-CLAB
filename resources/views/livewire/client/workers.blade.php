@@ -259,6 +259,11 @@
                             <flux:table.cell>
                                 @if($worker->contract_info && $worker->contract_info->isActive() && !in_array($worker->wkr_id, $manuallyInactiveIds))
                                     <flux:badge color="green" size="sm" inset="top bottom">Active</flux:badge>
+                                    @if(!empty($exceptionMonthsByWorker[$worker->wkr_id]))
+                                        <flux:tooltip content="Excluded from payroll: {{ implode(', ', $exceptionMonthsByWorker[$worker->wkr_id]) }}">
+                                            <flux:badge color="amber" size="sm" inset="top bottom" icon="pause-circle">Exception</flux:badge>
+                                        </flux:tooltip>
+                                    @endif
                                 @else
                                     <flux:badge color="zinc" size="sm" inset="top bottom">Inactive</flux:badge>
                                 @endif

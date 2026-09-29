@@ -122,7 +122,11 @@ class OTEntryService
         $period = $this->getEntryPeriod();
 
         // Get IDs of currently active workers for this contractor
-        $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
+        $manuallyInactiveIds = array_merge(
+            \App\Models\InactiveWorker::getInactiveWorkerIds(),
+            // OT entered now is paid in this submission month, so skip workers paused from it
+            \App\Models\PayrollException::getExceptedWorkerIds($period['submission_month'], $period['submission_year'])
+        );
 
         $activeWorkerIds = \App\Models\ContractWorker::where('con_ctr_clab_no', $clabNo)
             ->active()
@@ -225,6 +229,10 @@ class OTEntryService
         // Use contractor-specific window check
         if (! $this->isContractorWindowOpen($clabNo)) {
             throw new \Exception('OT entry window is closed for your contractor. Please contact administrator.');
+        }
+
+        if (\App\Models\PayrollException::isExcepted((string) $data['worker_id'], $period['submission_month'], $period['submission_year'])) {
+            throw new \Exception("{$data['worker_name']} is excluded from the {$period['submission_month_name']} payroll by administrator. OT cannot be entered.");
         }
 
         // Find or create entry

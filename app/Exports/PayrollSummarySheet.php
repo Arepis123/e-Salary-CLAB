@@ -51,6 +51,9 @@ class PayrollSummarySheet implements FromCollection, WithColumnWidths, WithStyle
         if (! empty($this->filters['contractor'])) {
             $filterInfo[] = 'Contractor: '.$this->filters['contractor'];
         }
+        if (! empty($this->filters['pic'])) {
+            $filterInfo[] = 'PIC: '.$this->filters['pic'];
+        }
         if (! empty($this->filters['status'])) {
             $filterInfo[] = 'Status: '.ucfirst($this->filters['status']);
         }

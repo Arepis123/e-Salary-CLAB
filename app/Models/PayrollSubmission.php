@@ -22,6 +22,7 @@ class PayrollSubmission extends Model
         'total_with_penalty',
         'total_workers',
         'submitted_at',
+        'submitted_by',
         'paid_at',
         'tax_invoice_number',
         'tax_invoice_generated_at',
@@ -61,6 +62,15 @@ class PayrollSubmission extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'contractor_clab_no', 'contractor_clab_no');
+    }
+
+    /**
+     * Get the admin who submitted this on the contractor's behalf (null for
+     * client or auto-submitted payrolls)
+     */
+    public function submittedBy()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
     }
 
     /**
