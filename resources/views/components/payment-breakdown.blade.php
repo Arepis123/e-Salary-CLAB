@@ -138,13 +138,15 @@
                     </div>
                 @endif
 
+                {{-- Source/reconciliation notes and the withheld memo are for
+                     admins only; the client sees just the billed figures. --}}
+                @if($internal)
                 @if($file)
                     {{-- Where the figures came from, and how they compare with the
-                         submitted timesheet. The contractor is entitled to both:
-                         they can download the same file from their invoice. --}}
+                         submitted timesheet. --}}
                     <p class="mt-1 border-t border-zinc-200 pt-1.5 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                         From {{ $submission->breakdown_file_name ?: 'the approved breakdown file' }}.
-                        {{ $internal ? 'Contractor submitted' : 'Your submitted figures totalled' }}
+                        Contractor submitted
                         {{ $fmt($b['computed_payroll']) }}@if(round($submittedVariance, 2) != 0.00) ({{ $submittedVariance < 0 ? '−' : '+' }}{{ $fmt(abs($submittedVariance)) }} difference)@endif.
                         @if(($file['backpay'] ?? 0) > 0)
                             Backpay {{ $fmt($file['backpay']) }} excluded by design.
@@ -179,7 +181,7 @@
                                 <span>SKBBK (worker)</span>
                                 <span class="shrink-0 tabular-nums">({{ $fmt($skbbk) }})</span>
                             </div>
-                        @elseif($internal && $file)
+                        @elseif($file)
                             <div class="flex items-start justify-between gap-3 py-0.5 text-zinc-400 dark:text-zinc-500">
                                 <span>SKBBK (worker)</span>
                                 <span class="shrink-0 tabular-nums">not in this breakdown file</span>
@@ -194,6 +196,7 @@
                         <p class="mt-1">Deducted from the workers&rsquo; salary &mdash; already inside the gross above.</p>
                     </div>
                 </div>
+                @endif
             </div>
             @endunless
 
