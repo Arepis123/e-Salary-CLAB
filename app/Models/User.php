@@ -34,6 +34,7 @@ class User extends Authenticatable
         'email',
         'phone',
         'person_in_charge',
+        'pic_acronym',
         'password',
         'role',
         'is_active',

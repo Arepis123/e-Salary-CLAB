@@ -280,7 +280,19 @@ class Salary extends Component
 
     protected function getSubmissionsQuery()
     {
-        $query = PayrollSubmission::with(['user', 'payment'])->withCount('workers');
+        // select() must come before withCount(), or it wipes workers_count
+        $query = PayrollSubmission::select('payroll_submissions.*')
+            ->with(['user', 'payment'])
+            ->withCount('workers')
+            // Acronym of the admin managing this contractor (one PIC per contractor)
+            ->selectSub(
+                \App\Models\UserContractorAssignment::query()
+                    ->join('users', 'users.id', '=', 'user_contractor_assignments.user_id')
+                    ->whereColumn('user_contractor_assignments.contractor_clab_no', 'payroll_submissions.contractor_clab_no')
+                    ->select('users.pic_acronym')
+                    ->limit(1),
+                'pic_acronym'
+            );
 
         // Apply search filter
         if ($this->search) {
@@ -331,7 +343,11 @@ class Salary extends Component
         // then the chosen column sort applies within each group.
         $query->orderByRaw("CASE WHEN status IN ('approved', 'pending_payment') THEN 0 ELSE 1 END");
 
-        // Apply sorting
+        // Apply sorting (contractors without a PIC acronym go last)
+        if ($this->sortBy === 'pic_acronym') {
+            $query->orderByRaw('pic_acronym IS NULL');
+        }
+
         $query->orderBy($this->sortBy, $this->sortDirection);
 
         return $query;

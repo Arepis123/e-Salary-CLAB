@@ -86,6 +86,15 @@ class Configuration extends Component
     /** contractor_clab_no => name of the PIC already managing it (excluding the one being edited) */
     public $picTakenClabs = [];
 
+    // PIC acronym (short tag shown on the salary list)
+    public $showPicAcronymModal = false;
+
+    public $acronymUserId = null;
+
+    public $acronymUserName = '';
+
+    public $picAcronym = '';
+
     // Contractor configuration properties
     public $contractorConfigs = [];
 
@@ -809,6 +818,74 @@ class Configuration extends Component
     }
 
     /**
+     * Open the acronym editor for one admin / super admin.
+     */
+    public function openPicAcronymModal(int $userId)
+    {
+        $user = \App\Models\User::personsInCharge()->find($userId);
+
+        if (! $user) {
+            Flux::toast(variant: 'danger', text: 'User not found.');
+
+            return;
+        }
+
+        $this->acronymUserId = $user->id;
+        $this->acronymUserName = $user->name;
+        $this->picAcronym = (string) $user->pic_acronym;
+        $this->resetValidation('picAcronym');
+        $this->showPicAcronymModal = true;
+    }
+
+    public function closePicAcronymModal()
+    {
+        $this->showPicAcronymModal = false;
+        $this->acronymUserId = null;
+        $this->acronymUserName = '';
+        $this->picAcronym = '';
+        $this->resetValidation('picAcronym');
+    }
+
+    /**
+     * Save the acronym (1-3 letters, unique). Blank clears it.
+     */
+    public function savePicAcronym()
+    {
+        $user = \App\Models\User::personsInCharge()->find($this->acronymUserId);
+
+        if (! $user) {
+            $this->closePicAcronymModal();
+
+            return;
+        }
+
+        $this->picAcronym = strtoupper(trim($this->picAcronym));
+
+        $this->validate([
+            'picAcronym' => [
+                'nullable',
+                'regex:/^[A-Z]{1,3}$/',
+                \Illuminate\Validation\Rule::unique('users', 'pic_acronym')->ignore($user->id),
+            ],
+        ], [
+            'picAcronym.regex' => 'Use 1 to 3 letters only.',
+            'picAcronym.unique' => 'This acronym is already used by another admin.',
+        ]);
+
+        $user->update(['pic_acronym' => $this->picAcronym !== '' ? $this->picAcronym : null]);
+
+        Flux::toast(
+            variant: 'success',
+            heading: 'Acronym Saved',
+            text: $this->picAcronym !== ''
+                ? $user->name.' is now shown as '.$this->picAcronym.'.'
+                : 'Acronym removed for '.$user->name.'.'
+        );
+
+        $this->closePicAcronymModal();
+    }
+
+    /**
      * Admin / super admin rows for the PIC tab, with their assigned contractors.
      */
     protected function getPicData(): array
@@ -838,6 +915,7 @@ class Configuration extends Component
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'acronym' => $user->pic_acronym,
                     'role' => $user->role,
                     'is_active' => (bool) $user->is_active,
                     'assigned_count' => $clabs->count(),

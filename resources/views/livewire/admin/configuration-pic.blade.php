@@ -91,6 +91,7 @@
             <flux:table>
                 <flux:table.columns>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">User</span></flux:table.column>
+                    <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Acronym</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Role</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Status</span></flux:table.column>
                     <flux:table.column><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Managed Contractors</span></flux:table.column>
@@ -108,6 +109,14 @@
                                         <p class="text-xs text-zinc-600 dark:text-zinc-400">{{ $picUser['email'] }}</p>
                                     </div>
                                 </div>
+                            </flux:table.cell>
+
+                            <flux:table.cell>
+                                @if($picUser['acronym'])
+                                    <flux:badge color="zinc" size="sm">{{ $picUser['acronym'] }}</flux:badge>
+                                @else
+                                    <span class="text-zinc-400 dark:text-zinc-500">-</span>
+                                @endif
                             </flux:table.cell>
 
                             <flux:table.cell>
@@ -149,6 +158,12 @@
                                             >
                                                 Assign Contractors
                                             </flux:menu.item>
+                                            <flux:menu.item
+                                                icon="tag"
+                                                wire:click="openPicAcronymModal({{ $picUser['id'] }})"
+                                            >
+                                                Set Acronym
+                                            </flux:menu.item>
                                         </flux:menu>
                                     </flux:dropdown>
                                 </div>
@@ -156,7 +171,7 @@
                         </flux:table.row>
                     @empty
                         <flux:table.row>
-                            <flux:table.cell colspan="5">
+                            <flux:table.cell colspan="6">
                                 <div class="py-12 text-center">
                                     <flux:icon.user-group class="mx-auto size-7 text-zinc-400 dark:text-zinc-600 mb-2" />
                                      <flux:heading>Not Found</flux:heading>
@@ -257,4 +272,31 @@
             Save Assignments
         </flux:button>
     </div>
+</flux:modal>
+
+<!-- Set Acronym Modal -->
+<flux:modal name="pic-acronym" class="md:w-md space-y-6" wire:model="showPicAcronymModal">
+    <div>
+        <flux:heading size="lg">Set Acronym</flux:heading>
+        <flux:subheading>
+            A short tag for <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $acronymUserName }}</span>,
+            shown in the PIC column on the salary list.
+        </flux:subheading>
+    </div>
+
+    <form wire:submit="savePicAcronym" class="space-y-6">
+        <flux:input
+            wire:model="picAcronym"
+            label="Acronym"
+            placeholder="e.g. HAF"
+            maxlength="3"
+            class:input="uppercase"
+            description="1 to 3 letters. Leave blank to remove."
+        />
+
+        <div class="flex gap-2 justify-end">
+            <flux:button variant="ghost" wire:click="closePicAcronymModal">Cancel</flux:button>
+            <flux:button type="submit" variant="primary">Save</flux:button>
+        </div>
+    </form>
 </flux:modal>

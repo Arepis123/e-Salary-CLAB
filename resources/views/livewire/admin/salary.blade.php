@@ -157,6 +157,7 @@
                         <flux:table.column>No</flux:table.column>
                         <flux:table.column>Submission ID</flux:table.column>
                         <flux:table.column>Contractor</flux:table.column>
+                        <flux:table.column>PIC</flux:table.column>
                         <flux:table.column>Workers</flux:table.column>
                         <flux:table.column>Period</flux:table.column>
                         <flux:table.column>Grand Total</flux:table.column>
@@ -180,6 +181,7 @@
                                 <flux:table.cell><flux:skeleton.line /></flux:table.cell>
                                 <flux:table.cell><flux:skeleton.line /></flux:table.cell>
                                 <flux:table.cell><flux:skeleton.line /></flux:table.cell>
+                                <flux:table.cell><flux:skeleton.line /></flux:table.cell>
                             </flux:table.row>
                         @endfor
                     </flux:table.rows>
@@ -191,6 +193,7 @@
                 <flux:table.column align="center"><span class="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">No</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'id'" :direction="$sortDirection" wire:click="sortByColumn('id')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Submission ID</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'contractor_clab_no'" :direction="$sortDirection" wire:click="sortByColumn('contractor_clab_no')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Contractor</span></flux:table.column>
+                <flux:table.column align="center" sortable :sorted="$sortBy === 'pic_acronym'" :direction="$sortDirection" wire:click="sortByColumn('pic_acronym')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">PIC</span></flux:table.column>
                 <flux:table.column align="center" sortable :sorted="$sortBy === 'total_workers'" :direction="$sortDirection" wire:click="sortByColumn('total_workers')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Workers</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'month'" :direction="$sortDirection" wire:click="sortByColumn('month')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Period</span></flux:table.column>
                 <flux:table.column sortable :sorted="$sortBy === 'grand_total'" :direction="$sortDirection" wire:click="sortByColumn('grand_total')"><span class="text-left text-xs font-medium text-zinc-600 dark:text-zinc-400">Grand Total</span></flux:table.column>
@@ -212,6 +215,14 @@
 
                         <flux:table.cell variant="strong" class="max-w-xs truncate">
                             {{ $submission->user ? $submission->user->name : 'Client ' . $submission->contractor_clab_no }}
+                        </flux:table.cell>
+
+                        <flux:table.cell align="center">
+                            @if($submission->pic_acronym)
+                                <flux:badge color="zinc" size="sm">{{ $submission->pic_acronym }}</flux:badge>
+                            @else
+                                <span class="text-zinc-400 dark:text-zinc-500"></span>
+                            @endif
                         </flux:table.cell>
 
                         <flux:table.cell variant="strong" align="center">
@@ -287,7 +298,7 @@
                     </flux:table.rows>
                 @empty
                     <flux:table.rows>
-                        <flux:table.cell variant="strong" colspan="10" class="text-center">
+                        <flux:table.cell variant="strong" colspan="12" class="text-center">
                             @if($search || $contractor || $statusFilter || $payslipFilter)
                                 No submissions found matching your filters.
                             @else
