@@ -922,6 +922,9 @@ class Report extends Component
                 $accommodation = 0;
                 $medicalClaim = 0;
 
+                // Use PayrollWorker data if submitted, otherwise Worker data
+                $salary = $payrollWorker ? $payrollWorker->basic_salary : $worker->wkr_salary;
+
                 if ($otEntry) {
                     foreach ($otEntry->transactions as $transaction) {
                         if ($transaction->type === 'allowance') {
@@ -976,8 +979,6 @@ class Report extends Component
                     }
                 }
 
-                // Use PayrollWorker data if submitted, otherwise Worker data
-                $salary = $payrollWorker ? $payrollWorker->basic_salary : $worker->wkr_salary;
                 $otNormal = $payrollWorker ? $payrollWorker->ot_normal_hours : ($otEntry ? $otEntry->ot_normal_hours : 0);
                 $otRest = $payrollWorker ? $payrollWorker->ot_rest_hours : ($otEntry ? $otEntry->ot_rest_hours : 0);
                 $otPublic = $payrollWorker ? $payrollWorker->ot_public_hours : ($otEntry ? $otEntry->ot_public_hours : 0);
