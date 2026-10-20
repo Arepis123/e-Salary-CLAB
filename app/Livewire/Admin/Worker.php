@@ -224,11 +224,21 @@ class Worker extends Component
         // Get the contracted workers
         $contractWorkers = $query->get();
 
+        // Collapse each worker's contract history: keep only their active contract(s),
+        // or the most recent one if none are active, so past clients don't show as duplicates
+        $contractWorkers = $contractWorkers->groupBy('con_wkr_id')->flatMap(function ($contracts) {
+            $active = $contracts->filter(fn ($contract) => $contract->isActive());
+
+            return $active->isNotEmpty()
+                ? $active
+                : $contracts->sortByDesc(fn ($contract) => $contract->effective_end?->timestamp ?? 0)->take(1);
+        })->values();
+
         // Pre-fetch manually deactivated worker IDs to factor into status
         $manuallyInactiveIds = \App\Models\InactiveWorker::getInactiveWorkerIds();
 
-        // Transform the data — one row per contract (no unique filter)
-        // This correctly shows a worker multiple times if they have overlapping contracts
+        // Transform the data — one row per remaining contract
+        // A worker still appears more than once only if they have overlapping active contracts
         $transformedWorkers = $contractWorkers->map(function ($contractWorker) use ($manuallyInactiveIds) {
             $worker = $contractWorker->worker;
             $contractor = $contractWorker->contractor;
