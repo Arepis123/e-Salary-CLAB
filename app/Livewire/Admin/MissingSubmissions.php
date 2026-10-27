@@ -10,6 +10,7 @@ use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
+use App\Services\NplCalculatorService;
 use App\Services\PayrollService;
 use App\Services\SalaryProratingService;
 use App\Services\TimesheetDriftService;
@@ -468,12 +469,17 @@ class MissingSubmissions extends Component
             $payrollWorker->save();
 
             if ($otEntry && $otEntry->transactions) {
+                $npl = app(NplCalculatorService::class);
+
                 foreach ($otEntry->transactions as $txn) {
-                    $payrollWorker->transactions()->create([
+                    $payrollTxn = $payrollWorker->transactions()->create([
                         'type' => $txn->type,
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
                     ]);
+
+                    // Carry the per-month NPL breakdown into payroll.
+                    $npl->syncDetails($payrollTxn, $npl->detailRows($txn));
                 }
             }
 
@@ -520,7 +526,7 @@ class MissingSubmissions extends Component
                     $otEntryMonth = 12;
                     $otEntryYear--;
                 }
-                $otEntries = MonthlyOTEntry::with('transactions')
+                $otEntries = MonthlyOTEntry::with('transactions.nplDetails')
                     ->where('contractor_clab_no', $clabNo)
                     ->where('entry_month', $otEntryMonth)
                     ->where('entry_year', $otEntryYear)

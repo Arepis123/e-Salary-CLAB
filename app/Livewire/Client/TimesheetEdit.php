@@ -5,6 +5,7 @@ namespace App\Livewire\Client;
 use App\Models\MonthlyOTEntry;
 use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
+use App\Services\NplCalculatorService;
 use App\Services\PayrollService;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -87,7 +88,7 @@ class TimesheetEdit extends Component
         }
 
         // Load the draft submission with transactions
-        $submission = PayrollSubmission::with('workers.transactions')
+        $submission = PayrollSubmission::with('workers.transactions.nplDetails')
             ->where('id', $this->submissionId)
             ->where('contractor_clab_no', $clabNo)
             ->where('status', 'draft')
@@ -122,7 +123,7 @@ class TimesheetEdit extends Component
         $isAfterOTWindow = $today->day > 15;
 
         // Check if there are submitted OT entries for this period
-        $monthlyOTEntries = MonthlyOTEntry::with('transactions')
+        $monthlyOTEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('contractor_clab_no', $clabNo)
             ->where('entry_month', $otEntryMonth)
             ->where('entry_year', $otEntryYear)
@@ -201,6 +202,8 @@ class TimesheetEdit extends Component
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
                         'locked' => true, // Flag to make read-only
+                        // Carry the per-month NPL breakdown into payroll.
+                        'npl_details' => app(NplCalculatorService::class)->detailRows($txn),
                     ];
                 })->toArray();
             } elseif ($isAfterOTWindow) {
@@ -214,6 +217,7 @@ class TimesheetEdit extends Component
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
                         'locked' => false,
+                        'npl_details' => app(NplCalculatorService::class)->detailRows($txn),
                     ];
                 })->toArray();
             }
@@ -576,7 +580,7 @@ class TimesheetEdit extends Component
 
             // Delete existing workers and transactions
             foreach ($submission->workers as $worker) {
-                $worker->transactions()->delete();
+                app(NplCalculatorService::class)->deleteTransactionsWithDetails($worker->transactions());
             }
             $submission->workers()->delete();
 
@@ -610,11 +614,14 @@ class TimesheetEdit extends Component
                 // Locked transactions from monthly entries are copied here for the payroll record
                 if (isset($workerData['transactions']) && is_array($workerData['transactions'])) {
                     foreach ($workerData['transactions'] as $transaction) {
-                        $payrollWorker->transactions()->create([
+                        $payrollTransaction = $payrollWorker->transactions()->create([
                             'type' => $transaction['type'],
                             'amount' => $transaction['amount'],
                             'remarks' => $transaction['remarks'],
                         ]);
+
+                        app(NplCalculatorService::class)
+                            ->syncDetails($payrollTransaction, $transaction['npl_details'] ?? []);
                     }
                 }
 

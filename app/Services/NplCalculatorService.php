@@ -169,6 +169,29 @@ class NplCalculatorService
     }
 
     /**
+     * A transaction's per-month breakdown in the shape syncDetails() accepts,
+     * so it can be carried across when the transaction is copied (OT entry →
+     * payroll, or one payroll record → another). Non-NPL transactions and
+     * legacy NPL without a breakdown yield no rows.
+     */
+    public function detailRows($transaction): array
+    {
+        if ($transaction->type !== 'npl') {
+            return [];
+        }
+
+        return $transaction->nplDetails->map(fn ($detail) => [
+            'npl_year' => $detail->npl_year,
+            'npl_month' => $detail->npl_month,
+            'days_in_month' => $detail->days_in_month,
+            'npl_days' => (float) $detail->npl_days,
+            'monthly_salary' => (float) $detail->monthly_salary,
+            'daily_rate' => (float) $detail->daily_rate,
+            'amount' => (float) $detail->amount,
+        ])->all();
+    }
+
+    /**
      * Replace a transaction's per-month breakdown with the given rows.
      *
      * Accepts either MonthlyOTEntryTransaction or PayrollWorkerTransaction (both

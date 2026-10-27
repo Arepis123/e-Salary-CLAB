@@ -230,11 +230,18 @@ class TimesheetDriftService
      */
     public function resyncSubmission(PayrollSubmission $submission): array
     {
-        if (! in_array($submission->status, self::CHECKABLE_STATUSES, true)) {
-            throw new \RuntimeException('This submission can no longer be re-synced because payment has started.');
-        }
+        $npl = app(NplCalculatorService::class);
 
-        return DB::transaction(function () use ($submission) {
+        return DB::transaction(function () use ($submission, $npl) {
+            // Lock the row and re-check the status inside the transaction, so a
+            // payment started after the caller loaded the submission is never
+            // overwritten with 'submitted'.
+            $submission = PayrollSubmission::lockForUpdate()->findOrFail($submission->id);
+
+            if (! in_array($submission->status, self::CHECKABLE_STATUSES, true)) {
+                throw new \RuntimeException('This submission can no longer be re-synced because payment has started.');
+            }
+
             $workers = $submission->workers()->with('transactions')->get();
 
             if ($workers->isEmpty()) {
@@ -243,7 +250,7 @@ class TimesheetDriftService
 
             [$otMonth, $otYear] = $this->otEntryPeriod($submission->month, $submission->year);
 
-            $otEntries = MonthlyOTEntry::with('transactions')
+            $otEntries = MonthlyOTEntry::with('transactions.nplDetails')
                 ->where('contractor_clab_no', $submission->contractor_clab_no)
                 ->where('entry_month', $otMonth)
                 ->where('entry_year', $otYear)
@@ -264,14 +271,17 @@ class TimesheetDriftService
                 $worker->ot_public_hours = $entry->ot_public_hours;
 
                 // Replace only client-entered transactions; keep configured
-                // deductions (description IS NOT NULL) intact.
-                $worker->transactions()->whereNull('description')->delete();
+                // deductions (description IS NOT NULL) intact. NPL carries its
+                // per-month breakdown, or it would be revalued at the legacy rate.
+                $npl->deleteTransactionsWithDetails($worker->transactions()->whereNull('description'));
                 foreach ($entry->transactions as $txn) {
-                    $worker->transactions()->create([
+                    $payrollTxn = $worker->transactions()->create([
                         'type' => $txn->type,
                         'amount' => $txn->amount,
                         'remarks' => $txn->remarks,
                     ]);
+
+                    $npl->syncDetails($payrollTxn, $npl->detailRows($txn));
                 }
 
                 // No-op unless auto-calculations are enabled.
@@ -296,6 +306,12 @@ class TimesheetDriftService
                 $submission->status = 'submitted';
                 $submission->admin_reviewed_by = null;
                 $submission->admin_reviewed_at = null;
+
+                // A late-approval penalty was 8% of the old amount. Clear it so
+                // re-approval applies it afresh against the new amount.
+                $submission->has_penalty = false;
+                $submission->penalty_amount = 0;
+                $submission->total_with_penalty = 0;
             }
 
             $submission->save();

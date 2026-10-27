@@ -560,6 +560,15 @@
                     </p>
                 </div>
 
+                @if($resyncContractor['status'] === 'approved')
+                    <flux:callout icon="exclamation-triangle" variant="warning">
+                        <flux:callout.heading>This timesheet is already approved</flux:callout.heading>
+                        <flux:callout.text>
+                            Re-syncing withdraws the approval and returns it to <strong>Submitted</strong>. The client cannot pay until it is re-approved with a new breakdown file, and any late-payment penalty is re-applied against the new amount.
+                        </flux:callout.text>
+                    </flux:callout>
+                @endif
+
                 <div class="space-y-3 max-h-96 overflow-y-auto">
                     @foreach($resyncContractor['drifts'] as $drift)
                         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">

@@ -314,8 +314,36 @@ class PaymentController extends Controller
             ]
         );
 
-        // Update submission status
-        $submission->update(['status' => 'pending_payment']);
+        // Update submission status — only while it is still admin-reviewed. An
+        // admin re-sync can withdraw the approval while the bill above is being
+        // created; that bill is at the old amount and must not be paid.
+        $stillReviewed = PayrollSubmission::whereKey($submission->id)
+            ->whereNotNull('admin_reviewed_at')
+            ->whereIn('status', ['approved', 'submitted', 'pending_payment', 'overdue'])
+            ->update(['status' => 'pending_payment']);
+
+        if (! $stillReviewed) {
+            $payment->update([
+                'status' => 'cancelled',
+                'payment_response' => json_encode([
+                    'reason' => 'Approval withdrawn while payment was being created',
+                    'cancelled_at' => now()->toDateTimeString(),
+                ]),
+            ]);
+
+            try {
+                $this->billplzService->deleteBill($bill['id']);
+            } catch (\Exception $e) {
+                Log::warning('Could not delete Billplz bill after approval was withdrawn', [
+                    'bill_id' => $bill['id'],
+                    'submission_id' => $submission->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return redirect()->route('timesheet')
+                ->with('error', 'This submission is being re-reviewed by admin. Please try again once it is approved.');
+        }
 
         // Redirect to Billplz payment page with auto-submit
         $paymentUrl = $this->billplzService->getDirectPaymentUrl($bill['url']);
