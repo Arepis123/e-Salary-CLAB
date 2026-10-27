@@ -564,7 +564,7 @@
                     <flux:callout icon="exclamation-triangle" variant="warning">
                         <flux:callout.heading>This timesheet is already approved</flux:callout.heading>
                         <flux:callout.text>
-                            Re-syncing withdraws the approval and returns it to <strong>Submitted</strong>. The client cannot pay until it is re-approved with a new breakdown file, and any late-payment penalty is re-applied against the new amount.
+                            Re-syncing withdraws the approval and returns it to <strong>Submitted</strong>. The current breakdown file is detached, the client cannot pay until it is re-approved with a new one, and any late-payment penalty is re-applied against the new amount. The client is emailed that the approval was withdrawn.
                         </flux:callout.text>
                     </flux:callout>
                 @endif

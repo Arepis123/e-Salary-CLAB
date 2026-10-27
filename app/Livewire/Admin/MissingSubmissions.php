@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Mail\PayrollApprovalWithdrawn;
 use App\Mail\PayrollReminderMail;
 use App\Models\Contractor;
 use App\Models\ContractWorker;
@@ -14,6 +15,7 @@ use App\Services\NplCalculatorService;
 use App\Services\PayrollService;
 use App\Services\SalaryProratingService;
 use App\Services\TimesheetDriftService;
+use App\Traits\LogsActivity;
 use Flux\Flux;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
@@ -27,7 +29,7 @@ use Livewire\WithPagination;
 #[Lazy]
 class MissingSubmissions extends Component
 {
-    use WithPagination;
+    use LogsActivity, WithPagination;
 
     /**
      * Day of the month the auto-submit scheduler runs (see routes/console.php).
@@ -1529,9 +1531,39 @@ class MissingSubmissions extends Component
         }
 
         try {
+            $previousStatus = $submission->status;
             $result = app(TimesheetDriftService::class)->resyncSubmission($submission);
 
             if ($result['synced'] > 0) {
+                $synced = $result['submission'];
+
+                $this->logTimesheetActivity(
+                    action: $result['approval_withdrawn'] ? 'approval_withdrawn' : 'resynced',
+                    description: 'Re-synced '.$result['synced'].' '.\Illuminate\Support\Str::plural('worker', $result['synced'])
+                        ." from the latest OT data for {$synced->contractor_clab_no} ({$synced->month_year})"
+                        .($result['approval_withdrawn'] ? '; approval withdrawn for re-review' : ''),
+                    timesheet: $synced,
+                    oldValues: ['status' => $previousStatus],
+                    newValues: ['status' => $synced->status],
+                    properties: [
+                        'workers_synced' => $result['synced'],
+                        'drifts' => $this->resyncContractor['drifts'] ?? [],
+                    ]
+                );
+
+                // The client was told it was approved; tell them it no longer is.
+                if ($result['approval_withdrawn'] && $synced->user?->email) {
+                    try {
+                        Mail::to($synced->user->email)
+                            ->send(new PayrollApprovalWithdrawn($synced, $result['synced']));
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to send payroll approval withdrawn email', [
+                            'submission_id' => $synced->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 Flux::toast(
                     variant: 'success',
                     heading: 'Timesheet re-synced',

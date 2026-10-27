@@ -49,22 +49,48 @@ class TimesheetDriftService
     }
 
     /**
-     * Build a normalized comparable key for a transaction (type|amount|remarks).
+     * Build a normalized comparable key for a transaction
+     * (type|amount|remarks, plus the NPL per-month breakdown).
+     *
+     * The breakdown is part of the key because it decides the NPL charge: days
+     * moved between months keep the same total but change the amount, and an
+     * NPL copied without its breakdown is revalued at the legacy rate.
      */
-    protected function txnKey(string $type, $amount, ?string $remarks): string
+    protected function txnKey($txn): string
     {
-        return $type.'|'.number_format((float) $amount, 2, '.', '').'|'.trim((string) $remarks);
+        return $txn->type.'|'.number_format((float) $txn->amount, 2, '.', '').'|'.trim((string) $txn->remarks)
+            .'|'.$this->nplBreakdown($txn)
+                ->map(fn ($detail) => $detail->month_key.':'.number_format((float) $detail->npl_days, 2, '.', ''))
+                ->implode(',');
     }
 
     /**
      * Human-readable label for a transaction, for the before/after preview.
      */
-    protected function txnLabel(string $type, $amount, ?string $remarks): string
+    protected function txnLabel($txn): string
     {
-        $label = ucwords(str_replace('_', ' ', $type)).': RM '.number_format((float) $amount, 2);
-        $remarks = trim((string) $remarks);
+        $label = ucwords(str_replace('_', ' ', $txn->type)).': RM '.number_format((float) $txn->amount, 2);
+        $remarks = trim((string) $txn->remarks);
+
+        $months = $this->nplBreakdown($txn)
+            ->map(fn ($detail) => $detail->short_month_label.' '.rtrim(rtrim(number_format((float) $detail->npl_days, 2), '0'), '.').'d')
+            ->implode(', ');
+
+        if ($months !== '') {
+            $label .= " [{$months}]";
+        }
 
         return $remarks !== '' ? "{$label} ({$remarks})" : $label;
+    }
+
+    /**
+     * A transaction's NPL per-month rows in month order (empty for non-NPL).
+     */
+    protected function nplBreakdown($txn): Collection
+    {
+        return $txn->type === 'npl'
+            ? $txn->nplDetails->sortBy('month_key')->values()
+            : collect();
     }
 
     /**
@@ -90,19 +116,19 @@ class TimesheetDriftService
         $snapshotTxns = $worker->transactions->whereNull('description');
 
         $liveKeys = $entry->transactions
-            ->map(fn ($t) => $this->txnKey($t->type, $t->amount, $t->remarks))
+            ->map(fn ($t) => $this->txnKey($t))
             ->sort()->values()->all();
         $snapshotKeys = $snapshotTxns
-            ->map(fn ($t) => $this->txnKey($t->type, $t->amount, $t->remarks))
+            ->map(fn ($t) => $this->txnKey($t))
             ->sort()->values()->all();
 
         if ($liveKeys !== $snapshotKeys) {
             $changes['transactions'] = [
                 'before' => $snapshotTxns
-                    ->map(fn ($t) => $this->txnLabel($t->type, $t->amount, $t->remarks))
+                    ->map(fn ($t) => $this->txnLabel($t))
                     ->values()->all(),
                 'after' => $entry->transactions
-                    ->map(fn ($t) => $this->txnLabel($t->type, $t->amount, $t->remarks))
+                    ->map(fn ($t) => $this->txnLabel($t))
                     ->values()->all(),
             ];
         }
@@ -125,7 +151,7 @@ class TimesheetDriftService
         // Ensure the relations we compare against are loaded.
         $workers = $submission->relationLoaded('workers')
             ? $submission->workers
-            : $submission->workers()->with('transactions')->get();
+            : $submission->workers()->with('transactions.nplDetails')->get();
 
         if ($workers->isEmpty()) {
             return [];
@@ -133,7 +159,7 @@ class TimesheetDriftService
 
         [$otMonth, $otYear] = $this->otEntryPeriod($submission->month, $submission->year);
 
-        $otEntries = MonthlyOTEntry::with('transactions')
+        $otEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->where('contractor_clab_no', $submission->contractor_clab_no)
             ->where('entry_month', $otMonth)
             ->where('entry_year', $otYear)
@@ -168,7 +194,7 @@ class TimesheetDriftService
         $submissions = PayrollSubmission::where('month', $month)
             ->where('year', $year)
             ->whereIn('status', self::CHECKABLE_STATUSES)
-            ->with('workers.transactions')
+            ->with('workers.transactions.nplDetails')
             ->get();
 
         if ($submissions->isEmpty()) {
@@ -180,7 +206,7 @@ class TimesheetDriftService
         // of running a separate query per submission.
         [$otMonth, $otYear] = $this->otEntryPeriod($month, $year);
 
-        $otEntries = MonthlyOTEntry::with('transactions')
+        $otEntries = MonthlyOTEntry::with('transactions.nplDetails')
             ->whereIn('contractor_clab_no', $submissions->pluck('contractor_clab_no')->unique()->all())
             ->where('entry_month', $otMonth)
             ->where('entry_year', $otYear)
@@ -226,7 +252,7 @@ class TimesheetDriftService
      * the submission back into the admin review queue so the final amount is
      * re-confirmed.
      *
-     * @return array{synced:int}
+     * @return array{synced:int,approval_withdrawn:bool,submission:PayrollSubmission}
      */
     public function resyncSubmission(PayrollSubmission $submission): array
     {
@@ -242,10 +268,10 @@ class TimesheetDriftService
                 throw new \RuntimeException('This submission can no longer be re-synced because payment has started.');
             }
 
-            $workers = $submission->workers()->with('transactions')->get();
+            $workers = $submission->workers()->with('transactions.nplDetails')->get();
 
             if ($workers->isEmpty()) {
-                return ['synced' => 0];
+                return ['synced' => 0, 'approval_withdrawn' => false, 'submission' => $submission];
             }
 
             [$otMonth, $otYear] = $this->otEntryPeriod($submission->month, $submission->year);
@@ -292,17 +318,20 @@ class TimesheetDriftService
             }
 
             if ($synced === 0) {
-                return ['synced' => 0];
+                return ['synced' => 0, 'approval_withdrawn' => false, 'submission' => $submission];
             }
 
-            // When the system auto-calculates, refresh the payroll amount.
-            if (config('payroll.use_auto_calculations', false)) {
+            $approvalWithdrawn = $submission->status === 'approved';
+
+            // Refresh the payroll amount the same way submission sets it, so a
+            // withdrawn approval no longer shows the old approved amount.
+            if ($approvalWithdrawn || config('payroll.use_auto_calculations', false)) {
                 $submission->admin_final_amount = $submission->workers()->sum('total_payment');
             }
 
             // Bounce an already-approved timesheet back into the review queue so
             // the admin re-confirms the final amount against the new data.
-            if ($submission->status === 'approved') {
+            if ($approvalWithdrawn) {
                 $submission->status = 'submitted';
                 $submission->admin_reviewed_by = null;
                 $submission->admin_reviewed_at = null;
@@ -312,11 +341,19 @@ class TimesheetDriftService
                 $submission->has_penalty = false;
                 $submission->penalty_amount = 0;
                 $submission->total_with_penalty = 0;
+
+                // The approved breakdown file and its itemisation describe the
+                // old figures. Re-approval requires a new file, so drop the
+                // reference (the file stays on disk) to stop clients downloading
+                // it and the breakdown backfill restoring it.
+                $submission->admin_breakdown = null;
+                $submission->breakdown_file_path = null;
+                $submission->breakdown_file_name = null;
             }
 
             $submission->save();
 
-            return ['synced' => $synced];
+            return ['synced' => $synced, 'approval_withdrawn' => $approvalWithdrawn, 'submission' => $submission];
         });
     }
 }
