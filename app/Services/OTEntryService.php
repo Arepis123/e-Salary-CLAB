@@ -248,9 +248,11 @@ class OTEntryService
                 'worker_passport' => $data['worker_passport'],
                 'submission_month' => $period['submission_month'],
                 'submission_year' => $period['submission_year'],
-                'ot_normal_hours' => $data['ot_normal_hours'] ?? 0,
-                'ot_rest_hours' => $data['ot_rest_hours'] ?? 0,
-                'ot_public_hours' => $data['ot_public_hours'] ?? 0,
+                // A cleared number input arrives as '' rather than null, which
+                // the decimal cast rejects — treat anything blank as zero hours.
+                'ot_normal_hours' => is_numeric($data['ot_normal_hours'] ?? null) ? $data['ot_normal_hours'] : 0,
+                'ot_rest_hours' => is_numeric($data['ot_rest_hours'] ?? null) ? $data['ot_rest_hours'] : 0,
+                'ot_public_hours' => is_numeric($data['ot_public_hours'] ?? null) ? $data['ot_public_hours'] : 0,
                 'status' => 'draft',
             ]
         );

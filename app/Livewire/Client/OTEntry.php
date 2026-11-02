@@ -1356,7 +1356,10 @@ class OTEntry extends Component
         try {
             $spreadsheet = IOFactory::load($this->importFile->getRealPath());
             $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray();
+            // Raw cell values, not display-formatted ones: a formula like
+            // =100/31*18 shown as "58.065" must import as 58.0645..., which then
+            // rounds to the RM 58.06 the client expects.
+            $rows = $sheet->toArray(null, true, false);
 
             $this->importData = [];
             $this->importErrors = [];
@@ -1610,9 +1613,10 @@ class OTEntry extends Component
             }
 
             foreach ($accommodationByWorker as $passport => $info) {
-                // Include existing accommodation from current entries
+                // Include existing accommodation from current entries, unless
+                // override mode is about to discard them.
                 $existingAccommodation = 0;
-                foreach ($this->entries as $entry) {
+                foreach ($this->importMode === 'override' ? [] : $this->entries as $entry) {
                     if ($entry['worker_passport'] === $passport) {
                         $existingAccommodation = collect($entry['transactions'] ?? [])
                             ->where('type', 'accommodation')
@@ -1637,9 +1641,9 @@ class OTEntry extends Component
                 return;
             }
 
-            if (! empty($this->importData)) {
-                $this->showImportPreview = true;
-            }
+            // Show the preview even when every row was rejected, so the client
+            // can read the errors and switch import mode.
+            $this->showImportPreview = true;
 
             if (! empty($this->importErrors)) {
                 // Show specific error details in the toast so user knows exactly what's wrong
@@ -1660,6 +1664,18 @@ class OTEntry extends Component
                 heading: 'Import Failed',
                 text: 'Failed to process file: '.$e->getMessage()
             );
+        }
+    }
+
+    /**
+     * The duplicate-NPL and accommodation-limit checks depend on whether the
+     * import adds to or replaces existing transactions, so re-validate the
+     * file whenever the mode is switched on the preview screen.
+     */
+    public function updatedImportMode(): void
+    {
+        if ($this->importFile) {
+            $this->processImport();
         }
     }
 
@@ -1796,6 +1812,7 @@ class OTEntry extends Component
                 }
 
                 $amount = $this->sanitizeNumericValue($row[$colIndex]);
+                $amount = $amount === null ? null : round($amount, 2);
                 $label = self::TEMPLATE_COLUMNS[$col]['label'];
 
                 if ($amount === null) {

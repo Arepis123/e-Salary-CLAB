@@ -945,22 +945,25 @@
                                         The following data will be imported. Review carefully before confirming.
                                     </p>
                                 </flux:card>
+                            @endif
 
-                                <!-- Import Mode Selection -->
+                            @if(count($importData) > 0 || count($importErrors) > 0)
+                                <!-- Import Mode Selection — switching re-validates the file -->
+
                                 <flux:card class="p-4 bg-zinc-100 dark:bg-zinc-800">
                                     <h3 class="text-sm font-semibold mb-3">
                                         How should transactions be handled?
                                     </h3>
                                     <div class="space-y-2">
                                         <label class="flex items-start gap-3 cursor-pointer">
-                                            <input type="radio" wire:model="importMode" value="add" class="mt-1">
+                                            <input type="radio" wire:model.live="importMode" value="add" class="mt-1">
                                             <div>
                                                 <span class="text-sm font-medium ">Add to existing</span>
                                                 <p class="text-xs ">OT hours will be <strong>added</strong> to existing values. Transactions will be <strong>appended</strong> to existing list.</p>
                                             </div>
                                         </label>
                                         <label class="flex items-start gap-3 cursor-pointer">
-                                            <input type="radio" wire:model="importMode" value="override" class="mt-1">
+                                            <input type="radio" wire:model.live="importMode" value="override" class="mt-1">
                                             <div>
                                                 <span class="text-sm font-medium ">Override existing</span>
                                                 <p class="text-xs ">OT hours will be <strong>replaced</strong> with imported values. Transactions will be <strong>replaced</strong> entirely.</p>
@@ -968,7 +971,9 @@
                                         </label>
                                     </div>
                                 </flux:card>
+                            @endif
 
+                            @if(count($importData) > 0)
                                 <!-- Data Preview Table -->
                                 <div id="import-preview-table" class="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
                                     <div class="max-h-96 overflow-y-auto">
