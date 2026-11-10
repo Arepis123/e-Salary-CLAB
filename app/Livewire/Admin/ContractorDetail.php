@@ -129,9 +129,10 @@ class ContractorDetail extends Component
 
         return [
             'total_submissions' => $submissions->count(),
-            'total_workers' => PayrollWorker::whereHas('payrollSubmission', function ($query) {
-                $query->where('contractor_clab_no', $this->contractorClabNo);
-            })->distinct('worker_passport')->count('worker_passport'),
+            // Same source as the Workers History list: one per contracted worker
+            'total_workers' => ContractWorker::where('con_ctr_clab_no', $this->contractorClabNo)
+                ->distinct('con_wkr_id')
+                ->count('con_wkr_id'),
             'total_paid' => $submissions->where('status', 'paid')->sum('grand_total'),
             'total_outstanding' => $submissions->whereIn('status', ['pending_payment', 'overdue'])->sum('grand_total'),
             'pending_submissions' => $submissions->whereIn('status', ['pending_payment', 'overdue'])->count(),
