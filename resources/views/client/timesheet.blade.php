@@ -274,7 +274,7 @@
 
                 <flux:table.rows>
                     @forelse($recentSubmissions as $submission)
-                        <flux:table.rows :key="$submission->id">
+                        <flux:table.row :key="$submission->id">
                             <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">{{ $submission->month_year }}</flux:table.cell>
@@ -328,13 +328,13 @@
                                     </flux:menu>
                                 </flux:dropdown>
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @empty
-                        <flux:table.rows>
+                        <flux:table.row>
                             <flux:table.cell variant="strong" colspan="8" class="text-center">
                                 No submissions yet.
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @endforelse
                 </flux:table.rows>
             </flux:table>

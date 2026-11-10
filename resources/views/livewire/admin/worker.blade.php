@@ -168,7 +168,7 @@
                                 }
                             }
                         @endphp
-                        <flux:table.rows :key="$worker['contract_id']">
+                        <flux:table.row :key="$worker['contract_id']">
                             <flux:table.cell>{{ $workers->firstItem() + $loop->index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong" class="flex items-center gap-3">
@@ -219,13 +219,13 @@
                                     </flux:menu>
                                 </flux:dropdown>
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @empty
-                        <flux:table.rows>
+                        <flux:table.row>
                             <flux:table.cell variant="strong" colspan="11" class="text-center">
                                 No workers found.
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @endforelse
                 </flux:table.rows>
             </flux:table>

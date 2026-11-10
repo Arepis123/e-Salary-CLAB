@@ -534,7 +534,7 @@
 
                 <flux:table.rows>
                     @foreach($workers as $index => $worker)
-                        <flux:table.rows :key="$worker->id">
+                        <flux:table.row :key="$worker->id">
                             <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">
@@ -637,11 +637,11 @@
                                     <span class="text-zinc-500">-</span>
                                 @endif
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @endforeach
 
                     <!-- Summary Row -->
-                    <flux:table.rows class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 hidden">
+                    <flux:table.row class="border-t-2 border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 hidden">
                         <flux:table.cell colspan="8" variant="strong" class="font-bold">
                             <span class="flex justify-center">TOTALS (Reference Only)</span>
                         </flux:table.cell>
@@ -678,7 +678,7 @@
                                 @endif
                             </div>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 </flux:table.rows>
             </flux:table>
         </div>

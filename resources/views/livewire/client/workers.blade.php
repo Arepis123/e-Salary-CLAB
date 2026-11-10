@@ -200,7 +200,7 @@
                             $permitExpired = $worker->wkr_permitexp && $worker->wkr_permitexp->isPast();
                             $permitExpiringSoon = $worker->wkr_permitexp && $worker->wkr_permitexp->isFuture() && now()->diffInDays($worker->wkr_permitexp, false) <= 30;
                         @endphp
-                        <flux:table.rows :key="$worker->wkr_id">
+                        <flux:table.row :key="$worker->wkr_id">
                             <flux:table.cell>{{ $workers->firstItem() + $loop->index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong" class="flex items-center gap-2">
@@ -277,13 +277,13 @@
                                     </flux:menu>
                                 </flux:dropdown>
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @empty
-                        <flux:table.rows>
+                        <flux:table.row>
                             <flux:table.cell variant="strong" colspan="11" class="text-center">
                                 No workers found.
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @endforelse
                 </flux:table.rows>
             </flux:table>

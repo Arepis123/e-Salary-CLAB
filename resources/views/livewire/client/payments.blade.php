@@ -200,7 +200,7 @@
 
             <flux:table.rows>
                 @forelse($payments as $payment)
-                    <flux:table.rows :key="$payment->id">
+                    <flux:table.row :key="$payment->id">
                         <flux:table.cell>{{ $payments->firstItem() + $loop->index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong" class="font-mono">
@@ -243,15 +243,15 @@
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell variant="strong" colspan="9" class="text-center">
                             <div class="py-5">
                                 No payment records found for {{ $year }}
                             </div>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>

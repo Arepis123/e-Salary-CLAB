@@ -53,7 +53,7 @@
 
                 <flux:table.rows>
                     @foreach($this->historicalPaginated as $index => $contractor)
-                        <flux:table.rows :key="$contractor['clab_no']">
+                        <flux:table.row :key="$contractor['clab_no']">
                             <flux:table.cell align="center">{{ $this->historicalPaginated->firstItem() + $index }}</flux:table.cell>
 
                             <flux:table.cell variant="strong">
@@ -93,7 +93,7 @@
                                     @endforeach
                                 </div>
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @endforeach
                 </flux:table.rows>
             </flux:table>
@@ -194,7 +194,7 @@
                     </flux:table.columns>
                     <flux:table.rows>
                         @foreach($this->missingPaginated as $index => $contractor)
-                            <flux:table.rows :key="$contractor['clab_no']">
+                            <flux:table.row :key="$contractor['clab_no']">
                                 <flux:table.cell align="center">{{ $this->missingPaginated->firstItem() + $index }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
@@ -245,7 +245,7 @@
                                         </flux:menu>
                                     </flux:dropdown>
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @endforeach
                     </flux:table.rows>
                 </flux:table>
@@ -276,7 +276,7 @@
                     </flux:table.columns>
                     <flux:table.rows>
                         @foreach($this->missingPaginated as $index => $contractor)
-                            <flux:table.rows :key="$contractor['clab_no']">
+                            <flux:table.row :key="$contractor['clab_no']">
                                 <flux:table.cell align="center">{{ $this->missingPaginated->firstItem() + $index }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
@@ -326,7 +326,7 @@
                                         </flux:menu>
                                     </flux:dropdown>
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @endforeach
                     </flux:table.rows>
                 </flux:table>
@@ -372,7 +372,7 @@
                     </flux:table.columns>
                     <flux:table.rows>
                         @foreach($this->missingPaginated as $index => $contractor)
-                            <flux:table.rows :key="$contractor['clab_no']">
+                            <flux:table.row :key="$contractor['clab_no']">
                                 <flux:table.cell align="center">{{ $this->missingPaginated->firstItem() + $index }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['clab_no'] }}</flux:table.cell>
                                 <flux:table.cell variant="strong">{{ $contractor['name'] }}</flux:table.cell>
@@ -391,7 +391,7 @@
                                         Review & Re-sync
                                     </flux:button>
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @endforeach
                     </flux:table.rows>
                 </flux:table>

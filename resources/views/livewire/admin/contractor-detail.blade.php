@@ -178,7 +178,7 @@
                                 // Get the latest submission for this worker
                                 $latestSubmission = App\Models\PayrollSubmission::where('id', $worker->latest_submission_id)->first();
                             @endphp
-                            <flux:table.rows :key="$worker->worker_passport">
+                            <flux:table.row :key="$worker->worker_passport">
                                 <flux:table.cell variant="strong">
                                     {{ $worker->worker_name }}
                                 </flux:table.cell>
@@ -204,13 +204,13 @@
                                 <flux:table.cell variant="strong">
                                     {{ $worker->total_submissions }}
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @empty
-                            <flux:table.rows>
+                            <flux:table.row>
                                 <flux:table.cell variant="strong" colspan="7" class="text-center">
                                     No workers found for this contractor.
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @endforelse
                     </flux:table.rows>
                 </flux:table>
@@ -240,7 +240,7 @@
 
                     <flux:table.rows>
                         @forelse($payrollHistory as $submission)
-                            <flux:table.rows :key="$submission->id">
+                            <flux:table.row :key="$submission->id">
                                 <flux:table.cell variant="strong">
                                     INV-{{ str_pad($submission->id, 4, '0', STR_PAD_LEFT) }}
                                 </flux:table.cell>
@@ -284,13 +284,13 @@
                                         href="{{ route('payroll.detail', $submission->id) }}"
                                     />
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @empty
-                            <flux:table.rows>
+                            <flux:table.row>
                                 <flux:table.cell variant="strong" colspan="7" class="text-center">
                                     No payroll submissions found for this contractor.
                                 </flux:table.cell>
-                            </flux:table.rows>
+                            </flux:table.row>
                         @endforelse
                     </flux:table.rows>
                 </flux:table>

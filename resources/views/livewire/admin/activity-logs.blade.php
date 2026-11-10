@@ -108,7 +108,7 @@
 
             <flux:table.rows>
                 @forelse($logs as $log)
-                    <flux:table.rows :key="$log->id">
+                    <flux:table.row :key="$log->id">
                         <flux:table.cell variant="strong">
                             <div class="text-xs">
                                 <div>{{ $log->created_at->format('d M Y') }}</div>
@@ -187,9 +187,9 @@
                                 View
                             </flux:button>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell colspan="7" class="text-center">
                             @if($search || $moduleFilter || $actionFilter || $contractorFilter || $startDate || $endDate)
                                 <div class="py-8">
@@ -203,7 +203,7 @@
                                 </div>
                             @endif
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>

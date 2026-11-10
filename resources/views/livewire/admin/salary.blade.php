@@ -206,7 +206,7 @@
 
             <flux:table.rows>
                 @forelse($submissions as $index => $submission)
-                    <flux:table.rows :key="$submission->id">
+                    <flux:table.row :key="$submission->id">
                         <flux:table.cell>{{ $submissions->firstItem() + $index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -295,9 +295,9 @@
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell variant="strong" colspan="12" class="text-center">
                             @if($search || $contractor || $statusFilter || $payslipFilter)
                                 No submissions found matching your filters.
@@ -305,7 +305,7 @@
                                 No payroll submissions have been created yet.
                             @endif
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>

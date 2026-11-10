@@ -216,7 +216,7 @@
 
             <flux:table.rows>
                 @forelse($invoices as $invoice)
-                    <flux:table.rows :key="$invoice->id">
+                    <flux:table.row :key="$invoice->id">
                         <flux:table.cell>{{ $invoices->firstItem() + $loop->index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">
@@ -283,13 +283,13 @@
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell variant="strong" colspan="10" class="text-center">
                             No invoices found for {{ $year }}.
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>

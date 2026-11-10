@@ -124,7 +124,7 @@
 
             <flux:table.rows>
                 @forelse ($users as $user)
-                    <flux:table.rows :key="$user->id">
+                    <flux:table.row :key="$user->id">
                         <flux:table.cell>{{ $users->firstItem() + $loop->index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong" class="flex items-center gap-3">
@@ -175,13 +175,13 @@
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell variant="strong" colspan="7" class="text-center">
                             {{ __('No users found.') }}
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>

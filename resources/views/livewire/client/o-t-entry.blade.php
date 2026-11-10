@@ -187,7 +187,7 @@
                         <flux:table.rows>
                             <flux:skeleton.group>
                                 @for($i = 0; $i < 6; $i++)
-                                <flux:table.rows>
+                                <flux:table.row>
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></flux:table.cell>
                                     <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
                                     <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-28 rounded" /></flux:table.cell>
@@ -197,7 +197,7 @@
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-8 w-20 rounded mx-auto" /></flux:table.cell>
                                     <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
                                     <flux:table.cell align="center"><flux:skeleton animate="shimmer" class="h-7 w-16 rounded mx-auto" /></flux:table.cell>
-                                </flux:table.rows>
+                                </flux:table.row>
                                 @endfor
                             </flux:skeleton.group>
                         </flux:table.rows>
@@ -246,7 +246,7 @@
 
                         <flux:table.rows>
                             @foreach($entries as $index => $entry)
-                                <flux:table.rows :key="$entry['id']">
+                                <flux:table.row :key="$entry['id']">
                                     <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
 
                                     <flux:table.cell variant="strong">
@@ -354,7 +354,7 @@
                                             <span class="text-xs text-zinc-400 dark:text-zinc-600">Locked</span>
                                         @endif
                                     </flux:table.cell>
-                                </flux:table.rows>
+                                </flux:table.row>
                             @endforeach
                         </flux:table.rows>
                     </flux:table>

@@ -348,7 +348,7 @@
 
                         <flux:table.rows>
                             @foreach($submission->workers as $index => $worker)
-                                <flux:table.rows :key="$worker->id">
+                                <flux:table.row :key="$worker->id">
                                     <flux:table.cell align="center">{{ $index + 1 }}</flux:table.cell>
 
                                     <flux:table.cell variant="strong">
@@ -427,7 +427,7 @@
                                             <span class="text-zinc-500">-</span>
                                         @endif
                                     </flux:table.cell>
-                                </flux:table.rows>
+                                </flux:table.row>
                             @endforeach
                         </flux:table.rows>
                     </flux:table>

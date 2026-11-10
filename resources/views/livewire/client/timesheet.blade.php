@@ -166,7 +166,7 @@
                 <flux:table.rows>
                     <flux:skeleton.group>
                         @for($i = 0; $i < 5; $i++)
-                        <flux:table.rows>
+                        <flux:table.row>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></flux:table.cell>
                             <flux:table.cell>
                                 <div class="flex items-center gap-2">
@@ -182,7 +182,7 @@
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-10 rounded ml-auto" /></flux:table.cell>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-10 rounded ml-auto" /></flux:table.cell>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                         @endfor
                     </flux:skeleton.group>
                 </flux:table.rows>
@@ -201,7 +201,7 @@
 
                 <flux:table.rows>
                     @foreach($workers as $index => $worker)
-                        <flux:table.rows wire:key="worker-{{ $worker['worker_id'] }}">
+                        <flux:table.row wire:key="worker-{{ $worker['worker_id'] }}">
                             <flux:table.cell class="text-center tabular-nums text-zinc-500 dark:text-zinc-400">{{ $index + 1 }}</flux:table.cell>
 
                             <flux:table.cell>
@@ -263,7 +263,7 @@
                                     <span class="text-sm text-zinc-400 dark:text-zinc-600">—</span>
                                 @endif
                             </flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                     @endforeach
                 </flux:table.rows>
             </flux:table>
@@ -299,7 +299,7 @@
                 @if($isLoading)
                     <flux:skeleton.group>
                         @for($i = 0; $i < 5; $i++)
-                        <flux:table.rows>
+                        <flux:table.row>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-4 rounded mx-auto" /></flux:table.cell>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-20 rounded" /></flux:table.cell>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-24 rounded" /></flux:table.cell>
@@ -308,12 +308,12 @@
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-4 w-16 rounded" /></flux:table.cell>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-5 w-20 rounded-full" /></flux:table.cell>
                             <flux:table.cell><flux:skeleton animate="shimmer" class="h-7 w-7 rounded" /></flux:table.cell>
-                        </flux:table.rows>
+                        </flux:table.row>
                         @endfor
                     </flux:skeleton.group>
                 @else
                 @forelse($recentSubmissions as $submission)
-                    <flux:table.rows :key="$submission->id">
+                    <flux:table.row :key="$submission->id">
                         <flux:table.cell>{{ $loop->iteration }}</flux:table.cell>
 
                         <flux:table.cell variant="strong">{{ $submission->month_year }}</flux:table.cell>
@@ -372,13 +372,13 @@
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell variant="strong" colspan="8" class="text-center">
                             No submissions yet.
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
                 @endif
             </flux:table.rows>

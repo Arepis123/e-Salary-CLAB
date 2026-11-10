@@ -120,7 +120,7 @@
 
             <flux:table.rows>
                 @forelse($contractors as $index => $contractor)
-                    <flux:table.rows :key="$contractor->id">
+                    <flux:table.row :key="$contractor->id">
                         <flux:table.cell class="whitespace-nowrap">{{ $contractors->firstItem() + $loop->index }}</flux:table.cell>
 
                         <flux:table.cell variant="strong" class="whitespace-nowrap">
@@ -174,9 +174,9 @@
                                 </flux:menu>
                             </flux:dropdown>
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @empty
-                    <flux:table.rows>
+                    <flux:table.row>
                         <flux:table.cell variant="strong" colspan="10" class="text-center">
                             @if($search || $statusFilter)
                                 No contractors found matching your filters.
@@ -184,7 +184,7 @@
                                 No contractors found.
                             @endif
                         </flux:table.cell>
-                    </flux:table.rows>
+                    </flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>
