@@ -233,6 +233,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('role:client')->group(function () {
         Route::get('ot-entry', \App\Livewire\Client\OTEntry::class)->name('ot-entry');
+        // Browser reports when the Manage Transactions popup goes blank (see ClientDiagnosticsController)
+        Route::post('ot-entry/diagnostics/modal-blank', [\App\Http\Controllers\Client\ClientDiagnosticsController::class, 'otModalBlank'])
+            ->middleware('throttle:10,1')
+            ->name('ot-entry.diagnostics.modal-blank');
         Route::get('timesheet', \App\Livewire\Client\Timesheet::class)->name('timesheet');
         Route::get('timesheet/{id}', [\App\Http\Controllers\Client\TimesheetController::class, 'show'])->name('timesheet.show');
         Route::get('timesheet/{id}/edit', \App\Livewire\Client\TimesheetEdit::class)->name('timesheet.edit');

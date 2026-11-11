@@ -553,9 +553,9 @@
         </flux:callout>
 
         <!-- Transaction Management Modal -->
-        @if($showTransactionModal && $currentWorkerIndex !== null)
-            <flux:modal wire:model="showTransactionModal" class="min-w-[600px]" :dismissible="false">
-                <div class="space-y-6">
+        <flux:modal data-txn-modal wire:model="showTransactionModal" wire:key="transaction-modal" @close="closeTransactionModal" class="min-w-[600px]" :dismissible="false">
+            @if($showTransactionModal && $currentWorkerIndex !== null)
+                <div class="space-y-6" data-txn-modal-body>
                     <div>
                         <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                             Manage Transactions
@@ -743,12 +743,12 @@
                             @else
                                 <!-- Amount Input -->
                                 <div>
-                                    <flux:input wire:model.live="newTransactionAmount" type="number" step="0.01" min="0" label="Amount (RM)" placeholder="0.00" />
+                                    <flux:input wire:model="newTransactionAmount" type="number" step="0.01" min="0" label="Amount (RM)" placeholder="0.00" />
                                 </div>
                             @endif
 
                             <div>
-                                <flux:textarea wire:model.live="newTransactionRemarks" label="Remarks" placeholder="Enter reason for this transaction..." rows="2" />
+                                <flux:textarea wire:model="newTransactionRemarks" label="Remarks" placeholder="Enter reason for this transaction..." rows="2" />
                                 @error('newTransactionRemarks') <span class="text-xs text-red-600 dark:text-red-400">{{ $message }}</span> @enderror
                             </div>
 
@@ -834,8 +834,139 @@
                         <flux:button wire:click="closeTransactionModal" variant="primary">Close</flux:button>
                     </div>
                 </div>
-            </flux:modal>
-        @endif
+            @endif
+        </flux:modal>
+
+        <!--
+            Diagnostics: some clients report the Manage Transactions popup going blank
+            (only the ✕ left). It cannot be reproduced locally, so when it happens the
+            browser reports what it saw to storage/logs/ot-modal-blank.log. Remove once
+            the cause is known.
+        -->
+        @script
+        <script>
+            (() => {
+                const REPORT_URL = @js(route('ot-entry.diagnostics.modal-blank'));
+                const MAX = 10;
+                const recent = { requests: [], errors: [], events: [] };
+                const now = () => Math.round(performance.now());
+                const push = (list, item) => { list.push({ t: now(), ...item }); if (list.length > MAX) list.shift(); };
+                const describe = (el) => el && el.tagName ? {
+                    tag: el.tagName.toLowerCase(),
+                    model: el.getAttribute('wire:model') || el.getAttribute('wire:model.live') || el.getAttribute('wire:model.blur') || null,
+                    inPopup: !!el.closest('ui-modal[data-txn-modal]'),
+                } : null;
+
+                // Livewire requests (field names and method names only, never values)
+                let morphing = false;
+                Livewire.hook('request', ({ payload, respond, succeed, fail }) => {
+                    const started = performance.now();
+                    const entry = { calls: [], updates: [], bytesUp: (payload || '').length };
+                    try {
+                        JSON.parse(payload).components.forEach((c) => {
+                            entry.calls.push(...c.calls.map((x) => x.method));
+                            entry.updates.push(...Object.keys(c.updates).slice(0, 10));
+                        });
+                    } catch (e) {}
+                    respond(({ status }) => { entry.status = status; });
+                    succeed(({ status }) => push(recent.requests, { ...entry, status, ok: true, ms: Math.round(performance.now() - started) }));
+                    fail(({ status, content }) => push(recent.requests, { ...entry, status, ok: false, ms: Math.round(performance.now() - started), body: String(content ?? '').slice(0, 300) }));
+                });
+                Livewire.hook('morph', () => { morphing = true; });
+                Livewire.hook('morphed', () => { morphing = false; });
+                Livewire.hook('morph.removing', ({ el }) => {
+                    if (el?.matches?.('[data-txn-modal-body]')) push(recent.events, { event: 'livewire morph removed popup body' });
+                });
+
+                // JavaScript errors
+                window.addEventListener('error', (e) => push(recent.errors, { msg: String(e.message).slice(0, 300), src: `${e.filename}:${e.lineno}:${e.colno}` }));
+                window.addEventListener('unhandledrejection', (e) => push(recent.errors, { msg: 'unhandled rejection: ' + String(e.reason?.message ?? e.reason).slice(0, 300) }));
+
+                // What the user did inside the popup (field only, not what was typed)
+                ['focusin', 'change'].forEach((type) => document.addEventListener(type, (e) => {
+                    const d = describe(e.target);
+                    if (!d?.inPopup) return;
+                    // Attribute names on the focused field reveal writing-assistant extensions (e.g. data-gramm)
+                    if (type === 'focusin' && d.tag === 'textarea') d.attrs = [...e.target.attributes].map((a) => a.name);
+                    push(recent.events, { event: type, ...d });
+                }, true));
+                document.addEventListener('keydown', (e) => {
+                    if (['Escape', 'Enter', 'Tab'].includes(e.key) && e.target?.closest?.('ui-modal[data-txn-modal]')) push(recent.events, { event: 'key ' + e.key, ...describe(e.target) });
+                }, true);
+
+                // Who removed the popup body: Livewire's morph, or something else (extension, translator, ...)
+                let observed = null;
+                const observer = new MutationObserver((records) => {
+                    for (const r of records) for (const n of r.removedNodes) {
+                        if (n.nodeType === 1 && n.matches('[data-txn-modal-body]')) push(recent.events, { event: 'popup body removed from page', duringLivewireMorph: morphing });
+                    }
+                });
+
+                const foreignElements = () => {
+                    const tags = new Set();
+                    document.querySelectorAll('*').forEach((el) => {
+                        const n = el.tagName.toLowerCase();
+                        if (n.includes('-') && !/^(ui-|flux-)/.test(n)) tags.add(n);
+                    });
+                    return [...tags].slice(0, 30);
+                };
+
+                const send = (dialog) => {
+                    const html = document.documentElement;
+                    const entries = $wire.entries;
+                    const report = {
+                        url: location.href,
+                        userAgent: navigator.userAgent,
+                        language: navigator.language,
+                        viewport: [window.innerWidth, window.innerHeight],
+                        secondsOnPage: Math.round(performance.now() / 1000),
+                        translation: {
+                            htmlLang: html.lang,
+                            htmlClass: html.className.slice(0, 200),
+                            translatedClass: /translated-(ltr|rtl)/.test(html.className),
+                            fontTags: document.querySelectorAll('font').length,
+                        },
+                        extensions: {
+                            foreignElements: foreignElements(),
+                            bodyAttributes: [...document.body.attributes].map((a) => a.name).filter((n) => n !== 'class'),
+                            remarksAttributes: [...(dialog.querySelector('textarea')?.attributes ?? [])].map((a) => a.name),
+                        },
+                        livewireState: {
+                            showTransactionModal: $wire.showTransactionModal,
+                            currentWorkerIndex: $wire.currentWorkerIndex,
+                            category: $wire.newTransactionCategory,
+                            type: $wire.newTransactionType,
+                            workerCount: entries ? Object.keys(entries).length : null,
+                        },
+                        popup: { childCount: dialog.children.length, html: dialog.innerHTML.slice(0, 3000) },
+                        activeElement: describe(document.activeElement),
+                        recent,
+                    };
+                    fetch(REPORT_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                        },
+                        body: JSON.stringify({ report }),
+                    }).catch(() => {});
+                };
+
+                // Check once a second: popup open but its contents gone for 2 checks in a row → report once per opening.
+                let strikes = 0, reported = false;
+                const timer = setInterval(() => {
+                    if (!document.body.contains($wire.$el)) { clearInterval(timer); observer.disconnect(); return; }
+                    const modal = document.querySelector('ui-modal[data-txn-modal]');
+                    if (modal && modal !== observed) { observer.disconnect(); observer.observe(modal, { childList: true, subtree: true }); observed = modal; }
+                    const dialog = modal?.querySelector('dialog');
+                    if (!dialog?.open) { strikes = 0; reported = false; return; }
+                    strikes = dialog.querySelector('[data-txn-modal-body]') ? 0 : strikes + 1;
+                    if (strikes >= 2 && !reported) { reported = true; send(dialog); }
+                }, 1000);
+            })();
+        </script>
+        @endscript
 
         <!-- Floating Scroll-to-Bottom Button -->
         <button
