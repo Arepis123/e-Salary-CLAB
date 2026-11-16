@@ -20,7 +20,7 @@
  * "Call to undefined function exec()".
  *
  * Usage (set this as a cron job on the server):
- *   0 3 * * * /opt/plesk/php/8.2/bin/php /path/to/e-payroll/run-sync-worker-names.php >> /path/to/e-payroll/storage/logs/sync-worker-names-cron.log 2>&1
+ *   0 13,19 * * * /opt/plesk/php/8.2/bin/php /path/to/e-payroll/run-sync-worker-names.php >> /path/to/e-payroll/storage/logs/sync-worker-names-cron.log 2>&1
  *
  * Cron fires on the server's clock, which is not necessarily MYT. Check with
  * `date` on the server and adjust the hour if needed; the exact time does not

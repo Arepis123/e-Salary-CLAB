@@ -33,6 +33,12 @@ class SyncWorkerNames extends Command
 
     protected $description = 'Refresh snapshotted worker names/passports from the worker_db source of truth';
 
+    /** Max IDs per whereIn against worker_db. */
+    protected const ID_BATCH = 5000;
+
+    /** Rows read per page when comparing snapshots, keeping memory flat. */
+    protected const ROW_CHUNK = 2000;
+
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
@@ -87,9 +93,15 @@ class SyncWorkerNames extends Command
         $this->line("Found {$referencedIds->count()} distinct worker(s) referenced in scope.");
 
         try {
-            $canonical = Worker::whereIn('wkr_id', $referencedIds)
-                ->get(['wkr_id', 'wkr_name', 'wkr_passno'])
-                ->keyBy(fn ($worker) => (string) $worker->wkr_id);
+            // Batched so a large scope never exceeds the prepared-statement
+            // placeholder limit (~65K) or builds one huge IN list.
+            $canonical = collect();
+            foreach ($referencedIds->chunk(self::ID_BATCH) as $batch) {
+                Worker::whereIn('wkr_id', $batch->values())
+                    ->toBase()
+                    ->get(['wkr_id', 'wkr_name', 'wkr_passno'])
+                    ->each(fn ($worker) => $canonical->put((string) $worker->wkr_id, $worker));
+            }
         } catch (\Throwable $e) {
             $this->error('Could not read from the worker_db connection.');
             $this->error("Error: {$e->getMessage()}");
@@ -159,9 +171,15 @@ class SyncWorkerNames extends Command
         $written = 0;
 
         foreach ($changes as $change) {
+            $field = $change['field']; // fixed whitelist: worker_name / worker_passport
+
+            // BINARY because the columns are utf8mb4_unicode_ci: a plain != treats
+            // "MARUF MRIDHA" and "Maruf Mridha" as equal, so case-only renames were
+            // detected every night but never written. NULLs never match !=, so
+            // they need their own branch.
             $written += $this->scopedQuery($change['target'], $change['worker_id'])
-                ->where($change['field'], '!=', $change['new'])
-                ->update([$change['field'] => $change['new']]);
+                ->where(fn ($q) => $q->whereNull($field)->orWhereRaw("BINARY {$field} <> ?", [$change['new']]))
+                ->update([$field => $change['new']]);
         }
 
         $changedWorkerIds = array_values(array_unique(array_column($changes, 'worker_id')));
@@ -307,12 +325,23 @@ class SyncWorkerNames extends Command
      */
     protected function collectChanges(array $target, ?string $workerId, $canonical): array
     {
-        $rows = $this->scopedQuery($target, $workerId)
-            ->get(['worker_id', 'worker_name', 'worker_passport']);
+        $query = $this->scopedQuery($target, $workerId);
+        $model = $query->getModel();
+        $keyColumn = $model->getQualifiedKeyName();
 
-        $changes = [];
+        // Stream plain rows page by page (keyset on the primary key) instead of
+        // hydrating every row in the window as a model. Memory stays bounded by
+        // ROW_CHUNK plus one small tally per drifted (worker, field).
+        $rows = $query->toBase()
+            ->select([$keyColumn, 'worker_id', 'worker_name', 'worker_passport'])
+            ->lazyById(self::ROW_CHUNK, $keyColumn, $model->getKeyName());
 
-        foreach ($rows->groupBy(fn ($row) => (string) $row->worker_id) as $id => $group) {
+        $stale = [];
+        $rowCount = 0;
+
+        foreach ($rows as $row) {
+            $rowCount++;
+            $id = (string) $row->worker_id;
             $source = $canonical->get($id);
 
             if (! $source) {
@@ -325,25 +354,35 @@ class SyncWorkerNames extends Command
                     continue;
                 }
 
-                $stale = $group->filter(fn ($row) => (string) $row->{$field} !== (string) $value);
-
-                if ($stale->isEmpty()) {
+                // Whitespace-only drift (trailing/double spaces) is not a rename.
+                if ($this->normalize($row->{$field}) === $this->normalize($value)) {
                     continue;
                 }
 
-                $changes[] = [
+                $key = $id."\0".$field;
+                $stale[$key] ??= [
                     'target' => $target,
                     'label' => $target['label'],
                     'worker_id' => $id,
                     'field' => $field,
-                    'old' => $stale->first()->{$field} ?? '(null)',
+                    'old' => $row->{$field} ?? '(null)',
                     'new' => $value,
-                    'rows' => $stale->count(),
+                    'rows' => 0,
                 ];
+                $stale[$key]['rows']++;
             }
         }
 
-        return [$changes, $rows->count()];
+        return [array_values($stale), $rowCount];
+    }
+
+    /**
+     * Comparison form of a stored value: trimmed, with any run of whitespace
+     * (including non-breaking spaces) collapsed to a single space.
+     */
+    protected function normalize(mixed $value): string
+    {
+        return trim((string) preg_replace('/[\s\x{00A0}]+/u', ' ', (string) $value));
     }
 
     /**
@@ -356,15 +395,16 @@ class SyncWorkerNames extends Command
 
         foreach ($workerIds as $id) {
             Cache::forget("worker:{$id}");
-            $clabNumbers = $clabNumbers->merge(
-                ContractWorker::where('con_wkr_id', $id)->pluck('con_ctr_clab_no')
-            );
         }
 
-        $clabNumbers = $clabNumbers
-            ->merge(Worker::whereIn('wkr_id', $workerIds)->pluck('wkr_currentemp'))
-            ->filter()
-            ->unique();
+        // One worker_db round trip per batch rather than one per worker.
+        foreach (array_chunk($workerIds, self::ID_BATCH) as $batch) {
+            $clabNumbers = $clabNumbers
+                ->merge(ContractWorker::whereIn('con_wkr_id', $batch)->pluck('con_ctr_clab_no'))
+                ->merge(Worker::whereIn('wkr_id', $batch)->pluck('wkr_currentemp'));
+        }
+
+        $clabNumbers = $clabNumbers->filter()->unique();
 
         foreach ($clabNumbers as $clabNo) {
             Cache::forget("workers:contractor:{$clabNo}");

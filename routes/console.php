@@ -22,14 +22,14 @@ Schedule::command('reminders:payment')->dailyAt('09:00');
 Schedule::command('penalties:apply-overdue')->dailyAt('00:01');
 
 // Refresh worker name/passport snapshots from worker_db (the external system)
-// Runs daily at 3:00 AM MYT. Renames made in the other system write straight to
+// Runs daily at 1:00 PM and 7:00 PM MYT. Renames made in the other system write straight to
 // the database, so nothing in this app invalidates the copies it took at
 // submission time; this closes that gap without rewriting closed periods.
 //
 // NOTE: the scheduler does not run on the production server, so in prod this is
 // driven by a server cron calling run-sync-worker-names.php directly.
 Schedule::command('workers:sync-names --no-interaction')
-    ->dailyAt('03:00')
+    ->twiceDaily(13, 19)
     ->timezone('Asia/Kuala_Lumpur');
 
 // Auto-submit OT entries on the 16th of every month at 12:01 AM MYT.
