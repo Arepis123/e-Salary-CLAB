@@ -148,9 +148,6 @@
                         From {{ $submission->breakdown_file_name ?: 'the approved breakdown file' }}.
                         Contractor submitted
                         {{ $fmt($b['computed_payroll']) }}@if(round($submittedVariance, 2) != 0.00) ({{ $submittedVariance < 0 ? '−' : '+' }}{{ $fmt(abs($submittedVariance)) }} difference)@endif.
-                        @if(($file['backpay'] ?? 0) > 0)
-                            Backpay {{ $fmt($file['backpay']) }} excluded by design.
-                        @endif
                     </p>
                 @elseif($b['overtime_derived'] || $b['statutory_derived'])
                     <p class="mt-1 border-t border-zinc-200 pt-1.5 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
