@@ -73,11 +73,12 @@ if (app()->environment('local')) {
 // ============================================================================
 Route::post('api/payslip/notify', [\App\Http\Controllers\Api\PayslipNotifyController::class, 'notify'])
     ->name('api.payslip.notify')
-    ->middleware('api')
+    ->middleware(['api', 'throttle:60,1'])
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 Route::post('api/payslip/contractors-by-ic', [\App\Http\Controllers\Api\PayslipNotifyController::class, 'contractorsByIc'])
     ->name('api.payslip.contractors-by-ic')
+    ->middleware('throttle:60,1')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 Route::get('user-manual', \App\Livewire\UserManual::class)->name('user-manual');
@@ -292,11 +293,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // ============================================================================
 // Billplz routes (No auth/middleware required - users may have lost session)
 
-Route::post('/billplz/callback', [\App\Http\Controllers\Client\PaymentController::class, 'callback'])->name('billplz.callback');
+Route::post('/billplz/callback', [\App\Http\Controllers\Client\PaymentController::class, 'callback'])
+    ->middleware('throttle:120,1')
+    ->name('billplz.callback');
 Route::get('/client/payment/{submission}/return', [\App\Http\Controllers\Client\PaymentController::class, 'return'])->name('client.payment.return');
 
 // Brevo transactional email delivery webhook (secured by ?token=...)
-Route::post('/webhooks/brevo/email', [\App\Http\Controllers\Webhooks\BrevoWebhookController::class, 'email'])->name('webhooks.brevo.email');
+Route::post('/webhooks/brevo/email', [\App\Http\Controllers\Webhooks\BrevoWebhookController::class, 'email'])
+    ->middleware('throttle:300,1')
+    ->name('webhooks.brevo.email');
 
 // ============================================================================
 // OTHER ROUTES

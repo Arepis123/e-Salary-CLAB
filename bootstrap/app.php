@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global middleware - applies to all requests
         $middleware->web(append: [
             \App\Http\Middleware\ForceHttps::class,
+            \App\Http\Middleware\EnsureUserIsActive::class,
         ]);
 
         $middleware->alias([

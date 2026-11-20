@@ -7,6 +7,8 @@ use App\Models\PayrollSubmission;
 use App\Services\ContractWorkerService;
 use App\Services\NplCalculatorService;
 use App\Services\PayrollService;
+use App\Services\ClientPayrollInputGuard;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -18,13 +20,22 @@ class TimesheetEdit extends Component
 
     protected ContractWorkerService $contractWorkerService;
 
+    #[Locked]
     public $submissionId;
 
     public $workers = [];
 
     public $selectedWorkers = [];
 
+    #[Locked]
     public $period;
+
+    /**
+     * Server-built copy of every worker row, keyed by worker_id. Locked so the
+     * browser cannot change it; saving rebuilds rows from this, not from \$workers.
+     */
+    #[Locked]
+    public array $trustedWorkers = [];
 
     public $currentSubmission;
 
@@ -240,6 +251,8 @@ class TimesheetEdit extends Component
                 'included' => true,
             ];
         })->values()->toArray();
+
+        $this->trustedWorkers = collect($this->workers)->keyBy('worker_id')->all();
 
         // Initialize selected workers (all selected by default)
         $this->selectedWorkers = collect($this->workers)->pluck('worker_id')->toArray();
@@ -530,6 +543,11 @@ class TimesheetEdit extends Component
 
         // Validate
         try {
+            // Rebuild rows from the server's copy so salary, worker identity and lock
+            // flags cannot be altered from the browser; only OT hours and unlocked
+            // transactions are taken from the request, and those are validated.
+            $this->workers = app(ClientPayrollInputGuard::class)->workerRows($this->workers, $this->trustedWorkers, $clabNo);
+
             $this->validate([
                 'workers.*.worker_id' => 'required',
                 'workers.*.worker_name' => 'required|string',

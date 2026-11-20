@@ -33,7 +33,7 @@ class PayslipNotifyController extends Controller
     {
         // --- Authenticate via shared secret token ---
         $secret = config('services.payslip_api.secret');
-        if (! $secret || $request->header('X-Payslip-Token') !== $secret) {
+        if (! $secret || ! hash_equals((string) $secret, (string) $request->header('X-Payslip-Token'))) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -42,7 +42,8 @@ class PayslipNotifyController extends Controller
             'contractor_name' => 'required|string',
             'month'           => 'required|integer|min:1|max:12',
             'year'            => 'required|integer|min:2020',
-            'file_name'       => 'required|string',
+            // A bare file name inside storage/app/payslips — no folders, no "..".
+            'file_name'       => ['required', 'string', 'max:255', 'not_regex:/[\/\\\\\x00]|\.\./'],
             'force_reupload'  => 'boolean',
         ]);
 
@@ -85,7 +86,7 @@ class PayslipNotifyController extends Controller
         if (! Storage::disk('local')->exists($filePath)) {
             return response()->json([
                 'error'    => 'File not found on server',
-                'expected' => storage_path('app/'.$filePath),
+                'expected' => $filePath,
             ], 422);
         }
 
@@ -167,7 +168,7 @@ class PayslipNotifyController extends Controller
     {
         // --- Authenticate via shared secret token ---
         $secret = config('services.payslip_api.secret');
-        if (! $secret || $request->header('X-Payslip-Token') !== $secret) {
+        if (! $secret || ! hash_equals((string) $secret, (string) $request->header('X-Payslip-Token'))) {
             return response()->json(['success' => false, 'error' => 'Invalid token'], 401);
         }
 

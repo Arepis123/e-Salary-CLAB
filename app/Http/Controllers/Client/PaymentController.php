@@ -356,17 +356,22 @@ class PaymentController extends Controller
      */
     public function callback(Request $request)
     {
-        // Validate signature — Billplz sends x_signature in the POST body, not as an HTTP header
-        $billplzId = $request->input('id');
-        $xSignature = $request->input('x_signature') ?? $request->header('X-Signature') ?? '';
+        $billplzId = (string) $request->input('id');
 
-        if (! $this->billplzService->validateSignature($billplzId, $xSignature)) {
-            Log::warning('Billplz callback signature validation failed', [
+        // Bill IDs are short alphanumeric strings. Anything else is not from
+        // Billplz, and must never reach the API URL below.
+        if (! preg_match('/^[A-Za-z0-9_-]{1,64}$/', $billplzId)) {
+            return response('Invalid bill', 400);
+        }
+
+        // The signature is logged for monitoring only. The decision below never
+        // trusts the POST body: anyone can send this request, so payment status
+        // and amount are read from the Billplz API with our own API key.
+        if (! $this->billplzService->validateSignature($request->except('x_signature'), (string) $request->input('x_signature'))) {
+            Log::warning('Billplz callback signature mismatch — verifying with Billplz API instead', [
                 'bill_id' => $billplzId,
-                'x_signature' => $xSignature,
+                'ip' => $request->ip(),
             ]);
-
-            return response('Invalid signature', 403);
         }
 
         // Find payment by billplz_bill_id
@@ -375,6 +380,7 @@ class PaymentController extends Controller
         if (! $payment) {
             Log::error('Payment not found for Billplz callback', [
                 'bill_id' => $billplzId,
+                'ip' => $request->ip(),
             ]);
 
             return response('Payment not found', 404);
@@ -385,12 +391,32 @@ class PaymentController extends Controller
             return response('OK');
         }
 
-        // Get payment details
-        $paid = $request->input('paid') === 'true';
-        $state = $request->input('state');
-        $amount = $request->input('paid_amount');
-        $billplzBillId = $request->input('id'); // Billplz Bill ID is the transaction identifier
+        $bill = $this->billplzService->getBill($billplzId);
+
+        if (! $bill || ($bill['id'] ?? null) !== $billplzId) {
+            Log::error('Billplz callback: could not verify bill with Billplz API', [
+                'bill_id' => $billplzId,
+                'payment_id' => $payment->id,
+            ]);
+
+            // Non-2xx so Billplz retries the callback later.
+            return response('Unable to verify bill', 503);
+        }
+
+        $paid = $this->billplzService->isBillPaidInFull($bill, (float) $payment->amount);
+        $state = $bill['state'] ?? null;
+        $amount = isset($bill['paid_amount']) ? ((int) $bill['paid_amount']) / 100 : 0;
+        $billplzBillId = $billplzId; // Billplz Bill ID is the transaction identifier
         $transactionStatus = $request->input('transaction_status');
+
+        if (($bill['paid'] ?? false) === true && ! $paid) {
+            Log::critical('Billplz bill paid with an amount that does not match the payment record', [
+                'bill_id' => $billplzId,
+                'payment_id' => $payment->id,
+                'expected_amount' => $payment->amount,
+                'paid_amount_sen' => $bill['paid_amount'] ?? null,
+            ]);
+        }
 
         // Capture payment type and bank information from Billplz callback
         // Billplz sends bank_code and other bank details in the callback
@@ -408,12 +434,12 @@ class PaymentController extends Controller
         // If no bank_code provided or empty, default to B2C (most common for individuals)
         $paymentType = $bankCode && in_array($bankCode, $b2bBankCodes) ? 'B2B' : 'B2C';
 
-        if ($paid && $state === 'paid') {
-            // Payment successful - update all fields at once to ensure transaction_id is saved
+        if ($paid) {
+            // Payment successful (verified against the Billplz API) - update all fields at once to ensure transaction_id is saved
             $payment->update([
                 'status' => 'completed',
                 'completed_at' => now(),
-                'payment_response' => json_encode($request->all()),
+                'payment_response' => json_encode(['callback' => $request->except('x_signature'), 'verified_bill' => $bill]),
                 'transaction_id' => $billplzBillId,
                 'payment_type' => $paymentType,
                 'bank_name' => $bankName,
@@ -518,7 +544,8 @@ class PaymentController extends Controller
         $submission = PayrollSubmission::with('payment')->findOrFail($submissionId);
 
         // Get the bill ID from Billplz redirect parameters
-        $billplzBillId = $request->input('billplz')['id'] ?? null;
+        $billplzParams = $request->input('billplz');
+        $billplzBillId = is_array($billplzParams) ? ($billplzParams['id'] ?? null) : null;
 
         // Find the specific payment for this bill (not just latest payment)
         $payment = null;
@@ -538,7 +565,7 @@ class PaymentController extends Controller
         if ($payment && $payment->billplz_bill_id && $payment->status === 'pending') {
             $bill = $this->billplzService->getBill($payment->billplz_bill_id);
 
-            if ($bill && $bill['paid']) {
+            if ($bill && $this->billplzService->isBillPaidInFull($bill, (float) $payment->amount)) {
                 // Update payment status
                 $payment->markAsCompleted($bill);
                 $submission->refresh();
@@ -568,6 +595,12 @@ class PaymentController extends Controller
                 return redirect()->route('login')
                     ->with('info', 'Payment is being processed. Please login to check status.');
             }
+        }
+
+        // A logged-in client may only see the outcome of their own company's payroll.
+        $viewer = auth()->user();
+        if (! $viewer->hasAdminAccess() && $viewer->contractor_clab_no !== $submission->contractor_clab_no) {
+            abort(404);
         }
 
         // User is authenticated, show the appropriate view

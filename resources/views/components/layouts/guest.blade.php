@@ -22,9 +22,6 @@
                             <flux:button :href="route('login')" wire:navigate variant="primary">
                                 {{ __('Login') }}
                             </flux:button>
-                            <!-- <flux:button :href="route('register')" wire:navigate variant="primary">
-                                {{ __('Register') }}
-                            </flux:button> -->
                         @endauth
                     </div>
                 </div>

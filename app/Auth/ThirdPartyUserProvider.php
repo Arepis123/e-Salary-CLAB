@@ -24,7 +24,7 @@ class ThirdPartyUserProvider implements UserProvider
     {
         $user = User::find($identifier);
 
-        return $user && $user->remember_token === $token ? $user : null;
+        return $user && $user->remember_token && hash_equals((string) $user->remember_token, (string) $token) ? $user : null;
     }
 
     /**

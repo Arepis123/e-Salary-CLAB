@@ -235,24 +235,35 @@ class OTEntryService
             throw new \Exception("{$data['worker_name']} is excluded from the {$period['submission_month_name']} payroll by administrator. OT cannot be entered.");
         }
 
-        // Find or create entry
-        $entry = MonthlyOTEntry::updateOrCreate(
+        // The entry must already exist: getOrCreateEntriesForContractor() creates
+        // one per worker under contract with this contractor. Refusing anything
+        // else stops a tampered request from adding another company's worker, and
+        // the lock is enforced here rather than trusting the browser's flag.
+        $entry = MonthlyOTEntry::where('contractor_clab_no', $data['contractor_clab_no'])
+            ->where('worker_id', $data['worker_id'])
+            ->where('entry_month', $period['entry_month'])
+            ->where('entry_year', $period['entry_year'])
+            ->first();
+
+        if (! $entry) {
+            throw new \Exception('Worker not found for your company in this OT period. Please reload the page.');
+        }
+
+        if ($entry->isLocked()) {
+            throw new \Exception("OT for {$entry->worker_name} is locked and can no longer be changed.");
+        }
+
+        $guard = app(ClientPayrollInputGuard::class);
+
+        $entry->update(
             [
-                'contractor_clab_no' => $data['contractor_clab_no'],
-                'worker_id' => $data['worker_id'],
-                'entry_month' => $period['entry_month'],
-                'entry_year' => $period['entry_year'],
-            ],
-            [
-                'worker_name' => $data['worker_name'],
-                'worker_passport' => $data['worker_passport'],
                 'submission_month' => $period['submission_month'],
                 'submission_year' => $period['submission_year'],
-                // A cleared number input arrives as '' rather than null, which
-                // the decimal cast rejects — treat anything blank as zero hours.
-                'ot_normal_hours' => is_numeric($data['ot_normal_hours'] ?? null) ? $data['ot_normal_hours'] : 0,
-                'ot_rest_hours' => is_numeric($data['ot_rest_hours'] ?? null) ? $data['ot_rest_hours'] : 0,
-                'ot_public_hours' => is_numeric($data['ot_public_hours'] ?? null) ? $data['ot_public_hours'] : 0,
+                // Blank counts as zero; anything non-numeric, negative or above
+                // 744 hours (a full month) is rejected.
+                'ot_normal_hours' => $guard->hours($data['ot_normal_hours'] ?? 0, $entry->worker_name),
+                'ot_rest_hours' => $guard->hours($data['ot_rest_hours'] ?? 0, $entry->worker_name),
+                'ot_public_hours' => $guard->hours($data['ot_public_hours'] ?? 0, $entry->worker_name),
                 'status' => 'draft',
             ]
         );

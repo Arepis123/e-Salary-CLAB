@@ -10,6 +10,8 @@ use App\Services\OutstandingPayrollService;
 use App\Services\PayrollService;
 use App\Traits\LogsActivity;
 use Illuminate\Support\Facades\Mail;
+use App\Services\ClientPayrollInputGuard;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Timesheet extends Component
@@ -24,7 +26,15 @@ class Timesheet extends Component
 
     public $selectedWorkers = [];
 
+    #[Locked]
     public $period;
+
+    /**
+     * Server-built copy of every worker row, keyed by worker_id. Locked so the
+     * browser cannot change it; saving rebuilds rows from this, not from \$workers.
+     */
+    #[Locked]
+    public array $trustedWorkers = [];
 
     public $currentSubmission;
 
@@ -425,6 +435,8 @@ class Timesheet extends Component
                 'contract_ended' => ! $hasActiveContract,
             ];
         })->values()->toArray();
+
+        $this->trustedWorkers = collect($this->workers)->keyBy('worker_id')->all();
 
         // Initialize selected workers (all selected by default)
         $this->selectedWorkers = collect($this->workers)->pluck('worker_id')->toArray();
@@ -831,6 +843,11 @@ class Timesheet extends Component
 
         // Validate
         try {
+            // Rebuild rows from the server's copy so salary, worker identity and lock
+            // flags cannot be altered from the browser; only OT hours and unlocked
+            // transactions are taken from the request, and those are validated.
+            $this->workers = app(ClientPayrollInputGuard::class)->workerRows($this->workers, $this->trustedWorkers, $clabNo);
+
             $this->validate([
                 'workers.*.worker_id' => 'required',
                 'workers.*.worker_name' => 'required|string',

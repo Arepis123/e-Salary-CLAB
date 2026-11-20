@@ -132,16 +132,43 @@ class BillplzService
     /**
      * Validate webhook signature
      */
-    public function validateSignature(string $billplzId, string $xSignature): bool
+    public function validateSignature(array $params, string $xSignature): bool
     {
-        // If X Signature is not configured or not sent, skip validation
-        if (empty($xSignature) || empty($this->xSignatureKey)) {
-            return true;
+        if ($xSignature === '' || empty($this->xSignatureKey)) {
+            return false;
         }
 
-        $computedSignature = hash_hmac('sha256', $this->xSignatureKey.'|'.$billplzId, $this->apiKey);
+        // Billplz X Signature: every key+value pair (except x_signature) as
+        // "keyvalue", sorted ascending case-insensitively, joined with "|",
+        // then HMAC-SHA256 with the X Signature key.
+        $pairs = [];
+        foreach ($params as $key => $value) {
+            if ($key === 'x_signature' || is_array($value)) {
+                continue;
+            }
+            $pairs[] = $key.(is_bool($value) ? ($value ? 'true' : 'false') : (string) $value);
+        }
+
+        usort($pairs, 'strcasecmp');
+
+        $computedSignature = hash_hmac('sha256', implode('|', $pairs), $this->xSignatureKey);
 
         return hash_equals($computedSignature, $xSignature);
+    }
+
+    /**
+     * Whether a bill fetched from the Billplz API is paid, and paid at least the
+     * amount we billed. Only the API response is trusted, never callback input.
+     */
+    public function isBillPaidInFull(array $bill, float $expectedAmount): bool
+    {
+        if (($bill['paid'] ?? false) !== true || ($bill['state'] ?? null) !== 'paid') {
+            return false;
+        }
+
+        $paidSen = (int) ($bill['paid_amount'] ?? $bill['amount'] ?? 0);
+
+        return $paidSen >= $this->convertToSen($expectedAmount);
     }
 
     /**

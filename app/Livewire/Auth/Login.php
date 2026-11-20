@@ -16,7 +16,10 @@ use Livewire\Component;
 #[Layout('components.layouts.auth-split')]
 class Login extends Component
 {
-    #[Validate('required|string')]
+    /** Failed attempts lock the username+IP pair for 15 minutes. */
+    private const LOCKOUT_SECONDS = 900;
+
+    #[Validate('required|string|max:255')]
     public string $username = '';
 
     #[Validate('required|string')]
@@ -40,7 +43,7 @@ class Login extends Component
         ];
 
         if (! Auth::attempt($credentials, $this->remember)) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), self::LOCKOUT_SECONDS);
 
             throw ValidationException::withMessages([
                 'username' => __('auth.failed'),
@@ -51,7 +54,7 @@ class Login extends Component
         if (! Auth::user()->isActive()) {
             Auth::logout();
 
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), self::LOCKOUT_SECONDS);
 
             throw ValidationException::withMessages([
                 'username' => __('Your account has been disabled. Please contact the administrator.'),

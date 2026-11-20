@@ -3,6 +3,7 @@
 namespace App\Livewire\Client;
 
 use App\Models\SalaryDeductionForm;
+use App\Services\ClientPayrollInputGuard;
 use App\Services\NplCalculatorService;
 use App\Services\OTEntryService;
 use App\Services\OutstandingPayrollService;
@@ -367,7 +368,7 @@ class OTEntry extends Component
                 $clabNo,
                 $month,
                 $year,
-                $this->deductionFormFile->getClientOriginalExtension() ?: $this->deductionFormFile->extension()
+                $this->deductionFormFile->extension()
             );
 
             $storedPath = $this->deductionFormFile->storeAs($directory, $fileName, 'local');
@@ -485,9 +486,32 @@ class OTEntry extends Component
         );
     }
 
+    /**
+     * The page hides the OT form while payroll is outstanding, but that is only
+     * what the browser shows. Re-check on the server before any write.
+     */
+    protected function rejectIfBlocked(?string $clabNo): bool
+    {
+        if (! $clabNo || app(OutstandingPayrollService::class)->getOutstandingPeriods($clabNo)->isEmpty()) {
+            return false;
+        }
+
+        Flux::toast(
+            variant: 'danger',
+            heading: 'Outstanding Payroll',
+            text: 'Please settle your outstanding payroll before entering OT and transactions.'
+        );
+
+        return true;
+    }
+
     public function saveDraft()
     {
         $clabNo = auth()->user()->contractor_clab_no;
+
+        if ($this->rejectIfBlocked($clabNo)) {
+            return;
+        }
 
         // Re-check window status
         if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
@@ -529,11 +553,14 @@ class OTEntry extends Component
 
                 // Save transactions
                 if (isset($entry['transactions']) && is_array($entry['transactions'])) {
+                    $transactions = app(ClientPayrollInputGuard::class)
+                        ->transactions($entry['transactions'], (int) $entry['worker_id'], $clabNo);
+
                     // Delete existing transactions (and their NPL breakdowns)
                     $this->nplCalculator->deleteTransactionsWithDetails($savedEntry->transactions());
 
                     // Create new transactions
-                    foreach ($entry['transactions'] as $txn) {
+                    foreach ($transactions as $txn) {
                         $savedTxn = $savedEntry->transactions()->create([
                             'type' => $txn['type'],
                             'amount' => $txn['amount'],
@@ -576,6 +603,10 @@ class OTEntry extends Component
     public function submitEntries()
     {
         $clabNo = auth()->user()->contractor_clab_no;
+
+        if ($this->rejectIfBlocked($clabNo)) {
+            return;
+        }
 
         // Re-check window status
         if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
@@ -651,7 +682,8 @@ class OTEntry extends Component
     {
         $clabNo = auth()->user()->contractor_clab_no;
 
-        if (! $this->otEntryService->isContractorWindowOpen($clabNo)) {
+        if (! $this->otEntryService->isContractorWindowOpen($clabNo)
+            || app(OutstandingPayrollService::class)->getOutstandingPeriods($clabNo)->isNotEmpty()) {
             return;
         }
 
@@ -672,9 +704,12 @@ class OTEntry extends Component
                 'ot_public_hours' => $entry['ot_public_hours'] ?? 0,
             ]);
 
+            $transactions = app(ClientPayrollInputGuard::class)
+                ->transactions($entry['transactions'] ?? [], (int) $entry['worker_id'], $clabNo);
+
             // Always sync transactions (handles deletions, including removing all)
             $this->nplCalculator->deleteTransactionsWithDetails($savedEntry->transactions());
-            foreach ($entry['transactions'] ?? [] as $txn) {
+            foreach ($transactions as $txn) {
                 $savedTxn = $savedEntry->transactions()->create([
                     'type' => $txn['type'],
                     'amount' => $txn['amount'],
