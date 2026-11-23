@@ -2,11 +2,10 @@
 
 namespace App\Livewire\Admin\Dashboard;
 
-use App\Models\ContractWorker;
 use App\Models\PayrollPayment;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
-use App\Models\User;
+use App\Services\MissingSubmissionService;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
@@ -41,26 +40,18 @@ class StatsCards extends Component
             ? [$lastMonth, $lastMonthYear, $twoMonthsAgoMonth, $twoMonthsAgoYear]
             : [$currentMonth, $currentYear, $lastMonth, $lastMonthYear];
 
-        // Get clients that have at least one active worker
-        $activeClabNos = ContractWorker::active()
-            ->distinct('con_ctr_clab_no')
-            ->pluck('con_ctr_clab_no')
-            ->toArray();
+        // Pending Submissions mirrors the No Submissions page's "Not Submit" tab:
+        // same service, same rules (inactive / excepted / late-start workers are
+        // excluded, and a partial submission still counts as pending).
+        $missingSubmissions = app(MissingSubmissionService::class);
+        $contractorStatus = $missingSubmissions->contractorStatus($currentMonth, $currentYear);
 
-        $allClients = User::where('role', 'client')
-            ->whereIn('contractor_clab_no', $activeClabNos)
-            ->get();
-        $totalClients = $allClients->count();
+        $totalClients = $contractorStatus->count();
+        $clientsWithoutSubmission = $contractorStatus->filter(fn ($s) => $s['not_submitted'] > 0)->count();
+        $clientsWithSubmissionCount = $totalClients - $clientsWithoutSubmission;
 
-        // Get clients who have submitted for current month (exclude drafts)
-        $clientsWithSubmission = PayrollSubmission::where('month', $currentMonth)
-            ->where('year', $currentYear)
-            ->whereIn('status', ['submitted', 'approved', 'pending_payment', 'paid', 'overdue'])
-            ->distinct('contractor_clab_no')
-            ->pluck('contractor_clab_no');
-
-        // Clients without submission this month
-        $clientsWithoutSubmission = $allClients->whereNotIn('contractor_clab_no', $clientsWithSubmission)->count();
+        // Before auto-submit the page hides the list, so the card does too.
+        $submissionWindowOpen = $missingSubmissions->isWindowOpen($currentMonth, $currentYear);
 
         // Active workers — use display period (last month before 16th, current month after)
         $activeWorkers = PayrollWorker::whereHas('submission', function ($q) use ($displayMonth, $displayYear) {
@@ -105,7 +96,9 @@ class StatsCards extends Component
         $this->stats = [
             'clients_without_submission' => $clientsWithoutSubmission,
             'total_clients' => $totalClients,
-            'clients_with_submission_count' => $clientsWithSubmission->count(),
+            'clients_with_submission_count' => $clientsWithSubmissionCount,
+            'submission_window_open' => $submissionWindowOpen,
+            'auto_submit_date' => now()->setDay(MissingSubmissionService::AUTO_SUBMIT_DAY)->format('d M'),
             'active_workers' => $activeWorkers,
             'this_month_payments' => $thisMonthPayments,
             'last_month_payments' => $lastMonthPayments,

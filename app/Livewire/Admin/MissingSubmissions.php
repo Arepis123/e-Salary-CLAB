@@ -11,6 +11,7 @@ use App\Models\PayrollReminder;
 use App\Models\PayrollSubmission;
 use App\Models\PayrollWorker;
 use App\Models\User;
+use App\Services\MissingSubmissionService;
 use App\Services\NplCalculatorService;
 use App\Services\PayrollService;
 use App\Services\SalaryProratingService;
@@ -36,7 +37,7 @@ class MissingSubmissions extends Component
      * Before this day, the current month's "Not Submit" list is not meaningful
      * because contractors are still within their submission window.
      */
-    const AUTO_SUBMIT_DAY = 16;
+    const AUTO_SUBMIT_DAY = MissingSubmissionService::AUTO_SUBMIT_DAY;
 
     public $missingContractors = [];
 
@@ -52,12 +53,9 @@ class MissingSubmissions extends Component
 
     public $resyncContractor = null;
 
-    protected $activeWorkerSubquery = null;
-
-    /** Per-request cache for getPayrollWorkerIdsByContractor(), keyed "year-month" */
-    protected array $payrollWorkerIdsCache = [];
-
     protected SalaryProratingService $proratingService;
+
+    protected ?MissingSubmissionService $missingSubmissionService = null;
 
     public $showRemindModal = false;
 
@@ -1072,168 +1070,57 @@ class MissingSubmissions extends Component
         $this->refreshOutOfSync();
     }
 
+    /*
+     * The counting rules live in MissingSubmissionService so the dashboard's
+     * Pending Submissions card uses exactly the same logic as this page.
+     */
+    protected function missingSubmissions(): MissingSubmissionService
+    {
+        // One instance per request so its per-period lookups are cached.
+        return $this->missingSubmissionService ??= app(MissingSubmissionService::class);
+    }
+
     protected function getActiveWorkerIds(): string
     {
-        if ($this->activeWorkerSubquery === null) {
-            $workerDb = config('database.connections.worker_db.database');
-            $this->activeWorkerSubquery = "EXISTS (SELECT 1 FROM `{$workerDb}`.`workers` WHERE `{$workerDb}`.`workers`.`wkr_id` = `contract_worker`.`con_wkr_id` AND `{$workerDb}`.`workers`.`wkr_status` = '1')";
-        }
-
-        return $this->activeWorkerSubquery;
+        return $this->missingSubmissions()->activeWorkerCondition();
     }
 
     /**
-     * Worker IDs to leave out of a payroll period: manually deactivated workers
-     * plus workers with a payroll exception for that month (defaults to the
-     * selected period).
+     * Worker IDs to leave out of a payroll period (defaults to the selected period).
      */
     protected function getInactiveWorkerIds(?int $month = null, ?int $year = null): array
     {
-        static $inactiveIds = null;
-        static $exceptedIds = [];
-
-        $month ??= (int) $this->selectedMonth;
-        $year ??= (int) $this->selectedYear;
-
-        if ($inactiveIds === null) {
-            $inactiveIds = \DB::table('inactive_workers')->pluck('worker_id')->all();
-        }
-
-        $key = "{$year}-{$month}";
-        if (! isset($exceptedIds[$key])) {
-            $exceptedIds[$key] = \App\Models\PayrollException::getExceptedWorkerIds($month, $year);
-        }
-
-        return array_values(array_unique(array_merge($inactiveIds, $exceptedIds[$key])));
+        return $this->missingSubmissions()->inactiveWorkerIds(
+            $month ?? (int) $this->selectedMonth,
+            $year ?? (int) $this->selectedYear
+        );
     }
 
     /**
-     * Worker IDs on payroll for a period, grouped by contractor and split into
-     * paid and not-yet-paid. Scoped per contractor so a worker who transferred
-     * mid-month is judged only by the submissions of the contractor being
-     * checked, and a paid record wins over another unpaid one.
-     *
      * @return array{paid: \Illuminate\Support\Collection, unpaid: \Illuminate\Support\Collection}
      */
     protected function getPayrollWorkerIdsByContractor(int $month, int $year): array
     {
-        $key = "{$year}-{$month}";
-        if (isset($this->payrollWorkerIdsCache[$key])) {
-            return $this->payrollWorkerIdsCache[$key];
-        }
-
-        $rows = PayrollWorker::join('payroll_submissions', 'payroll_submissions.id', '=', 'payroll_workers.payroll_submission_id')
-            ->where('payroll_submissions.month', $month)
-            ->where('payroll_submissions.year', $year)
-            ->get(['payroll_workers.worker_id', 'payroll_submissions.contractor_clab_no', 'payroll_submissions.status']);
-
-        $paid = $rows->where('status', 'paid')
-            ->groupBy('contractor_clab_no')
-            ->map(fn ($group) => $group->pluck('worker_id')->unique()->values());
-
-        $unpaid = $rows->where('status', '!=', 'paid')
-            ->groupBy('contractor_clab_no')
-            ->map(fn ($group, $clabNo) => $group->pluck('worker_id')->unique()
-                ->diff($paid->get($clabNo, collect()))
-                ->values());
-
-        return $this->payrollWorkerIdsCache[$key] = ['paid' => $paid, 'unpaid' => $unpaid];
+        return $this->missingSubmissions()->payrollWorkerIdsByContractor($month, $year);
     }
 
-    /**
-     * Workers whose contract starts on/after the cutoff day of this month — their
-     * partial first month is paid with next month's payroll, so a missing
-     * submission for them this month is expected.
-     */
     protected function getFirstMonthWaivedWorkerIds($contracts, int $month, int $year): \Illuminate\Support\Collection
     {
-        return $contracts
-            ->filter(fn ($cw) => $cw->con_start && $this->proratingService->isFirstMonthWaived(\Carbon\Carbon::parse($cw->con_start), $month, $year))
-            ->pluck('con_wkr_id');
+        return $this->missingSubmissions()->firstMonthWaivedWorkerIds($contracts, $month, $year);
     }
 
     protected function loadMissingContractors()
     {
-        $currentMonth = $this->selectedMonth;
-        $currentYear = $this->selectedYear;
+        $currentMonth = (int) $this->selectedMonth;
+        $currentYear = (int) $this->selectedYear;
 
-        // Get period boundaries
-        $periodStart = \Carbon\Carbon::create($currentYear, $currentMonth, 1)->startOfMonth();
-        $periodEnd = $periodStart->copy()->endOfMonth();
+        $status = $this->missingSubmissions()->contractorStatus($currentMonth, $currentYear);
 
-        $inactiveWorkerIds = $this->getInactiveWorkerIds();
+        $totalActiveWorkers = $status->map(fn ($s) => $s['total_workers']);
 
-        // Get all contractors with workers who had active contracts during this period
-        $contractorsWithActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->endsOnOrAfter($periodStart->toDateString())
-            ->whereRaw($this->getActiveWorkerIds())
-            ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
-            ->distinct()
-            ->pluck('con_ctr_clab_no')
-            ->unique();
-
-        // Count total active workers per contractor for this period
-        $totalActiveWorkers = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->endsOnOrAfter($periodStart->toDateString())
-            ->whereRaw($this->getActiveWorkerIds())
-            ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
-            ->select('con_ctr_clab_no', \DB::raw('COUNT(*) as count'))
-            ->groupBy('con_ctr_clab_no')
-            ->pluck('count', 'con_ctr_clab_no');
-
-        // Paid / not-yet-paid worker IDs for this month, per contractor
-        $payrollWorkerIds = $this->getPayrollWorkerIdsByContractor($currentMonth, $currentYear);
-
-        // Count workers by issue type per contractor
-        $contractors = ContractWorker::where('con_start', '<=', $periodEnd->toDateString())
-            ->endsOnOrAfter($periodStart->toDateString())
-            ->whereRaw($this->getActiveWorkerIds())
-            ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
-            ->select('con_ctr_clab_no')
-            ->groupBy('con_ctr_clab_no')
-            ->get();
-
-        $contractorIssues = collect();
-
-        foreach ($contractors as $contractor) {
-            $clabNo = $contractor->con_ctr_clab_no;
-
-            // Get all worker IDs with active contracts during this period
-            $activeContracts = ContractWorker::where('con_ctr_clab_no', $clabNo)
-                ->where('con_start', '<=', $periodEnd->toDateString())
-                ->endsOnOrAfter($periodStart->toDateString())
-                ->whereRaw($this->getActiveWorkerIds())
-                ->whereNotIn('con_wkr_id', $inactiveWorkerIds)
-                ->get(['con_wkr_id', 'con_start']);
-
-            if ($activeContracts->isEmpty()) {
-                continue;
-            }
-
-            $activeWorkerIds = $activeContracts->pluck('con_wkr_id');
-            $submittedAndPaidWorkerIds = $payrollWorkerIds['paid']->get($clabNo, collect());
-            $submittedButUnpaidWorkerIds = $payrollWorkerIds['unpaid']->get($clabNo, collect());
-
-            // Count workers not submitted at all (late starters are paid with next month's payroll)
-            $notSubmitted = $activeWorkerIds->diff($submittedAndPaidWorkerIds)
-                ->diff($submittedButUnpaidWorkerIds)
-                ->diff($this->getFirstMonthWaivedWorkerIds($activeContracts, $currentMonth, $currentYear))
-                ->count();
-
-            // Count workers submitted but not paid
-            $submittedNotPaid = $activeWorkerIds->intersect($submittedButUnpaidWorkerIds)->count();
-
-            // Total workers with issues
-            $totalIssues = $notSubmitted + $submittedNotPaid;
-
-            if ($totalIssues > 0) {
-                $contractorIssues->put($clabNo, [
-                    'total_issues' => $totalIssues,
-                    'not_submitted' => $notSubmitted,
-                    'submitted_not_paid' => $submittedNotPaid,
-                ]);
-            }
-        }
+        $contractorIssues = $status
+            ->map(fn ($s) => $s + ['total_issues' => $s['not_submitted'] + $s['submitted_not_paid']])
+            ->filter(fn ($s) => $s['total_issues'] > 0);
 
         if ($contractorIssues->isEmpty()) {
             $this->missingContractors = collect();

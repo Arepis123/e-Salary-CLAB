@@ -5,14 +5,18 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Pending Submissions</p>
-                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['clients_without_submission'] }}</p>
+                    <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{{ $stats['submission_window_open'] ? '—' : $stats['clients_without_submission'] }}</p>
                 </div>
                 <div class="rounded-full bg-orange-100 dark:bg-orange-900/30 p-3 hidden lg:hidden xl:block">
                     <flux:icon.exclamation-triangle class="size-6 text-orange-600 dark:text-orange-400" />
                 </div>
             </div>
             <div class="flex items-center gap-2 text-xs">
-                <span class="text-zinc-600 dark:text-zinc-400">{{ $stats['clients_with_submission_count'] }} of {{ $stats['total_clients'] }} submitted</span>
+                @if($stats['submission_window_open'])
+                    <span class="text-zinc-600 dark:text-zinc-400">Window open until {{ $stats['auto_submit_date'] }}</span>
+                @else
+                    <span class="text-zinc-600 dark:text-zinc-400">{{ $stats['clients_with_submission_count'] }} of {{ $stats['total_clients'] }} submitted</span>
+                @endif
             </div>
         </flux:card>
     </a>
