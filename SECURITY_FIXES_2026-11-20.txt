@@ -1,0 +1,222 @@
+e-Salary CLAB - Security Fixes
+Date: 20 November 2026
+Status: Changes made in the working copy, NOT yet committed or deployed.
+
+======================================================================
+SUMMARY
+======================================================================
+
+A full security review was done on the system (routes, user roles,
+Livewire pages, payment gateway, external API, file uploads/downloads,
+login, configuration and third-party packages). The issues below were
+found and fixed in the code. Items under "ACTION REQUIRED" cannot be
+fixed in code and must be done by the system owner.
+
+
+======================================================================
+1. CRITICAL - Payroll could be marked "paid" without paying
+======================================================================
+
+Problem:
+  The Billplz payment callback (/billplz/callback) accepted any request
+  that had no signature. Anyone could send "paid=true" with a bill ID
+  and the payroll would be marked as PAID with no money received. A
+  client can see their own bill ID in the Billplz payment link.
+
+Fix:
+  - The callback no longer trusts the data sent to it. It now asks the
+    Billplz API directly (using our own API key) whether the bill is
+    paid, and checks the amount paid covers the bill.
+  - The bill ID format is validated before it is used.
+  - The signature check was rewritten to follow Billplz's documented
+    method. It is now logged for monitoring only; the Billplz API
+    result is what decides.
+  - The "return from payment" page now also checks the amount paid.
+
+Files:
+  app/Http/Controllers/Client/PaymentController.php
+  app/Services/BillplzService.php
+
+
+======================================================================
+2. CRITICAL - Clients could change salaries and add other workers
+======================================================================
+
+Problem:
+  On the Timesheet and Edit Draft pages, the browser could rewrite the
+  basic salary, payment totals, worker IDs and the payroll month before
+  submitting. A client could submit a lower salary, include a worker
+  from another company, or submit for a month they were blocked from.
+
+Fix:
+  - New service ClientPayrollInputGuard rebuilds every payroll row
+    from the server's own copy of the data loaded with the page.
+  - Clients can now change only OT hours and transactions, and only
+    while those are not locked.
+  - Transaction types must be one of the allowed types, amounts must be
+    between RM 0 and RM 100,000, and OT hours between 0 and 744.
+  - NPL (no-pay leave) amounts are recalculated on the server.
+  - The payroll month and draft ID can no longer be changed from the
+    browser.
+
+Files:
+  app/Services/ClientPayrollInputGuard.php (new)
+  app/Livewire/Client/Timesheet.php
+  app/Livewire/Client/TimesheetEdit.php
+
+
+======================================================================
+3. HIGH - OT & Transaction page rules could be bypassed
+======================================================================
+
+Problem:
+  - Locked OT entries could be edited and reset to "draft".
+  - OT could be saved for workers outside the client's company.
+  - The block for unpaid/outstanding payroll only hid the form on
+    screen; saving still worked.
+  - Transaction types and amounts were not checked when saving.
+
+Fix:
+  - The server now refuses to save locked entries and workers that do
+    not belong to the client.
+  - The outstanding-payroll block is checked on the server before every
+    save and submit.
+  - Transactions are validated the same way as in item 2.
+  - Uploaded Salary Deduction Forms are saved with the file extension
+    detected from the file content, not the name given by the user.
+
+Files:
+  app/Livewire/Client/OTEntry.php
+  app/Services/OTEntryService.php
+
+
+======================================================================
+4. HIGH - Payslip API could point to any file on the server
+======================================================================
+
+Problem:
+  The payslip API (/api/payslip/notify) accepted file names such as
+  "../../.env". That path would be saved as a payslip and then offered
+  to the client as a download.
+
+Fix:
+  - File names containing folders or ".." are refused.
+  - The API token is compared in a timing-safe way.
+  - Error messages no longer show the full server path.
+
+File:
+  app/Http/Controllers/Api/PayslipNotifyController.php
+
+
+======================================================================
+5. MEDIUM - Other fixes
+======================================================================
+
+a) Public registration removed
+   The Register page let anyone create an account. The page, route and
+   component were removed. New accounts can only be created by an
+   admin.
+   Files: routes/auth.php, app/Livewire/Auth/Register.php (deleted),
+          resources/views/livewire/auth/register.blade.php (deleted),
+          resources/views/components/layouts/guest.blade.php,
+          tests/Feature/Auth/RegistrationTest.php
+
+b) Payment result page showed other companies' payrolls
+   A logged-in client could open the payment result page of another
+   company's payroll. It now returns "not found".
+   File: app/Http/Controllers/Client/PaymentController.php
+
+c) Disabled accounts stayed logged in
+   Accounts disabled by an admin kept access until their session ended.
+   They are now logged out on their next request.
+   Files: app/Http/Middleware/EnsureUserIsActive.php (new),
+          bootstrap/app.php
+
+d) Login lockout too short
+   After 3 failed logins the lockout lasted 60 seconds instead of the
+   intended 15 minutes. It is now 15 minutes. The "remember me" token
+   is also compared in a timing-safe way.
+   Files: app/Livewire/Auth/Login.php,
+          app/Auth/ThirdPartyUserProvider.php
+
+e) No rate limit on public endpoints
+   The Billplz callback, Brevo webhook and payslip API now have request
+   rate limits.
+   File: routes/web.php
+
+f) PhpSpreadsheet security flaw
+   This package reads the OT Excel files clients upload, and version
+   1.30.0 had known critical flaws. Updated to 1.30.8.
+   File: composer.lock
+
+g) Secrets file stored in git
+   The file .env.real (database passwords, app key, mail password,
+   Billplz keys) was committed to GitHub. It has been removed from git
+   tracking and all .env.* files are now ignored (except .env.example).
+   The local copy of the file was kept.
+   File: .gitignore
+
+
+======================================================================
+TESTING DONE
+======================================================================
+
+Passed:
+  - A forged callback with no signature is rejected.
+  - Underpaid and unpaid bills are not treated as paid.
+  - Tampered salary, unknown workers, invalid transaction types,
+    negative amounts and out-of-range OT hours are all rejected.
+  - NPL amounts are recalculated on the server correctly.
+  - All changed files pass a PHP syntax check, all page templates
+    compile, and the routes load.
+  - All 108 existing user accounts are active, so the new disabled-
+    account check does not log anyone out by mistake.
+
+Not done:
+  - The automated test suite cannot run. A MySQL-only migration fails
+    on the SQLite test database before any test starts. This problem
+    existed before these changes.
+
+Manual checks needed before deploying:
+  [ ] Submit a timesheet
+  [ ] Edit and resubmit a draft
+  [ ] Save, submit and import OT entries
+  [ ] Make one payment in Billplz sandbox mode and confirm it is
+      marked paid
+  [ ] After that payment, check the log for "signature mismatch".
+      It is harmless now, but report it if it appears.
+
+
+======================================================================
+ACTION REQUIRED (cannot be fixed in code)
+======================================================================
+
+1. Change all passwords and keys that were in .env.real
+   It has been in GitHub history since commit f808a10: APP_KEY, worker
+   and auth database passwords, mail password and Billplz keys. If the
+   repository is or ever was public, treat them all as already stolen.
+   Removing the file from git history requires rewriting history and
+   force-pushing.
+
+2. Check the production .env
+     APP_ENV=production
+     APP_DEBUG=false
+     SESSION_SECURE_COOKIE=true
+   Debugbar is installed as a production package, so leaving debug mode
+   on would expose database queries and session data.
+
+3. Update the remaining packages
+   There are still 71 known security advisories across Laravel,
+   Symfony, Guzzle and other packages. The full update needs the
+   production server's PHP version confirmed first, because some
+   updated packages need PHP 8.4. Also run "npm audit fix".
+
+4. Outside this system
+   - Client passwords in the CLAB auth database are stored as unsalted
+     MD5, which is weak if that database leaks.
+   - Two-factor login for admin accounts is recommended.
+
+After deploying, run:
+  php artisan route:clear
+  php artisan view:clear
+  php artisan config:clear

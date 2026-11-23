@@ -146,7 +146,9 @@ class ClientPayrollInputGuard
                     $nplDetails[] = $this->nplCalculator->calculateMonth($monthlySalary, $year, $month, (float) $days);
                 }
 
-                $amount = round(array_sum(array_column($nplDetails, 'amount')), 2);
+                // An NPL transaction's `amount` is its total day count; the
+                // ringgit value lives in the breakdown rows.
+                $amount = round(array_sum(array_column($nplDetails, 'npl_days')), 1);
             }
 
             $clean[] = [
