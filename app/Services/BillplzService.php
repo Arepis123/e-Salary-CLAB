@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
@@ -126,6 +127,60 @@ class BillplzService
             ]);
 
             return false;
+        }
+    }
+
+    /**
+     * Make sure a bill can no longer be paid, before a replacement is issued.
+     *
+     * Returns ['status' => ..., 'bill' => ?array] where status is:
+     *  - 'closed'  the bill was deleted now, or was already gone
+     *  - 'paid'    money was taken on it, so it must not be replaced
+     *  - 'unknown' Billplz could not be reached; its state is not known
+     */
+    public function closeUnpaidBill(string $billId): array
+    {
+        try {
+            $bill = json_decode($this->client->get("bills/{$billId}")->getBody()->getContents(), true);
+        } catch (ClientException $e) {
+            if ($e->getResponse()->getStatusCode() === 404) {
+                return ['status' => 'closed', 'bill' => null];
+            }
+
+            Log::warning('Billplz bill lookup failed while closing bill', ['bill_id' => $billId, 'error' => $e->getMessage()]);
+
+            return ['status' => 'unknown', 'bill' => null];
+        } catch (GuzzleException $e) {
+            Log::warning('Billplz bill lookup failed while closing bill', ['bill_id' => $billId, 'error' => $e->getMessage()]);
+
+            return ['status' => 'unknown', 'bill' => null];
+        }
+
+        if (($bill['paid'] ?? false) === true || ($bill['state'] ?? null) === 'paid') {
+            return ['status' => 'paid', 'bill' => $bill];
+        }
+
+        if (($bill['state'] ?? null) === 'deleted') {
+            return ['status' => 'closed', 'bill' => $bill];
+        }
+
+        try {
+            $this->client->delete("bills/{$billId}");
+            Log::info('Billplz bill closed before issuing a new one', ['bill_id' => $billId]);
+
+            return ['status' => 'closed', 'bill' => $bill];
+        } catch (ClientException $e) {
+            if ($e->getResponse()->getStatusCode() === 404) {
+                return ['status' => 'closed', 'bill' => $bill];
+            }
+
+            Log::warning('Billplz bill could not be closed', ['bill_id' => $billId, 'error' => $e->getMessage()]);
+
+            return ['status' => 'unknown', 'bill' => $bill];
+        } catch (GuzzleException $e) {
+            Log::warning('Billplz bill could not be closed', ['bill_id' => $billId, 'error' => $e->getMessage()]);
+
+            return ['status' => 'unknown', 'bill' => $bill];
         }
     }
 

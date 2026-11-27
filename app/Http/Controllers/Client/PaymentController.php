@@ -10,6 +10,7 @@ use App\Services\BillplzService;
 use App\Services\ContractorConfigurationService;
 use App\Traits\LogsActivity;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
@@ -30,6 +31,97 @@ class PaymentController extends Controller
      * Create Billplz bill and redirect to payment
      */
     public function createPayment(Request $request, $submissionId)
+    {
+        // One payment set-up per payroll at a time: two quick clicks must not
+        // both get past the checks below and issue two bills.
+        $lock = Cache::lock('payroll-payment:'.(int) $submissionId, 60);
+
+        if (! $lock->get()) {
+            return redirect()->route('timesheet')
+                ->with('error', 'A payment for this payroll is already being prepared. Please wait a moment and try again.');
+        }
+
+        try {
+            return $this->startPayment($request, $submissionId);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Close every earlier Billplz bill for this payroll so it can no longer be
+     * paid. Returns a response when a new bill must not be issued, or null
+     * when it is safe to go ahead.
+     *
+     * Payment rows are kept as they are for attempt tracking; only pending
+     * rows whose bill has now been closed are marked cancelled.
+     */
+    protected function closeOpenBills(PayrollSubmission $submission)
+    {
+        $billIds = PayrollPayment::where('payroll_submission_id', $submission->id)
+            ->whereIn('status', ['pending', 'failed', 'cancelled'])
+            ->whereNotNull('billplz_bill_id')
+            ->distinct()
+            ->pluck('billplz_bill_id');
+
+        foreach ($billIds as $billId) {
+            $result = $this->billplzService->closeUnpaidBill($billId);
+
+            if ($result['status'] === 'closed') {
+                PayrollPayment::where('payroll_submission_id', $submission->id)
+                    ->where('billplz_bill_id', $billId)
+                    ->where('status', 'pending')
+                    ->update([
+                        'status' => 'cancelled',
+                        'payment_response' => json_encode([
+                            'reason' => 'Bill closed before a new bill was issued',
+                            'cancelled_at' => now()->toDateTimeString(),
+                        ]),
+                    ]);
+
+                continue;
+            }
+
+            if ($result['status'] === 'paid') {
+                // The client already paid on this bill; the callback may not
+                // have arrived yet. Record it instead of billing them again.
+                $payment = PayrollPayment::where('payroll_submission_id', $submission->id)
+                    ->where('billplz_bill_id', $billId)
+                    ->where('status', '!=', 'redirected')
+                    ->orderBy('id')
+                    ->first();
+
+                if ($payment && $this->billplzService->isBillPaidInFull($result['bill'], (float) $payment->amount)) {
+                    $payment->markAsCompleted(['verified_bill' => $result['bill']], ['transaction_id' => $billId]);
+
+                    return redirect()->route('timesheet')
+                        ->with('success', 'This payroll has already been paid.');
+                }
+
+                Log::critical('Earlier bill was paid but not in full — new bill blocked', [
+                    'submission_id' => $submission->id,
+                    'bill_id' => $billId,
+                    'payment_id' => $payment?->id,
+                    'paid_amount_sen' => $result['bill']['paid_amount'] ?? null,
+                ]);
+
+                return redirect()->route('timesheet')
+                    ->with('error', 'A payment was received on an earlier bill for this payroll. Please contact support before paying again.');
+            }
+
+            Log::warning('Could not confirm an earlier bill is closed — new bill blocked', [
+                'submission_id' => $submission->id,
+                'bill_id' => $billId,
+            ]);
+
+            return redirect()->route('timesheet')
+                ->with('error', 'We could not confirm the status of your previous payment attempt. Please try again in a few minutes.');
+        }
+
+        return null;
+    }
+
+    protected function startPayment(Request $request, $submissionId)
     {
         $clabNo = $request->user()->contractor_clab_no;
 
@@ -95,7 +187,7 @@ class PaymentController extends Controller
             try {
                 $bill = $this->billplzService->getBill($recentPendingPayment->billplz_bill_id);
 
-                if ($bill) {
+                if ($bill && ($bill['state'] ?? null) === 'due') {
                     $billExists = true;
 
                     Log::info('Redirecting to existing pending payment', [
@@ -105,7 +197,7 @@ class PaymentController extends Controller
                         'bill_verified' => true,
                     ]);
                 } else {
-                    Log::warning('Bill not found on Billplz, will create new bill', [
+                    Log::warning('Pending bill is no longer payable on Billplz, will close it and create a new bill', [
                         'payment_id' => $recentPendingPayment->id,
                         'bill_id' => $recentPendingPayment->billplz_bill_id,
                         'submission_id' => $submission->id,
@@ -162,65 +254,17 @@ class PaymentController extends Controller
                 $url = $this->billplzService->getDirectPaymentUrl($recentPendingPayment->billplz_url);
 
                 return redirect($url);
-            } else {
-                // Bill was deleted from Billplz, mark payment as cancelled and create new bill
-                $recentPendingPayment->update([
-                    'status' => 'cancelled',
-                    'payment_response' => json_encode([
-                        'reason' => 'Bill deleted from Billplz portal',
-                        'cancelled_at' => now()->toDateTimeString(),
-                        'auto_cancelled' => true,
-                    ]),
-                ]);
-
-                Log::info('Marked payment as cancelled due to deleted bill, creating new bill', [
-                    'cancelled_payment_id' => $recentPendingPayment->id,
-                    'submission_id' => $submission->id,
-                ]);
-
-                // Continue to create a new bill (don't return, let execution continue)
             }
+
+            // The bill could not be confirmed as payable. Don't assume it is gone:
+            // the close step below checks it properly before a new bill is issued.
         }
 
-        // If there's an old/expired pending payment (>2 hours old), cancel it and clean up.
-        // Also cancel any stale failed/cancelled payments to keep history clean.
-        // $latestPendingPayment is already set above; handle the expired case here.
-        $expiredPendingPayment = null;
-        if ($latestPendingPayment && ! $recentPendingPayment) {
-            // Pending payment exists but is older than 2 hours — treat as expired
-            $expiredPendingPayment = $latestPendingPayment;
-        }
-
-        if ($expiredPendingPayment) {
-            $expiredPendingPayment->update([
-                'status' => 'cancelled',
-                'payment_response' => json_encode([
-                    'reason' => 'Payment expired or user initiated new payment',
-                    'cancelled_at' => now()->toDateTimeString(),
-                ]),
-            ]);
-
-            Log::info('Marked old pending payment as cancelled', [
-                'old_payment_id' => $expiredPendingPayment->id,
-                'submission_id' => $submission->id,
-            ]);
-
-            // Try to delete the old Billplz bill
-            try {
-                if ($expiredPendingPayment->billplz_bill_id) {
-                    $this->billplzService->deleteBill($expiredPendingPayment->billplz_bill_id);
-                    Log::info('Deleted previous Billplz bill before retry', [
-                        'old_bill_id' => $expiredPendingPayment->billplz_bill_id,
-                        'old_payment_id' => $expiredPendingPayment->id,
-                        'submission_id' => $submission->id,
-                    ]);
-                }
-            } catch (\Exception $e) {
-                Log::warning('Could not delete previous Billplz bill', [
-                    'bill_id' => $expiredPendingPayment->billplz_bill_id ?? 'unknown',
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        // Close every earlier bill for this payroll before issuing a new one, so
+        // only one bill can ever be paid. Earlier code left failed bills open on
+        // Billplz, which let a client pay the same payroll twice.
+        if ($blocked = $this->closeOpenBills($submission)) {
+            return $blocked;
         }
 
         // Check for penalty (overdue) and update if needed
@@ -374,8 +418,12 @@ class PaymentController extends Controller
             ]);
         }
 
-        // Find payment by billplz_bill_id
-        $payment = PayrollPayment::where('billplz_bill_id', $billplzId)->first();
+        // Find payment by billplz_bill_id. 'redirected' rows share the bill ID but
+        // only log attempts; the original row is the one that holds the bill.
+        $payment = PayrollPayment::where('billplz_bill_id', $billplzId)
+            ->where('status', '!=', 'redirected')
+            ->orderBy('id')
+            ->first();
 
         if (! $payment) {
             Log::error('Payment not found for Billplz callback', [
@@ -435,21 +483,46 @@ class PaymentController extends Controller
         $paymentType = $bankCode && in_array($bankCode, $b2bBankCodes) ? 'B2B' : 'B2C';
 
         if ($paid) {
-            // Payment successful (verified against the Billplz API) - update all fields at once to ensure transaction_id is saved
-            $payment->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'payment_response' => json_encode(['callback' => $request->except('x_signature'), 'verified_bill' => $bill]),
-                'transaction_id' => $billplzBillId,
-                'payment_type' => $paymentType,
-                'bank_name' => $bankName,
-            ]);
+            // Payment successful (verified against the Billplz API). markAsCompleted
+            // refuses to mark the payroll paid twice and flags a second payment.
+            $firstPayment = $payment->markAsCompleted(
+                ['callback' => $request->except('x_signature'), 'verified_bill' => $bill],
+                [
+                    'transaction_id' => $billplzBillId,
+                    'payment_type' => $paymentType,
+                    'bank_name' => $bankName,
+                ]
+            );
 
-            // Update payroll submission status
-            $payment->payrollSubmission->update([
-                'status' => 'paid',
-                'paid_at' => now(),
-            ]);
+            if (! $firstPayment) {
+                $submission = $payment->payrollSubmission;
+                $payment->refresh();
+
+                ActivityLog::create([
+                    'user_id' => $submission->user_id ?? null,
+                    'contractor_clab_no' => $submission->contractor_clab_no,
+                    'user_name' => $submission->user ? ($submission->user->name ?? $submission->user->company_name) : 'Client '.$submission->contractor_clab_no,
+                    'user_email' => $submission->user?->email,
+                    'module' => 'payment',
+                    'action' => 'duplicate',
+                    'description' => 'Duplicate payment of RM '.number_format($amount, 2)." received for payroll {$submission->month_year}, which was already paid. Refund required.",
+                    'subject_type' => get_class($payment),
+                    'subject_id' => $payment->id,
+                    'properties' => [
+                        'submission_id' => $submission->id,
+                        'amount' => $amount,
+                        'transaction_id' => $billplzBillId,
+                        'duplicate_of_payment_id' => $payment->payment_response['duplicate_of_payment_id'] ?? null,
+                        'period' => $submission->month_year,
+                    ],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => 'Billplz Webhook',
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                ]);
+
+                return response('OK');
+            }
 
             Log::info('Billplz payment completed', [
                 'payment_id' => $payment->id,
@@ -552,6 +625,8 @@ class PaymentController extends Controller
         if ($billplzBillId) {
             $payment = PayrollPayment::where('payroll_submission_id', $submissionId)
                 ->where('billplz_bill_id', $billplzBillId)
+                ->where('status', '!=', 'redirected')
+                ->orderBy('id')
                 ->first();
         }
 
@@ -562,7 +637,7 @@ class PaymentController extends Controller
 
         // Payment still pending, check with Billplz first
         $billPaid = false;
-        if ($payment && $payment->billplz_bill_id && $payment->status === 'pending') {
+        if ($payment && $payment->billplz_bill_id && in_array($payment->status, ['pending', 'failed', 'cancelled'])) {
             $bill = $this->billplzService->getBill($payment->billplz_bill_id);
 
             if ($bill && $this->billplzService->isBillPaidInFull($bill, (float) $payment->amount)) {

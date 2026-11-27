@@ -40,6 +40,18 @@ class BreakdownFileParser
      */
     public const WORKER_DEDUCTION_COLUMNS = ['SKBBK'];
 
+    /**
+     * Basic salary columns, most specific first. Gross Salary is built from
+     * the basic after unpaid leave, so that is the one to take when present.
+     */
+    public const BASIC_COLUMNS = ['Basic (After Unpaid Leaves)', 'Basic (After Prorate)', 'Basic'];
+
+    /** Overtime earned in the month. */
+    public const OVERTIME_COLUMNS = ['Overtime'];
+
+    /** Every other earning that goes into Gross Salary. */
+    public const ALLOWANCE_COLUMNS = ['Add-On Salary', 'General Allowance', 'Al Encashment', 'Ot Backpay', 'Medical Claim'];
+
     /** Rows to scan while hunting for the header row. */
     protected const HEADER_SEARCH_ROWS = 10;
 
@@ -49,7 +61,7 @@ class BreakdownFileParser
     /**
      * Parse a breakdown spreadsheet into its itemised totals.
      *
-     * @return array{gross_salary: float, epf: float, socso: float, eis: float, hrdf: float, backpay: float, skbbk: float, custom_advance_salary: float, custom_accomodation: float, custom_npl: float, total: float}
+     * @return array{gross_salary: float, epf: float, socso: float, eis: float, hrdf: float, backpay: float, skbbk: float, custom_advance_salary: float, custom_accomodation: float, custom_npl: float, total: float, earnings?: array{basic: float, overtime: float, allowances: float}}
      *
      * @throws BreakdownFileParseException
      */
@@ -98,7 +110,7 @@ class BreakdownFileParser
 
             $additions = array_sum($totals) - $totals['Backpay'];
 
-            return [
+            $result = [
                 'gross_salary' => $totals['Gross Salary'],
                 'epf' => $totals['EPF'],
                 'socso' => $totals['SOCSO'],
@@ -111,10 +123,59 @@ class BreakdownFileParser
                 'custom_npl' => $deductions['Custom Npl'],
                 'total' => $additions - array_sum($deductions),
             ];
+
+            // How the gross is made up, taken from the file itself so the
+            // breakdown never has to guess it from the contractor's OT hours.
+            // Display only: it plays no part in the total above.
+            $earnings = $this->readEarnings($sheet, $columnIndices, $totalsRow);
+
+            if ($earnings !== null) {
+                $result['earnings'] = $earnings;
+            }
+
+            return $result;
         } finally {
             // Keeps memory flat when a caller parses hundreds of files in a row.
             $spreadsheet->disconnectWorksheets();
         }
+    }
+
+    /**
+     * Read the earnings that make up Gross Salary from the totals row.
+     *
+     * Returns null when the file has neither a basic nor an overtime column,
+     * so older layouts keep the previous behaviour.
+     *
+     * @param  array<string, int>  $columnIndices
+     * @return array{basic: float, overtime: float, allowances: float}|null
+     */
+    protected function readEarnings($sheet, array $columnIndices, int $totalsRow): ?array
+    {
+        $read = fn (string $column) => (float) $sheet
+            ->getCellByColumnAndRow($columnIndices[$column], $totalsRow)
+            ->getCalculatedValue();
+
+        $basicColumn = null;
+        foreach (self::BASIC_COLUMNS as $column) {
+            if (isset($columnIndices[$column])) {
+                $basicColumn = $column;
+                break;
+            }
+        }
+
+        $overtimeColumns = array_filter(self::OVERTIME_COLUMNS, fn ($column) => isset($columnIndices[$column]));
+
+        if ($basicColumn === null && $overtimeColumns === []) {
+            return null;
+        }
+
+        $allowanceColumns = array_filter(self::ALLOWANCE_COLUMNS, fn ($column) => isset($columnIndices[$column]));
+
+        return [
+            'basic' => $basicColumn !== null ? $read($basicColumn) : 0.0,
+            'overtime' => array_sum(array_map($read, $overtimeColumns)),
+            'allowances' => array_sum(array_map($read, $allowanceColumns)),
+        ];
     }
 
     /**
@@ -178,6 +239,9 @@ class BreakdownFileParser
             self::OPTIONAL_ADDITION_COLUMNS,
             self::OPTIONAL_DEDUCTION_COLUMNS,
             self::WORKER_DEDUCTION_COLUMNS,
+            self::BASIC_COLUMNS,
+            self::OVERTIME_COLUMNS,
+            self::ALLOWANCE_COLUMNS,
         );
 
         $indices = [];

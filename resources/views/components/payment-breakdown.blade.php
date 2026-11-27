@@ -32,12 +32,20 @@
     // alongside statutory rather than reducing the client's bill.
     $withheld = $b['worker_statutory'] + $skbbk + $b['retained_deductions'];
 
-    // The breakdown file only carries a single gross figure, so its make-up is
-    // taken from the contractor's worker rows. Anything the two do not account
-    // for is shown as its own line rather than silently folded into one of the
-    // components.
-    $earningLines = array_values(array_filter([
-        ['Basic salary ('.$b['workers_counted'].' '.Str::plural('worker', $b['workers_counted']).')', $b['basic_salary']],
+    // The make-up of the gross comes from the approved file when it was stored
+    // (files parsed from this release onward). Older itemisations only carry a
+    // single gross figure, so those fall back to the contractor's worker rows.
+    // Anything the lines do not account for is shown as its own line rather
+    // than silently folded into one of the components.
+    $fileEarnings = is_array($file['earnings'] ?? null) ? $file['earnings'] : null;
+    $basicLabel = 'Basic salary ('.$b['workers_counted'].' '.Str::plural('worker', $b['workers_counted']).')';
+
+    $earningLines = array_values(array_filter($fileEarnings ? [
+        [$basicLabel, $fileEarnings['basic'] ?? 0],
+        ['Overtime', $fileEarnings['overtime'] ?? 0],
+        ['Allowances / claims / backpay', $fileEarnings['allowances'] ?? 0],
+    ] : [
+        [$basicLabel, $b['basic_salary']],
         ['Overtime', $b['overtime']],
         ['Allowances / claims / backpay', $b['additional_earnings']],
     ], fn ($line) => (float) $line[1] > 0));

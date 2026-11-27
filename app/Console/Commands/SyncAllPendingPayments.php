@@ -110,23 +110,24 @@ class SyncAllPendingPayments extends Command
                     if (! $dryRun) {
                         DB::beginTransaction();
 
-                        $payment->update([
-                            'status'           => 'completed',
-                            'completed_at'     => $paidAt,
-                            'payment_response' => json_encode($bill),
-                            'transaction_id'   => $bill['id'] ?? $payment->billplz_bill_id,
-                        ]);
-
                         $submission = $payment->payrollSubmission;
 
                         if (! $submission) {
                             throw new \Exception("Submission not found for payment {$payment->id}");
                         }
 
-                        $submission->update([
-                            'status'  => 'paid',
-                            'paid_at' => $paidAt,
+                        // Refuses to mark the payroll paid twice; a second
+                        // payment is recorded and flagged for refund instead.
+                        $firstPayment = $payment->markAsCompleted($bill, [
+                            'completed_at'   => $paidAt,
+                            'transaction_id' => $bill['id'] ?? $payment->billplz_bill_id,
                         ]);
+
+                        if (! $firstPayment) {
+                            $this->error("    → DUPLICATE: payroll #{$submission->id} was already paid. Refund required.");
+                        }
+
+                        $submission->refresh();
 
                         if (! $submission->hasTaxInvoice()) {
                             $submission->generateTaxInvoiceNumber();

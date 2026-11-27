@@ -30,7 +30,10 @@ class SyncPaymentStatus extends Command
         $this->newLine();
 
         // Find payment in database
-        $payment = PayrollPayment::where('billplz_bill_id', $billId)->first();
+        $payment = PayrollPayment::where('billplz_bill_id', $billId)
+            ->where('status', '!=', 'redirected')
+            ->orderBy('id')
+            ->first();
 
         if (! $payment) {
             $this->error("Payment not found in database with bill ID: {$billId}");
@@ -123,21 +126,19 @@ class SyncPaymentStatus extends Command
         try {
             DB::beginTransaction();
 
-            $payment->update([
-                'status' => 'completed',
+            $firstPayment = $payment->markAsCompleted($bill, [
                 'completed_at' => $bill['paid_at'] ?? now(),
-                'payment_response' => json_encode($bill),
                 'transaction_id' => $bill['id'],
             ]);
-
-            // Update submission status
             $submission = $payment->payrollSubmission;
-            $submission->update([
-                'status' => 'paid',
-                'paid_at' => $bill['paid_at'] ?? now(),
-            ]);
 
             DB::commit();
+
+            if (! $firstPayment) {
+                $this->error('This payroll was already paid by another payment. This one is recorded as a DUPLICATE — a refund is required.');
+
+                return self::SUCCESS;
+            }
 
             $this->newLine();
             $this->info('✓ Payment status synced successfully!');

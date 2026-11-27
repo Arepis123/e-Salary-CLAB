@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PayrollPayment extends Model
 {
@@ -94,21 +96,76 @@ class PayrollPayment extends Model
     }
 
     /**
-     * Mark payment as completed
+     * Mark payment as completed and its payroll as paid.
+     *
+     * A payroll is paid once. If it is already paid when this payment comes
+     * in, the money was still taken, so this payment is recorded as completed
+     * but flagged with `duplicate_of_payment_id` for a refund, and the payroll
+     * is left as it is. Returns false in that case, true otherwise.
+     *
+     * @param  array  $attributes  Extra columns to save (transaction_id, bank_name, completed_at...)
      */
-    public function markAsCompleted(array $response = []): void
+    public function markAsCompleted(array $response = [], array $attributes = []): bool
     {
-        $this->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'payment_response' => json_encode($response),
-        ]);
+        return DB::transaction(function () use ($response, $attributes) {
+            // Lock the payroll row so two completions for it run one at a time.
+            $submission = PayrollSubmission::whereKey($this->payroll_submission_id)
+                ->lockForUpdate()
+                ->first();
 
-        // Update payroll submission status
-        $this->payrollSubmission->update([
-            'status' => 'paid',
-            'paid_at' => now(),
-        ]);
+            $this->refresh();
+
+            if ($this->status === 'completed') {
+                return true;
+            }
+
+            $earlierPaymentId = static::where('payroll_submission_id', $this->payroll_submission_id)
+                ->whereKeyNot($this->id)
+                ->where('status', 'completed')
+                ->value('id');
+
+            $isDuplicate = $earlierPaymentId !== null || $submission?->status === 'paid';
+
+            if ($isDuplicate) {
+                $response['duplicate_of_payment_id'] = $earlierPaymentId;
+                $response['refund_required'] = true;
+            }
+
+            $completedAt = $attributes['completed_at'] ?? now();
+
+            $this->update(array_merge($attributes, [
+                'status' => 'completed',
+                'completed_at' => $completedAt,
+                'payment_response' => json_encode($response),
+            ]));
+
+            if ($isDuplicate) {
+                Log::critical('Duplicate payment received for a payroll that is already paid — refund required', [
+                    'payment_id' => $this->id,
+                    'duplicate_of_payment_id' => $earlierPaymentId,
+                    'submission_id' => $this->payroll_submission_id,
+                    'amount' => $this->amount,
+                    'billplz_bill_id' => $this->billplz_bill_id,
+                ]);
+
+                return false;
+            }
+
+            $submission?->update([
+                'status' => 'paid',
+                'paid_at' => $completedAt,
+            ]);
+
+            return true;
+        });
+    }
+
+    /**
+     * Whether this payment was taken for a payroll that was already paid.
+     */
+    public function isDuplicate(): bool
+    {
+        return (bool) ($this->payment_response['refund_required'] ?? false);
     }
 
     /**
