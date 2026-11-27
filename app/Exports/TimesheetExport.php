@@ -81,6 +81,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             // NPL is reported as the month the leave was taken plus the day count.
             'NPL MONTH',
             'NPL DAYS',
+            'NPL AMOUNT (RM)',
             'Other Deduction',
             'Normal',
             'Rest Day',
@@ -154,6 +155,7 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             $medicalClaim > 0 ? $medicalClaim : '', // MEDICAL CLAIM
             ! empty($nplMonths) ? implode(', ', array_unique($nplMonths)) : '', // NPL MONTH
             $npl > 0 ? $npl : '', // NPL DAYS
+            ($entry->npl_amount ?? 0) > 0 ? round((float) $entry->npl_amount, 2) : '', // NPL AMOUNT (RM)
             $otherDeduction > 0 ? $otherDeduction : '', // Other Deduction
             $entry->ot_normal_hours > 0 ? $entry->ot_normal_hours : '', // Normal OT
             $entry->ot_rest_hours > 0 ? $entry->ot_rest_hours : '', // Rest OT
@@ -229,15 +231,16 @@ class TimesheetExport implements FromCollection, WithColumnWidths, WithHeadings,
             'O' => 14, // MEDICAL CLAIM
             'P' => 22, // NPL MONTH
             'Q' => 10, // NPL DAYS
-            'R' => 15, // Other Deduction
-            'S' => 12, // Normal
-            'T' => 12, // Rest Day
-            'U' => 14, // Public holiday
-            'V' => 12, // Total OT
+            'R' => 16, // NPL AMOUNT (RM)
+            'S' => 15, // Other Deduction
+            'T' => 12, // Normal
+            'U' => 12, // Rest Day
+            'V' => 14, // Public holiday
+            'W' => 12, // Total OT
         ];
 
-        // Add column widths for deduction templates (starting after the fixed columns at column W)
-        $columnIndex = 22; // W = 23rd column (0-indexed = 22)
+        // Add column widths for deduction templates (starting after the fixed columns at column X)
+        $columnIndex = 23; // X = 24th column (0-indexed = 23)
         foreach ($this->deductionTemplates as $template) {
             $columnLetter = $this->getColumnLetter($columnIndex);
             $widths[$columnLetter] = max(15, strlen($template->name) + 2);

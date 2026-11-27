@@ -779,6 +779,29 @@ class Report extends Component
             ->toArray();
     }
 
+    /**
+     * Ringgit value of a worker's No-Pay Leave for the timesheet report.
+     *
+     * Once payroll is submitted, the payroll worker's own NPL transactions are
+     * the source of truth (same figure as PayrollWorker::total_npl, which is
+     * what is deducted from net salary). Before submission, the client's OT
+     * entry transactions are valued the same way.
+     */
+    protected function timesheetNplAmount($payrollWorker, $otEntry, float $salary): float
+    {
+        if ($payrollWorker) {
+            $transactions = $payrollWorker->transactions;
+            $salary = (float) $payrollWorker->basic_salary;
+        } else {
+            $transactions = $otEntry ? $otEntry->transactions : collect();
+        }
+
+        return round(
+            $transactions->where('type', 'npl')->sum(fn ($transaction) => $transaction->nplAmount($salary)),
+            2
+        );
+    }
+
     protected function loadTimesheetData()
     {
         $selectedMonth = $this->selectedMonth ?? now()->month;
@@ -807,7 +830,7 @@ class Report extends Component
         // Get all payroll submissions for the period (to check who submitted)
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
-            ->with(['user', 'workers'])
+            ->with(['user', 'workers.transactions.nplDetails'])
             ->get()
             ->keyBy('contractor_clab_no');
 
@@ -915,9 +938,8 @@ class Report extends Component
                 $advanceSalary = 0;
                 $clientDeduction = 0;
                 $npl = 0;
-                // NPL is recorded in days; these carry the ringgit value and the
-                // months the leave was actually taken.
-                $nplAmount = 0;
+                // NPL is recorded in days; this carries the months the leave
+                // was actually taken (the ringgit value is worked out below).
                 $nplMonths = [];
                 $accommodation = 0;
                 $medicalClaim = 0;
@@ -937,7 +959,6 @@ class Report extends Component
                             $clientDeduction += $transaction->amount;
                         } elseif ($transaction->type === 'npl') {
                             $npl += $transaction->amount;
-                            $nplAmount += $transaction->nplAmount((float) $salary);
                             foreach ($transaction->nplDetails as $detail) {
                                 $nplMonths[] = $detail->short_month_label;
                             }
@@ -948,6 +969,8 @@ class Report extends Component
                         }
                     }
                 }
+
+                $nplAmount = $this->timesheetNplAmount($payrollWorker, $otEntry, (float) $salary);
 
                 // Get admin template deductions for this worker
                 $workerDeductionsList = $workerDeductions[$workerId] ?? collect();
@@ -1273,7 +1296,7 @@ class Report extends Component
         // Get all payroll submissions for the period (to check who submitted)
         $submissions = PayrollSubmission::where('month', $selectedMonth)
             ->where('year', $selectedYear)
-            ->with(['user', 'workers'])
+            ->with(['user', 'workers.transactions.nplDetails'])
             ->get()
             ->keyBy('contractor_clab_no');
 
@@ -1374,6 +1397,7 @@ class Report extends Component
                     'ot_rest_hours' => $otRest,
                     'ot_public_hours' => $otPublic,
                     'transactions' => $otEntry ? $otEntry->transactions : collect(),
+                    'npl_amount' => $this->timesheetNplAmount($payrollWorker, $otEntry, (float) $salary),
                     'remarks' => $remarks,
                 ];
 
